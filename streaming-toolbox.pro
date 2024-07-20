@@ -10,10 +10,16 @@ CONFIG += c++17
 
 SOURCES += \
     src/main.cpp \
-    src/mainwindow.cpp
+    src/mainwindow.cpp \
+    src/plugin.cpp \
+    src/pluginloader.cpp
 
 HEADERS += \
-    src/mainwindow.h
+    src/mainwindow.h \
+    src/plugin.h \
+    src/pluginlink.h \
+    src/pluginlist.h \
+    src/pluginloader.h
 
 FORMS += \
     src/mainwindow.ui
