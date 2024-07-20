@@ -24,6 +24,7 @@ private:
 public:
     Plugin(std::filesystem::path path);
     ~Plugin();
+    void activate();
     std::string getName();
     std::string getVersion();
     std::string getAuthor();

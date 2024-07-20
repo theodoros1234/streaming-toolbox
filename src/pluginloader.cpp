@@ -45,13 +45,26 @@ void PluginLoader::loadPlugins(std::string path) {
     }
 }
 
+void PluginLoader::activatePlugins() {
+    std::lock_guard guard(this->lock);
+    std::cout << "Activating plugins" << std::endl;
+    for (auto p=this->loaded_plugins.begin(); p<this->loaded_plugins.end(); p++) {
+        try {
+            (*p)->activate();
+        } catch (std::exception& e) {
+            std::cout << "Couldn't activate '" << (*p)->getName() << "', ignoring this plugin." << std::endl;
+            this->loaded_plugins.erase(p);
+        }
+    }
+}
+
 PluginLoader::~PluginLoader() {
     std::lock_guard guard(this->lock);
+    std::cout << "Deactivating plugins" << std::endl;
     // Deactivate and unload all plugins
     while (!this->loaded_plugins.empty()) {
         Plugin *p = loaded_plugins.back();
         loaded_plugins.pop_back();
-        std::cout << "Deactivating plugin '" << p->getName() << "'" << std::endl;
         delete p;
     }
 }

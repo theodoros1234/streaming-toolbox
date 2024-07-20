@@ -41,10 +41,13 @@ void MainWindow::selectPlugin(int index) {
     // Update UI to match this info
     ui->pluginSettingsLabel->setText(("Settings for " + info.name).c_str());
     // Show plugin's settings page, or a blank page if it doesn't have one
-    if (settings == nullptr)
+    if (settings == nullptr) {
         ui->pluginSettingsTab = &this->empty_plugin_settings_page;
-    else
+        this->empty_plugin_settings_page.setParent(ui->pluginView);
+    } else {
         ui->pluginSettingsTab = settings;
+        settings->setParent(ui->pluginView);
+    }
     // Update about page, skipping any empty fields
     QString about_text;
     if (!info.name.empty()) {

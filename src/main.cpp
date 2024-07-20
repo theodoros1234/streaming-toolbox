@@ -14,6 +14,7 @@ int main(int argc, char *argv[]) {
     char* home_path = getenv("HOME");
     if (home_path != NULL)
         plugin_loader.loadPlugins(std::string(home_path) + "/.local/share/streaming-toolbox/plugins");
+    plugin_loader.activatePlugins();
 
     // Start GUI
     w.getPlugins(&plugin_loader);

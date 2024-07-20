@@ -35,7 +35,13 @@ Plugin::Plugin(fs::path path) {
 }
 
 Plugin::~Plugin() {
+    this->functions.deactivate();
     dlclose(this->library);
+}
+
+void Plugin::activate() {
+    if (this->functions.activate())
+        throw std::runtime_error("Couldn't activate");
 }
 
 std::string Plugin::getName() {
