@@ -3,14 +3,13 @@
 
 #include <string>
 #include <QWidget>
-/*
+
 // Chat message
-struct chat_message {
-    int source_id;
+struct chat_message_t {
     bool is_reply;
-    std::string source_name, user, user_color, message, replying_to_user, replying_to_message;
+    std::string user, user_color, message, replying_to_user, replying_to_message, reply_id;
 };
-*/
+
 // Information about the plugin that will be sent to Stream Toolbox
 struct plugin_info_t {
     // User-visible info; will be visible to user in about page

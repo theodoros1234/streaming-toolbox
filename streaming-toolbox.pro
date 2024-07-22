@@ -9,12 +9,25 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    src/chatchannel.cpp \
+    src/chatprovider.cpp \
+    src/chatqueue.cpp \
+    src/chatsystem.cpp \
+    src/deregistrationqueue.cpp \
     src/main.cpp \
     src/mainwindow.cpp \
     src/plugin.cpp \
     src/pluginloader.cpp
 
 HEADERS += \
+    src/chatchannel.h \
+    src/chatinterface.h \
+    src/chatmessage.h \
+    src/chatprovider.h \
+    src/chatqueue.h \
+    src/chatsystem.h \
+    src/deregistrationinterface.h \
+    src/deregistrationqueue.h \
     src/mainwindow.h \
     src/plugin.h \
     src/pluginlink.h \
