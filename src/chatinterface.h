@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "chatprovider.h"
-//#include "chatsubscription.h"
+#include "chatsubscription.h"
 
 struct ChatInterfaceChannelInfo {
     int provider_count;
@@ -18,7 +18,7 @@ protected:
 public:
     virtual ChatInterfaceChannelInfo getChannelInfo() = 0;
     virtual ChatProvider* registerProvider(std::string id, std::string name) = 0;
-    //virtual ChatSubscription* subscribe(std::string provider_id, std::string channel_id) = 0;
+    virtual ChatSubscription* subscribe(std::string provider_id, std::string channel_id) = 0;
 };
 
 #endif // CHATINTERFACE_H

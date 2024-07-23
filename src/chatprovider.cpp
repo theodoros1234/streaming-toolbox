@@ -30,9 +30,12 @@ ChatChannel* ChatProvider::registerChannel(std::string id, std::string name) {
     std::lock_guard<std::mutex> guard(this->lock);
     std::cout << "Registering new channel: " << this->id << ":" << id << std::endl;
     ChatChannel* channel;
+    // Don't allow a blank id
+    if (id.size() == 0)
+        throw std::invalid_argument("Channel ID can't be blank");
     // Make sure the channel doesn't already exist
     if (this->channels.find(id) != this->channels.end())
-        return nullptr;
+        throw std::runtime_error("Channel already exists");
     // Reguster new channel and return it
     channel = new ChatChannel(this->id, this->name, id, name, this->queue, this);
     this->channels[id] = channel;

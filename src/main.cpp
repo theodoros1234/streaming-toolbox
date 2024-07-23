@@ -23,6 +23,23 @@ void test(ChatInterface *chat_if) {
     delete provider;
 }
 
+void test_sub(ChatInterface *chat_if) {
+    ChatSubscription *sub = chat_if->subscribe("test_prv", "test_ch");
+    bool listen = true;
+    while (listen) {
+        std::vector<ChatMessage> messages = sub->pull();
+        for (auto msg:messages) {
+            std::cout << "[Test Sub] " << msg.user_name << ": " << msg.message << std::endl;
+            if (msg.message == "unsub")
+                listen = false;
+        }
+    }
+    std::cout << "[Test Sub] Unsubbing" << std::endl;
+    sub->unsubscribe();
+    std::cout << "[Test Sub] Deleting sub" << std::endl;
+    delete sub;
+}
+
 int main(int argc, char *argv[]) {
     QApplication a(argc, argv);
     MainWindow w;
@@ -38,6 +55,7 @@ int main(int argc, char *argv[]) {
 
     // Chat test
     std::thread t(test, (ChatInterface*) &chat_system);
+    test_sub((ChatInterface*) &chat_system);
     t.join();
 
     // Start GUI

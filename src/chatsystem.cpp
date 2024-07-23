@@ -16,8 +16,62 @@ void ChatSystem::incomingHandler(ChatSystem *target) {
     do {
         // Wait for messages
         messages = target->incoming->pull();
-        for (auto &msg:messages)
-            std::cout << msg.user_name << ": " << msg.message << std::endl;
+        // Relay messages to subscribers
+        std::lock_guard<std::mutex> guard(target->subscription_lock);
+        for (auto &msg:messages) {
+            {
+                // Find wanted provider
+                auto provider = target->subscriptions.find(msg.provider_id);
+                if (provider != target->subscriptions.end()) {
+                    {
+                        // Find wanted channel
+                        auto channel = provider->second->find(msg.channel_id);
+                        if (channel != provider->second->end()) {
+                            for (auto sub:*channel->second) {
+                                // Push to all subscribers of this channel
+                                sub.second->push(msg);
+                            }
+                        }
+                    }
+                    {
+                        // Also push to channel-agnostic subscribers
+                        auto channel_all = provider->second->find("");
+                        if (channel_all != provider->second->end()) {
+                            for (auto sub:*channel_all->second) {
+                                // Push to all channel-agnostic subscribers of this provider
+                                sub.second->push(msg);
+                            }
+                        }
+                    }
+                }
+            }
+            {
+                // Also push to provider-agnostic subscribers
+                auto provider_all = target->subscriptions.find("");
+                if (provider_all != target->subscriptions.end()) {
+                    {
+                        // Find wanted channel
+                        auto channel = provider_all->second->find(msg.channel_id);
+                        if (channel != provider_all->second->end()) {
+                            for (auto sub:*channel->second) {
+                                // Push to all subscribers of this channel
+                                sub.second->push(msg);
+                            }
+                        }
+                    }
+                    {
+                        // Also push to channel-agnostic subscribers
+                        auto channel_all = provider_all->second->find("");
+                        if (channel_all != provider_all->second->end()) {
+                            for (auto sub:*channel_all->second) {
+                                // Push to all channel-agnostic subscribers of this provider
+                                sub.second->push(msg);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     } while (!messages.empty());
     // Allow the queue to be deleted when we finish
     target->incoming->allowDeletion();
@@ -52,9 +106,12 @@ ChatInterfaceChannelInfo ChatSystem::getChannelInfo() {
 ChatProvider* ChatSystem::registerProvider(std::string id, std::string name) {
     std::cout << "Registering new provider: " << id << std::endl;
     std::lock_guard<std::mutex> guard(this->provider_lock);
-    // Abort if provider id is already used
+    // Don't allow a blank id
+    if (id.size() == 0)
+        throw std::invalid_argument("Provider ID can't be blank");
+    // Make sure the provider doesn't already exist
     if (this->providers.find(id) != this->providers.end())
-        return nullptr;
+        throw std::runtime_error("Provider already exists");
     // Register new provider and return it
     ChatProvider* provider = new ChatProvider(id, name, this->incoming, this);
     this->providers[id] = provider;
@@ -71,4 +128,80 @@ void ChatSystem::deregister(ChatProvider* object) {
         std::cout << "Warning: Deregistering a provider that wasn't registered: " << id << std::endl;
     else
         this->providers.erase(itr);
+}
+
+ChatSubscription* ChatSystem::subscribe(std::string provider_id, std::string channel_id) {
+    std::cout << "Subscribing to " << provider_id << ":" << channel_id << std::endl;
+    // Keep track of newly created stuff, so we can backtrack on errors
+    sub_map_channels *new_provider = nullptr;
+    sub_map_sublist *new_channel = nullptr;
+    ChatQueue *queue = nullptr;
+    ChatSubscription *sub = nullptr;
+    try {
+        std::lock_guard<std::mutex> guard(this->subscription_lock);
+        // Make sure provider exists in subscription map
+        auto provider = this->subscriptions.emplace(provider_id, nullptr);
+        if (provider.second) {
+            // Create it if it doesn't
+            new_provider = new sub_map_channels;
+            provider.first->second = new_provider;
+        }
+        // Make sure channel exists in subscription map
+        auto channel = provider.first->second->emplace(channel_id, nullptr);
+        if (provider.second) {
+            // Create it if it doesn't
+            new_channel = new sub_map_sublist;
+            channel.first->second = new_channel;
+        }
+        // Create channel and its message queue
+        queue = new ChatQueue();
+        sub = new ChatSubscription(provider_id, channel_id, queue, this);
+        // Put the sub in the submap
+        channel.first->second->emplace(sub, queue);
+        return sub;
+    } catch (std::exception& e) {
+        // On exceptions, delete any new objects (to avoid memory leaks) and pass on the exception
+        std::cout << "Error: Couldn't subscribe to " << provider_id << ":" << channel_id << " due to exception: " << e.what();
+        if (sub)
+            delete sub;
+        if (queue)
+            delete queue;
+        if (new_channel)
+            delete new_channel;
+        if (new_provider)
+            delete new_provider;
+        throw e;
+    }
+}
+
+void ChatSystem::deregister(ChatSubscription* object) {
+    std::string provider_id = object->getProviderId();
+    std::string channel_id = object->getChannelId();
+    std::cout << "Unsubscribing from " << provider_id << ":" << channel_id << std::endl;
+    std::lock_guard<std::mutex> guard(this->subscription_lock);
+    // Make sure subscription actually exists
+    auto provider = this->subscriptions.find(provider_id);
+    if (provider != this->subscriptions.end()) {
+        auto channel = provider->second->find(channel_id);
+        if (channel != provider->second->end()) {
+            auto sub_instance = channel->second->find(object);
+            if (sub_instance != channel->second->end()) {
+                // Everything exists, and we can deregister the subscription properly and delete its queue
+                delete sub_instance->second;
+                channel->second->erase(sub_instance);
+                // Also delete any map branches that are now empty
+                if (channel->second->size() == 0) {
+                    delete channel->second;
+                    provider->second->erase(channel);
+                }
+                if (provider->second->size() == 0) {
+                    delete provider->second;
+                    this->subscriptions.erase(provider);
+                }
+                return;
+            }
+        }
+    }
+    // Something in the map structure doesn't exist
+    std::cout << "Warning: Deregistering subscription that isn't registered: " << provider_id << ":" << channel_id << "@" << object << std::endl;
 }
