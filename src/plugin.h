@@ -3,6 +3,7 @@
 
 #include "qwidget.h"
 #include "pluginlink.h"
+#include "chatinterface.h"
 #include <filesystem>
 
 struct plugin_basic_info_t {
@@ -12,16 +13,19 @@ struct plugin_basic_info_t {
 
 class Plugin {
 private:
+    static plugin_interface_t plugin_interface;
     void *library = nullptr;
     struct plugin_info_t *info;
     std::filesystem::path path;
     struct {
-        struct plugin_info_t* (*exchange_info)(plugin_callback_t*);
+        struct plugin_info_t* (*exchange_info)(plugin_interface_t*);
         int (*activate)();
         void (*deactivate)();
     } functions;
 
 public:
+    static ChatInterface *chat_if;
+    static void setInterfaces(ChatInterface *chat_if);
     Plugin(std::filesystem::path path);
     ~Plugin();
     void activate();

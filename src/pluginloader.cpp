@@ -10,8 +10,9 @@
 
 namespace fs = std::filesystem;
 
-PluginLoader::PluginLoader() {
+PluginLoader::PluginLoader(ChatInterface *chat_if) {
     loaded_plugins = std::vector<Plugin*>();
+    Plugin::setInterfaces(chat_if);
 }
 
 void PluginLoader::loadPlugins(std::string path) {

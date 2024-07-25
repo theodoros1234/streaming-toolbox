@@ -42,9 +42,9 @@ void test_sub(ChatInterface *chat_if) {
 
 int main(int argc, char *argv[]) {
     QApplication a(argc, argv);
-    MainWindow w;
-    PluginLoader plugin_loader;
     ChatSystem chat_system;
+    PluginLoader plugin_loader((ChatInterface*)&chat_system);
+    MainWindow w;
 
 
     // Load user plugins
@@ -54,9 +54,9 @@ int main(int argc, char *argv[]) {
     plugin_loader.activatePlugins();
 
     // Chat test
-    std::thread t(test, (ChatInterface*) &chat_system);
+    /*std::thread t(test, (ChatInterface*) &chat_system);
     test_sub((ChatInterface*) &chat_system);
-    t.join();
+    t.join();*/
 
     // Start GUI
     w.getPlugins(&plugin_loader);

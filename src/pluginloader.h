@@ -3,6 +3,7 @@
 
 #include "plugin.h"
 #include "pluginlist.h"
+#include "chatinterface.h"
 #include <string>
 #include <vector>
 #include <mutex>
@@ -13,7 +14,7 @@ private:
     std::vector<Plugin*> loaded_plugins;
 
 public:
-    PluginLoader();
+    PluginLoader(ChatInterface *chat_if);
     ~PluginLoader();
     void loadPlugins(std::string path);
     void activatePlugins();
