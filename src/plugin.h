@@ -4,6 +4,7 @@
 #include "qwidget.h"
 #include "pluginlink.h"
 #include "chatinterface.h"
+#include "logging.h"
 #include <filesystem>
 
 struct plugin_basic_info_t {
@@ -13,6 +14,7 @@ struct plugin_basic_info_t {
 
 class Plugin {
 private:
+    logging::LogSource log_if, log_pl;
     static plugin_interface_t plugin_interface;
     void *library = nullptr;
     struct plugin_info_t *info;

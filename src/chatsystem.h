@@ -4,9 +4,9 @@
 #include "chatinterface.h"
 #include "chatqueue.h"
 #include "chatprovider.h"
-#include "chatchannel.h"
 #include "chatsubscription.h"
 #include "deregistrationinterface.h"
+#include "logging.h"
 #include <map>
 #include <thread>
 
@@ -17,6 +17,7 @@ private:
     typedef std::map<std::string, sub_map_sublist*> sub_map_channels;
     typedef std::map<std::string, sub_map_channels*> sub_map_providers;
 
+    logging::LogSource log;
     ChatQueue *incoming;
     std::thread *incoming_thread;
     std::map<std::string, ChatProvider*> providers;

@@ -1,31 +1,34 @@
 #include "plugin.h"
 #include "pluginlink.h"
-#include <iostream>
 #include <filesystem>
 #include <stdexcept>
 #include <dlfcn.h>
 
 namespace fs = std::filesystem;
 ChatInterface* Plugin::chat_if;
+logging::LogSource global_log("Plugin Interface");
 
-Plugin::Plugin(fs::path path) {
+Plugin::Plugin(fs::path path) : log_if("Plugin Interface"), log_pl("Plugin (not initialized)") {
     this->path = path;
 
     // Load the plugin
-    std::cout << "Loading plugin at " << path << std::endl;
+    this->log_if.put(logging::INFO, {"Loading plugin at ", path});
     this->library = dlopen(path.c_str(), RTLD_NOW);
-    if (this->library == NULL)
+    if (this->library == NULL) {
         // Plugin wasn't loaded
         throw std::runtime_error(dlerror());
+    }
 
     // Get needed functions from plugin
     void *ptr_exchange_info = dlsym(this->library, "plugin_exchange_info");
     void *ptr_activate = dlsym(this->library, "plugin_activate");
     void *ptr_deactivate = dlsym(this->library, "plugin_deactivate");
 
-    if (!ptr_exchange_info || !ptr_activate || !ptr_deactivate)
+    if (!ptr_exchange_info || !ptr_activate || !ptr_deactivate) {
         // Some required functions are missing from plugin
+        this->log_if.put(logging::ERROR, {"Failed loading plugin at ", path, ": Missing functions"});
         throw std::runtime_error("Missing functions");
+    }
 
     this->functions.exchange_info = reinterpret_cast<plugin_info_t* (*)(plugin_interface_t*)>(ptr_exchange_info);
     this->functions.activate = reinterpret_cast<int (*)()>(ptr_activate);
@@ -33,16 +36,22 @@ Plugin::Plugin(fs::path path) {
 
     // Exchange basic info with plugin
     this->info = this->functions.exchange_info(&Plugin::plugin_interface);
+    this->log_if = logging::LogSource("Plugin Interface: " + this->info->name);
+    this->log_pl = logging::LogSource("Plugin: " + this->info->name);
+    this->log_if.put(logging::INFO, {"Loaded"});
 }
 
 Plugin::~Plugin() {
+    this->log_if.put(logging::INFO, {"Deactivating and unloading"});
     this->functions.deactivate();
     dlclose(this->library);
 }
 
 void Plugin::activate() {
-    if (this->functions.activate())
+    if (this->functions.activate()) {
+        this->log_if.put(logging::ERROR, {"Couldn't activate"});
         throw std::runtime_error("Couldn't activate");
+    }
 }
 
 std::string Plugin::getName() {
@@ -182,7 +191,7 @@ chat_provider_t chat_if_register_provider(std::string id, std::string name) {
     try {
         return {Plugin::chat_if->registerProvider(id, name)};
     } catch (std::exception &e) {
-        std::cout << "Error: Could not register chat provider due to exception: " << e.what() << std::endl;
+        global_log.put(logging::ERROR, {"Could not register chat provider due to exception: ", e.what()});
         return {nullptr};
     }
 }
@@ -191,7 +200,7 @@ chat_subscription_t chat_if_subscribe(std::string provider_id, std::string chann
     try {
         return {Plugin::chat_if->subscribe(provider_id, channel_id)};
     } catch (std::exception &e) {
-        std::cout << "Error: Could not subscribe to chat due to exception: " << e.what() << std::endl;
+        global_log.put(logging::ERROR, {"Could not subscribe to chat due to exception: ", e.what()});
         return {nullptr};
     }
 }
@@ -215,7 +224,7 @@ chat_channel_t chat_provider_register_channel(chat_provider_t *provider, std::st
     try {
         return {convert(provider)->registerChannel(id, name)};
     } catch (std::exception &e) {
-        std::cout << "Error: Could not register chat channel due to exception: " << e.what() << std::endl;
+        global_log.put(logging::ERROR, {"Could not register chat channel due to exception: ", e.what()});
         return {nullptr};
     }
 }

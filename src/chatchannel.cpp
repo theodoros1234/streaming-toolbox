@@ -3,8 +3,8 @@
 ChatChannel::ChatChannel(std::string provider_id, std::string provider_name,
                          std::string channel_id, std::string channel_name,
                          ChatQueue *queue, DeregistrationInterface<ChatChannel*> *deregister)
-    : provider_id(provider_id), provider_name(provider_name), channel_id(channel_id), channel_name(channel_name),
-    queue(queue), deregister(deregister) {}
+    : queue(queue), deregister(deregister), provider_id(provider_id),
+    provider_name(provider_name), channel_id(channel_id), channel_name(channel_name) {}
 
 std::string ChatChannel::getId() {
     return this->channel_id;

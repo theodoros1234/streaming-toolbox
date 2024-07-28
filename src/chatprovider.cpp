@@ -1,9 +1,7 @@
 #include "chatprovider.h"
 
-#include <iostream>
-
 ChatProvider::ChatProvider(std::string id, std::string name, ChatQueue *queue, DeregistrationInterface<ChatProvider*> *deregister)
-    : id(id), name(name), queue(queue), deregister_provider(deregister) {}
+    : log("Chat Provider: " + id), queue(queue), deregister_provider(deregister), id(id), name(name) {}
 
 std::string ChatProvider::getId() {
     return this->id;
@@ -28,14 +26,18 @@ ChatProviderInfo ChatProvider::getInfo() {
 
 ChatChannel* ChatProvider::registerChannel(std::string id, std::string name) {
     std::lock_guard<std::mutex> guard(this->lock);
-    std::cout << "Registering new channel: " << this->id << ":" << id << std::endl;
+    this->log.put(logging::INFO, {"Registering new channel: ", id});
     ChatChannel* channel;
     // Don't allow a blank id
-    if (id.size() == 0)
+    if (id.size() == 0) {
+        this->log.put(logging::ERROR, {"Channel registration: Channel ID can't be blank"});
         throw std::invalid_argument("Channel ID can't be blank");
+    }
     // Make sure the channel doesn't already exist
-    if (this->channels.find(id) != this->channels.end())
+    if (this->channels.find(id) != this->channels.end()) {
+        this->log.put(logging::ERROR, {"Channel registration: Channel '", id, "' already exists"});
         throw std::runtime_error("Channel already exists");
+    }
     // Reguster new channel and return it
     channel = new ChatChannel(this->id, this->name, id, name, this->queue, this);
     this->channels[id] = channel;
@@ -44,12 +46,12 @@ ChatChannel* ChatProvider::registerChannel(std::string id, std::string name) {
 
 void ChatProvider::deregister(ChatChannel *object) {
     std::string id = object->getId();
-    std::cout << "Deregistering channel: " << this->id << ":" << id << std::endl;
+    this->log.put(logging::INFO, {"Deregistering channel: ", id});
     std::lock_guard<std::mutex> guard(this->lock);
     auto itr = this->channels.find(id);
     // Make sure the channel was actually registered
     if (itr == this->channels.end())
-        std::cout << "Warning: Deregistering a channel that wasn't registered: " << object->getProviderId() << ":" << object->getId() << std::endl;
+        this->log.put(logging::WARNING, {"Deregistering a channel that wasn't registered: ", object->getProviderId(), ":", object->getId()});
     else
         this->channels.erase(itr);
 }
@@ -60,5 +62,5 @@ ChatProvider::~ChatProvider() {
     this->deregister_provider->deregister(this);
     // Check for channels that have been abandoned
     for (auto c_itr:this->channels)
-        std::cout << "Warning: Deleting provider '" << this->id << "' with channel '" << c_itr.second->getId() << "' still in it. This could lead to memory leaks or a crash!" << std::endl;
+        this->log.put(logging::WARNING, {"Deleting self with channel '", c_itr.second->getId(), "' still in it. This could lead to memory leaks or a crash!"});
 }

@@ -4,6 +4,7 @@
 #include "chatqueue.h"
 #include "deregistrationinterface.h"
 #include "chatchannel.h"
+#include "logging.h"
 #include <vector>
 #include <map>
 #include <mutex>
@@ -16,6 +17,7 @@ struct ChatProviderInfo {
 
 class ChatProvider : DeregistrationInterface<ChatChannel*> {
 private:
+    logging::LogSource log;
     ChatQueue *queue;
     DeregistrationInterface<ChatProvider*> *deregister_provider;
     std::string id, name;

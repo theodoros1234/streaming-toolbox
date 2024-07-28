@@ -3,14 +3,13 @@
 #include <vector>
 #include <string>
 #include <filesystem>
-#include <iostream>
 #include <dlfcn.h>
 #include <exception>
 #include "plugin.h"
 
 namespace fs = std::filesystem;
 
-PluginLoader::PluginLoader(ChatInterface *chat_if) {
+PluginLoader::PluginLoader(ChatInterface *chat_if) : log("Plugin Loader") {
     loaded_plugins = std::vector<Plugin*>();
     Plugin::setInterfaces(chat_if);
 }
@@ -20,7 +19,7 @@ void PluginLoader::loadPlugins(std::string path) {
     // Check that path exists
     const fs::path path_obj(path);
     if (fs::exists(path_obj)) {
-        std::cout << "Loading plugins from " << path_obj << std::endl;
+        log.put(logging::INFO, {"Loading plugins from ", path_obj});
         // Search path for libraries
         for (auto dir_entry : fs::directory_iterator(path_obj)) {
             if (dir_entry.is_directory()) {
@@ -35,11 +34,7 @@ void PluginLoader::loadPlugins(std::string path) {
                         // Try to load plugin
                         Plugin *plugin = new Plugin(plugin_exec_path);
                         loaded_plugins.push_back(plugin);
-                        // Print plugin info
-                        std::cout << "Loaded '" << plugin->getName() << "' v" << plugin->getVersion() << std::endl;
-                    } catch (std::exception& e) {
-                        std::cout << "Failed to load " << plugin_possible_name << ": " << e.what() << std::endl;
-                    }
+                    } catch (std::exception& e) {/* Skip on error */}
                 }
             }
         }
@@ -48,25 +43,27 @@ void PluginLoader::loadPlugins(std::string path) {
 
 void PluginLoader::activatePlugins() {
     std::lock_guard guard(this->lock);
-    std::cout << "Activating plugins" << std::endl;
+    this->log.put(logging::INFO, {"Activating plugins"});
     for (auto p=this->loaded_plugins.begin(); p<this->loaded_plugins.end(); p++) {
         try {
             (*p)->activate();
         } catch (std::exception& e) {
-            std::cout << "Couldn't activate '" << (*p)->getName() << "', ignoring this plugin." << std::endl;
+            // Unload plugin on error
+            delete *p;
             this->loaded_plugins.erase(p);
+            // Adjust iterator (so next plugin doesn't get skipped)
+            p--;
         }
     }
 }
 
 PluginLoader::~PluginLoader() {
     std::lock_guard guard(this->lock);
-    std::cout << "Deactivating plugins" << std::endl;
+    this->log.put(logging::INFO, {"Deactivating and unloading plugins"});
     // Deactivate and unload all plugins
     while (!this->loaded_plugins.empty()) {
-        Plugin *p = loaded_plugins.back();
+        delete loaded_plugins.back();
         loaded_plugins.pop_back();
-        delete p;
     }
 }
 

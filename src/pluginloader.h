@@ -4,12 +4,14 @@
 #include "plugin.h"
 #include "pluginlist.h"
 #include "chatinterface.h"
+#include "logging.h"
 #include <string>
 #include <vector>
 #include <mutex>
 
 class PluginLoader : public PluginList {
 private:
+    logging::LogSource log;
     std::mutex lock;
     std::vector<Plugin*> loaded_plugins;
 

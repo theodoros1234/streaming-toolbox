@@ -14,7 +14,6 @@ SOURCES += \
     src/chatqueue.cpp \
     src/chatsubscription.cpp \
     src/chatsystem.cpp \
-    src/deregistrationqueue.cpp \
     src/logging.cpp \
     src/main.cpp \
     src/mainwindow.cpp \
@@ -30,7 +29,6 @@ HEADERS += \
     src/chatsubscription.h \
     src/chatsystem.h \
     src/deregistrationinterface.h \
-    src/deregistrationqueue.h \
     src/logging.h \
     src/mainwindow.h \
     src/plugin.h \

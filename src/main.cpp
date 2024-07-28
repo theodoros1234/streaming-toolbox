@@ -20,21 +20,11 @@ int main(int argc, char *argv[]) {
     ChatSystem chat_system;
     PluginLoader plugin_loader((ChatInterface*)&chat_system);
     MainWindow w;
-    log.put(logging::DEBUG, {"Test debug message"});
-    log.put(logging::INFO, {"Test info message"});
-    log.put(logging::WARNING, {"Test warning message"});
-    log.put(logging::ERROR, {"Test error message"});
-    log.put(logging::CRITICAL, {"Test critical message"});
 
     // Load user plugins
     if (home_path != NULL)
         plugin_loader.loadPlugins(std::string(home_path) + "/.local/share/streaming-toolbox/plugins");
     plugin_loader.activatePlugins();
-
-    // Chat test
-    /*std::thread t(test, (ChatInterface*) &chat_system);
-    test_sub((ChatInterface*) &chat_system);
-    t.join();*/
 
     // Start GUI
     w.getPlugins(&plugin_loader);

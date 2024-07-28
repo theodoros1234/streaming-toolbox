@@ -94,6 +94,16 @@ LogMessagePart::LogMessagePart(double value) {
     type = DOUBLE;
 }
 
+LogMessagePart::LogMessagePart(void *value) {
+    v.ptr = value;
+    type = PTR;
+}
+
+LogMessagePart::LogMessagePart(std::filesystem::path value) {
+    v_path = value;
+    type = PATH;
+}
+
 void LogMessagePart::putIntoStream(std::ostream *stream) {
     switch (type) {
     case STR:
@@ -123,6 +133,12 @@ void LogMessagePart::putIntoStream(std::ostream *stream) {
     case DOUBLE:
         *stream << v.db;
         break;
+    case PTR:
+        *stream << v.ptr;
+        break;
+    case PATH:
+        *stream << v_path;
+        break;
     }
 }
 
@@ -150,10 +166,10 @@ void LogSource::put(level type, std::vector<LogMessagePart> message) {
             // Color and format message appropriately: print timestamp, log level and object name
             switch (output.formatting) {
             case NONE:
-                *output.stream << "[" << timestamp_buffer << "] [" << this->name << "] [" << level_name[type] << "] ";
+                *output.stream << "[" << timestamp_buffer << "] [" << level_name[type] << "] [" << this->name << "] ";
                 break;
             case ANSI_ESCAPE_CODES:
-                *output.stream << "\e[90m[\e[1m" << timestamp_buffer << "\e[0m\e[90m] [\e[0m\e[1m" << this->name << "\e[0m\e[90m] [\e[0m\e[1m" << level_ansi_color[type] << level_name[type] << "\e[0m\e[90m]\e[0m ";
+                *output.stream << "\e[90m[\e[1m" << timestamp_buffer << "\e[0m\e[90m] [\e[0m\e[1m" << level_ansi_color[type] << level_name[type] << "\e[0m\e[90m] [\e[0m\e[1m" << this->name << "\e[0m\e[90m]\e[0m ";
                 break;
             }
             // Print actual message

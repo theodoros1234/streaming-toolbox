@@ -2,6 +2,7 @@
 #define LOGGING_H
 
 #include <cstdint>
+#include <filesystem>
 #include <ostream>
 #include <vector>
 
@@ -17,6 +18,7 @@ void addOutputFile(std::string path, level log_level, endline_type endline_type,
 class LogMessagePart {
 private:
     std::string v_str;
+    std::filesystem::path v_path;
     union {
         const char *c_str;
         char c;
@@ -26,8 +28,9 @@ private:
         uint64_t uint64;
         float fl;
         double db;
+        void *ptr;
     } v;
-    enum {STR, C_STR, CHAR, INT32, UINT32, INT64, UINT64, FLOAT, DOUBLE} type;
+    enum {STR, C_STR, CHAR, INT32, UINT32, INT64, UINT64, FLOAT, DOUBLE, PTR, PATH} type;
 public:
     LogMessagePart(std::string value);
     LogMessagePart(const char *value);
@@ -38,6 +41,8 @@ public:
     LogMessagePart(uint64_t value);
     LogMessagePart(float value);
     LogMessagePart(double value);
+    LogMessagePart(void *value);
+    LogMessagePart(std::filesystem::path value);
     void putIntoStream(std::ostream *stream);
 };
 

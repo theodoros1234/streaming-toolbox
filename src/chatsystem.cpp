@@ -1,9 +1,8 @@
 #include "chatsystem.h"
 #include <thread>
 #include <vector>
-#include <iostream>
 
-ChatSystem::ChatSystem() {
+ChatSystem::ChatSystem() : log("Chat System") {
     // Start incoming message thread
     this->incoming = new ChatQueue();
     this->incoming->blockDeletion();
@@ -86,7 +85,7 @@ ChatSystem::~ChatSystem() {
     // Check for providers that have been abandoned
     std::lock_guard<std::mutex> guard(provider_lock);
     for (auto p_itr:this->providers)
-        std::cout << "Warning: Deleting chat system with provider " << p_itr.second->getId() << " still in it. This could lead to memory leaks or a crash!" << std::endl;
+        this->log.put(logging::WARNING, {"Deleting self with provider ", p_itr.second->getId(), " still in it. This could lead to memory leaks or a crash!"});
 }
 
 ChatInterfaceChannelInfo ChatSystem::getChannelInfo() {
@@ -104,14 +103,18 @@ ChatInterfaceChannelInfo ChatSystem::getChannelInfo() {
 }
 
 ChatProvider* ChatSystem::registerProvider(std::string id, std::string name) {
-    std::cout << "Registering new provider: " << id << std::endl;
+    this->log.put(logging::INFO, {"Registering new provider: ", id});
     std::lock_guard<std::mutex> guard(this->provider_lock);
     // Don't allow a blank id
-    if (id.size() == 0)
+    if (id.size() == 0) {
+        this->log.put(logging::ERROR, {"Provider registration: Provider ID can't be blank"});
         throw std::invalid_argument("Provider ID can't be blank");
+    }
     // Make sure the provider doesn't already exist
-    if (this->providers.find(id) != this->providers.end())
+    if (this->providers.find(id) != this->providers.end()) {
+        this->log.put(logging::ERROR, {"Provider registration: Provider already exists"});
         throw std::runtime_error("Provider already exists");
+    }
     // Register new provider and return it
     ChatProvider* provider = new ChatProvider(id, name, this->incoming, this);
     this->providers[id] = provider;
@@ -120,18 +123,21 @@ ChatProvider* ChatSystem::registerProvider(std::string id, std::string name) {
 
 void ChatSystem::deregister(ChatProvider* object) {
     std::string id = object->getId();
-    std::cout << "Deregistering provider: " << id << std::endl;
+    this->log.put(logging::INFO, {"Deregistering provider: ", id});
     std::lock_guard<std::mutex> guard(this->provider_lock);
     auto itr = this->providers.find(id);
     // Make sure the provider was actually registered
     if (itr == this->providers.end())
-        std::cout << "Warning: Deregistering a provider that wasn't registered: " << id << std::endl;
+        this->log.put(logging::WARNING, {"Deregistering a provider that wasn't registered: ", id});
     else
         this->providers.erase(itr);
 }
 
 ChatSubscription* ChatSystem::subscribe(std::string provider_id, std::string channel_id) {
-    std::cout << "Subscribing to " << provider_id << ":" << channel_id << std::endl;
+    // Friendlier message when subscribing to any provider or any channel (which are empty ID strings)
+    std::string provider_id_log = provider_id.empty() ? "(any)" : provider_id;
+    std::string channel_id_log = channel_id.empty() ? "(any)" : channel_id;
+    this->log.put(logging::INFO, {"Subscribing to ", provider_id_log, ":", channel_id_log});
     // Keep track of newly created stuff, so we can backtrack on errors
     sub_map_channels *new_provider = nullptr;
     sub_map_sublist *new_channel = nullptr;
@@ -161,7 +167,7 @@ ChatSubscription* ChatSystem::subscribe(std::string provider_id, std::string cha
         return sub;
     } catch (std::exception& e) {
         // On exceptions, delete any new objects (to avoid memory leaks) and pass on the exception
-        std::cout << "Error: Couldn't subscribe to " << provider_id << ":" << channel_id << " due to exception: " << e.what();
+        this->log.put(logging::ERROR, {"Couldn't subscribe to ", provider_id_log, ":", channel_id_log, " due to exception: ", e.what()});
         if (sub)
             delete sub;
         if (queue)
@@ -177,7 +183,10 @@ ChatSubscription* ChatSystem::subscribe(std::string provider_id, std::string cha
 void ChatSystem::deregister(ChatSubscription* object) {
     std::string provider_id = object->getProviderId();
     std::string channel_id = object->getChannelId();
-    std::cout << "Unsubscribing from " << provider_id << ":" << channel_id << std::endl;
+    // Friendlier message when subscribing to any provider or any channel (which are empty ID strings)
+    std::string provider_id_log = provider_id.empty() ? "(any)" : provider_id;
+    std::string channel_id_log = channel_id.empty() ? "(any)" : channel_id;
+    this->log.put(logging::INFO, {"Unsubscribing from ", provider_id_log, ":", channel_id_log});
     std::lock_guard<std::mutex> guard(this->subscription_lock);
     // Make sure subscription actually exists
     auto provider = this->subscriptions.find(provider_id);
@@ -203,5 +212,5 @@ void ChatSystem::deregister(ChatSubscription* object) {
         }
     }
     // Something in the map structure doesn't exist
-    std::cout << "Warning: Deregistering subscription that isn't registered: " << provider_id << ":" << channel_id << "@" << object << std::endl;
+    this->log.put(logging::WARNING, {"Deregistering subscription that isn't registered: ", provider_id_log, ":", channel_id_log, "@", object});
 }
