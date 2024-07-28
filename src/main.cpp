@@ -1,54 +1,32 @@
 #include "mainwindow.h"
 #include "pluginloader.h"
 #include "chatsystem.h"
+#include "logging.h"
 
 #include <QApplication>
 #include <cstdlib>
 #include <string>
 #include <iostream>
 
-void test(ChatInterface *chat_if) {
-    ChatProvider *provider = chat_if->registerProvider("test_prv", "Test Provider");
-    ChatChannel *channel = provider->registerChannel("test_ch", "Test Channel");
-    std::cout << "Enter message: ";
-    ChatMessage msg;
-    msg.user_name = "theodoros_1234";
-    while (std::cin >> msg.message) {
-        std::cout << "Sending message" << std::endl;
-        channel->push(msg);
-        std::cout << "Enter message: ";
-    }
-    std::cout << "Stopping message sending thread" << std::endl;
-    delete channel;
-    delete provider;
-}
-
-void test_sub(ChatInterface *chat_if) {
-    ChatSubscription *sub = chat_if->subscribe("test_prv", "test_ch");
-    bool listen = true;
-    while (listen) {
-        std::vector<ChatMessage> messages = sub->pull();
-        for (auto msg:messages) {
-            std::cout << "[Test Sub] " << msg.user_name << ": " << msg.message << std::endl;
-            if (msg.message == "unsub")
-                listen = false;
-        }
-    }
-    std::cout << "[Test Sub] Unsubbing" << std::endl;
-    sub->unsubscribe();
-    std::cout << "[Test Sub] Deleting sub" << std::endl;
-    delete sub;
-}
-
 int main(int argc, char *argv[]) {
+    char* home_path = getenv("HOME");
+    // Configure logging system
+    logging::addOutputStream(&std::clog, logging::INFO, logging::LINUX, true, logging::ANSI_ESCAPE_CODES);
+    if (home_path != NULL)
+        logging::addOutputFile(std::string(home_path) + "/.local/share/streaming-toolbox/streaming-toolbox.log", logging::INFO, logging::LINUX, false, logging::NONE);
+    logging::LogSource log("Main");
+    // Init other things
     QApplication a(argc, argv);
     ChatSystem chat_system;
     PluginLoader plugin_loader((ChatInterface*)&chat_system);
     MainWindow w;
-
+    log.put(logging::DEBUG, {"Test debug message"});
+    log.put(logging::INFO, {"Test info message"});
+    log.put(logging::WARNING, {"Test warning message"});
+    log.put(logging::ERROR, {"Test error message"});
+    log.put(logging::CRITICAL, {"Test critical message"});
 
     // Load user plugins
-    char* home_path = getenv("HOME");
     if (home_path != NULL)
         plugin_loader.loadPlugins(std::string(home_path) + "/.local/share/streaming-toolbox/plugins");
     plugin_loader.activatePlugins();
