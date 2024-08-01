@@ -93,6 +93,9 @@ void MainWindow::selectPlugin(int index) {
     if (!info.path.empty()) {
         about_text.append("<b>Path:</b> ");
         about_text.append(QString(info.path.c_str()).toHtmlEscaped());
+        about_text.append("<br><br>");
     }
+    about_text.append("<b>API Version:</b> ");
+    about_text.append(QString(std::to_string(info.api_version).c_str()));
     ui->pluginAboutText->setHtml(about_text);
 }

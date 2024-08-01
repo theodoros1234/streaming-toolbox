@@ -31,6 +31,7 @@ public:
     std::string getPluginLicense(unsigned int index);
     std::filesystem::path getPluginPath(unsigned int index);
     QWidget* getPluginSettingsPage(unsigned int index);
+    int getPluginAPIVersion(unsigned int index);
     plugin_basic_info_t getPluginInfo(unsigned int index);
 };
 

@@ -1,6 +1,8 @@
 #ifndef PLUGINLINK_H
 #define PLUGINLINK_H
 
+#define STRTB_PLUGIN_API_VERSION 1
+
 #include <string>
 #include <QWidget>
 

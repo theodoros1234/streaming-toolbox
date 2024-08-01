@@ -155,6 +155,14 @@ QWidget* PluginLoader::getPluginSettingsPage(unsigned int index) {
         return nullptr;
 }
 
+int PluginLoader::getPluginAPIVersion(unsigned int index) {
+    std::lock_guard guard(lock);
+    if (index < this->loaded_plugins.size())
+        return this->loaded_plugins[index]->getAPIVersion();
+    else
+        return 0;
+}
+
 plugin_basic_info_t PluginLoader::getPluginInfo(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())

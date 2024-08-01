@@ -19,6 +19,31 @@ Plugin::Plugin(fs::path path) : log_if("Plugin Interface"), log_pl("Plugin (not 
         throw std::runtime_error(dlerror());
     }
 
+    // Check API version
+    void *ptr_get_api_version = dlsym(this->library, "plugin_get_api_version");
+    void *ptr_send_api_version = dlsym(this->library, "plugin_send_api_version");
+    if (!ptr_get_api_version || !ptr_send_api_version) {
+        // API check functions are missing from the plugin
+        this->log_if.put(logging::ERROR, {"Failed loading plugin at ", path, ": Couldn't check API version due to missing functions"});
+        dlclose(this->library);
+        throw std::runtime_error("Couldn't check API version due to missing functions");
+    }
+    this->functions.get_api_version = reinterpret_cast<int (*)()>(ptr_get_api_version);
+    this->functions.send_api_version = reinterpret_cast<bool (*)(int)>(ptr_send_api_version);
+    this->api_version = this->functions.get_api_version();
+    if (this->api_version < STRTB_PLUGIN_API_VERSION) {
+        // Streaming Toolbox doesn't support plugin's API version
+        this->log_if.put(logging::ERROR, {"Failed loading plugin at ", path, ": Plugin's API version not supported by Streaming Toolbox"});
+        dlclose(this->library);
+        throw std::runtime_error("Plugin's API version not supported by Streaming Toolbox");
+    }
+    if (!this->functions.send_api_version(STRTB_PLUGIN_API_VERSION)) {
+        // Plugin doesn't support plugin's API version
+        this->log_if.put(logging::ERROR, {"Failed loading plugin at ", path, ": Streaming Toolbox's API version not supported by plugin"});
+        dlclose(this->library);
+        throw std::runtime_error("Streaming Toolbox's API version not supported by plugin");
+    }
+
     // Get needed functions from plugin
     void *ptr_exchange_info = dlsym(this->library, "plugin_exchange_info");
     void *ptr_activate = dlsym(this->library, "plugin_activate");
@@ -27,6 +52,7 @@ Plugin::Plugin(fs::path path) : log_if("Plugin Interface"), log_pl("Plugin (not 
     if (!ptr_exchange_info || !ptr_activate || !ptr_deactivate) {
         // Some required functions are missing from plugin
         this->log_if.put(logging::ERROR, {"Failed loading plugin at ", path, ": Missing functions"});
+        dlclose(this->library);
         throw std::runtime_error("Missing functions");
     }
 
@@ -94,6 +120,10 @@ QWidget* Plugin::getSettingsPage() {
     return this->info->settings_page;
 }
 
+int Plugin::getAPIVersion() {
+    return this->api_version;
+}
+
 plugin_basic_info_t Plugin::getInfo() {
     return plugin_basic_info_t {
         .name = info->name,
@@ -104,7 +134,8 @@ plugin_basic_info_t Plugin::getInfo() {
         .website = info->website,
         .copyright = info->copyright,
         .license = info->license,
-        .path = path
+        .path = path,
+        .api_version = api_version
     };
 }
 

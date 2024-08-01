@@ -10,6 +10,7 @@
 struct plugin_basic_info_t {
     std::string name, version, author, description, accent_color, website, copyright, license;
     std::filesystem::path path;
+    int api_version;
 };
 
 class Plugin {
@@ -18,9 +19,12 @@ private:
     static plugin_interface_t plugin_interface;
     void *library = nullptr;
     struct plugin_info_t *info;
+    int api_version;
     std::filesystem::path path;
     struct {
-        struct plugin_info_t* (*exchange_info)(plugin_interface_t*);
+        int (*get_api_version)();
+        bool (*send_api_version)(int version);
+        struct plugin_info_t* (*exchange_info)(plugin_interface_t* interface);
         int (*activate)();
         void (*deactivate)();
     } functions;
@@ -41,6 +45,7 @@ public:
     std::string getLicense();
     std::filesystem::path getPath();
     QWidget* getSettingsPage();
+    int getAPIVersion();
     plugin_basic_info_t getInfo();
 };
 
