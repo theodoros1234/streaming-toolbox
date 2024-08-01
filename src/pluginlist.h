@@ -20,6 +20,7 @@ public:
     virtual std::string getPluginLicense(unsigned int index) = 0;
     virtual std::filesystem::path getPluginPath(unsigned int index) = 0;
     virtual QWidget* getPluginSettingsPage(unsigned int index) = 0;
+    virtual int getPluginAPIVersion(unsigned int index) = 0;
     virtual plugin_basic_info_t getPluginInfo(unsigned int index) = 0;
 };
 
