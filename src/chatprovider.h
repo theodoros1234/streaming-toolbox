@@ -30,7 +30,7 @@ public:
     std::string getName();
     ChatProviderInfo getInfo();
     ChatChannel* registerChannel(std::string id, std::string name);
-    virtual void deregister(ChatChannel *object);
+    void deregister(ChatChannel *object);
 };
 
 #endif // CHATPROVIDER_H

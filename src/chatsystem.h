@@ -30,11 +30,11 @@ private:
 public:
     ChatSystem();
     ~ChatSystem();
-    virtual ChatInterfaceChannelInfo getChannelInfo();
-    virtual ChatProvider* registerProvider(std::string id, std::string name);
-    virtual ChatSubscription* subscribe(std::string provider_id, std::string channel_id);
-    virtual void deregister(ChatProvider* object);
-    virtual void deregister(ChatSubscription* object);
+    ChatInterfaceChannelInfo getChannelInfo();
+    ChatProvider* registerProvider(std::string id, std::string name);
+    ChatSubscription* subscribe(std::string provider_id, std::string channel_id);
+    void deregister(ChatProvider* object);
+    void deregister(ChatSubscription* object);
 };
 
 #endif // CHATSYSTEM_H
