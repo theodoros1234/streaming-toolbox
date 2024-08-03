@@ -103,7 +103,7 @@ ChatInterfaceChannelInfo ChatSystem::getChannelInfo() {
 }
 
 ChatProvider* ChatSystem::registerProvider(std::string id, std::string name) {
-    this->log.put(logging::INFO, {"Registering new provider: ", id});
+    this->log.put(logging::DEBUG, {"Registering new provider: ", id});
     std::lock_guard<std::mutex> guard(this->provider_lock);
     // Don't allow a blank id
     if (id.size() == 0) {
@@ -123,7 +123,7 @@ ChatProvider* ChatSystem::registerProvider(std::string id, std::string name) {
 
 void ChatSystem::deregister(ChatProvider* object) {
     std::string id = object->getId();
-    this->log.put(logging::INFO, {"Deregistering provider: ", id});
+    this->log.put(logging::DEBUG, {"Deregistering provider: ", id});
     std::lock_guard<std::mutex> guard(this->provider_lock);
     auto itr = this->providers.find(id);
     // Make sure the provider was actually registered
@@ -137,7 +137,7 @@ ChatSubscription* ChatSystem::subscribe(std::string provider_id, std::string cha
     // Friendlier message when subscribing to any provider or any channel (which are empty ID strings)
     std::string provider_id_log = provider_id.empty() ? "(any)" : provider_id;
     std::string channel_id_log = channel_id.empty() ? "(any)" : channel_id;
-    this->log.put(logging::INFO, {"Subscribing to ", provider_id_log, ":", channel_id_log});
+    this->log.put(logging::DEBUG, {"Subscribing to ", provider_id_log, ":", channel_id_log});
     // Keep track of newly created stuff, so we can backtrack on errors
     sub_map_channels *new_provider = nullptr;
     sub_map_sublist *new_channel = nullptr;
@@ -186,7 +186,7 @@ void ChatSystem::deregister(ChatSubscription* object) {
     // Friendlier message when subscribing to any provider or any channel (which are empty ID strings)
     std::string provider_id_log = provider_id.empty() ? "(any)" : provider_id;
     std::string channel_id_log = channel_id.empty() ? "(any)" : channel_id;
-    this->log.put(logging::INFO, {"Unsubscribing from ", provider_id_log, ":", channel_id_log});
+    this->log.put(logging::DEBUG, {"Unsubscribing from ", provider_id_log, ":", channel_id_log});
     std::lock_guard<std::mutex> guard(this->subscription_lock);
     // Make sure subscription actually exists
     auto provider = this->subscriptions.find(provider_id);

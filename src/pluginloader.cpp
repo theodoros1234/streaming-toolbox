@@ -41,25 +41,9 @@ void PluginLoader::loadPlugins(std::string path) {
     }
 }
 
-void PluginLoader::activatePlugins() {
-    std::lock_guard guard(this->lock);
-    this->log.put(logging::INFO, {"Activating plugins"});
-    for (auto p=this->loaded_plugins.begin(); p<this->loaded_plugins.end(); p++) {
-        try {
-            (*p)->activate();
-        } catch (std::exception& e) {
-            // Unload plugin on error
-            delete *p;
-            this->loaded_plugins.erase(p);
-            // Adjust iterator (so next plugin doesn't get skipped)
-            p--;
-        }
-    }
-}
-
 PluginLoader::~PluginLoader() {
     std::lock_guard guard(this->lock);
-    this->log.put(logging::INFO, {"Deactivating and unloading plugins"});
+    this->log.put(logging::DEBUG, {"Deactivating and unloading plugins"});
     // Deactivate and unload all plugins
     while (!this->loaded_plugins.empty()) {
         delete loaded_plugins.back();

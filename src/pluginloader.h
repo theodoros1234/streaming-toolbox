@@ -19,7 +19,6 @@ public:
     PluginLoader(ChatInterface *chat_if);
     ~PluginLoader();
     void loadPlugins(std::string path);
-    void activatePlugins();
     std::vector<plugin_basic_info_t> getPlugins();
     std::string getPluginName(unsigned int index);
     std::string getPluginVersion(unsigned int index);

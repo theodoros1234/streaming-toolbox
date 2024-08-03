@@ -26,7 +26,7 @@ ChatProviderInfo ChatProvider::getInfo() {
 
 ChatChannel* ChatProvider::registerChannel(std::string id, std::string name) {
     std::lock_guard<std::mutex> guard(this->lock);
-    this->log.put(logging::INFO, {"Registering new channel: ", id});
+    this->log.put(logging::DEBUG, {"Registering new channel: ", id});
     ChatChannel* channel;
     // Don't allow a blank id
     if (id.size() == 0) {
@@ -46,7 +46,7 @@ ChatChannel* ChatProvider::registerChannel(std::string id, std::string name) {
 
 void ChatProvider::deregister(ChatChannel *object) {
     std::string id = object->getId();
-    this->log.put(logging::INFO, {"Deregistering channel: ", id});
+    this->log.put(logging::DEBUG, {"Deregistering channel: ", id});
     std::lock_guard<std::mutex> guard(this->lock);
     auto itr = this->channels.find(id);
     // Make sure the channel was actually registered
