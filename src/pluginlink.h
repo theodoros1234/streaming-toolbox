@@ -1,7 +1,7 @@
 #ifndef PLUGINLINK_H
 #define PLUGINLINK_H
 
-#define STRTB_PLUGIN_API_VERSION 1
+#define STRTB_PLUGIN_API_VERSION 2
 
 #include <string>
 #include <QWidget>
@@ -18,6 +18,11 @@ struct plugin_info_t {
     // Stream Toolbox ===calls==> plugin
     // Callbacks for various events that the plugin can subscribe to
     //void (*chat_messages_received)(std::vector<struct chat_message> messages);
+};
+
+// Plugin instance
+struct plugin_instance_t {
+    void *ptr = nullptr;
 };
 
 // Chat message
@@ -67,29 +72,29 @@ struct chat_if_channel_info_t {
 struct plugin_interface_t {
     // Chat interface
     chat_if_channel_info_t (*chat_if_get_channel_info)();
-    chat_provider_t (*chat_if_register_provider)(std::string id, std::string name);
-    chat_subscription_t (*chat_if_subscribe)(std::string provider_id, std::string channel_id);
+    chat_provider_t (*chat_if_register_provider)(plugin_instance_t plugin, std::string id, std::string name);
+    chat_subscription_t (*chat_if_subscribe)(plugin_instance_t plugin, std::string provider_id, std::string channel_id);
     // Chat provider
-    std::string (*chat_provider_get_id)(chat_provider_t *provider);
-    std::string (*chat_provider_get_name)(chat_provider_t *provider);
-    chat_provider_info_t (*chat_provider_get_info)(chat_provider_t *provider);
-    chat_channel_t (*chat_provider_register_channel)(chat_provider_t *provider, std::string id, std::string name);
-    void (*chat_provider_delete)(chat_provider_t *provider);
+    std::string (*chat_provider_get_id)(chat_provider_t provider);
+    std::string (*chat_provider_get_name)(chat_provider_t provider);
+    chat_provider_info_t (*chat_provider_get_info)(chat_provider_t provider);
+    chat_channel_t (*chat_provider_register_channel)(plugin_instance_t plugin, chat_provider_t provider, std::string id, std::string name);
+    void (*chat_provider_delete)(plugin_instance_t plugin, chat_provider_t *provider);
     // Chat channel
-    std::string (*chat_channel_get_id)(chat_channel_t *channel);
-    std::string (*chat_channel_get_name)(chat_channel_t *channel);
-    std::string (*chat_channel_get_provider_id)(chat_channel_t *channel);
-    std::string (*chat_channel_get_provider_name)(chat_channel_t *channel);
-    chat_channel_info_t (*chat_channel_get_info)(chat_channel_t *channel);
-    void (*chat_channel_push_one)(chat_channel_t *channel, chat_message_t *message);
-    void (*chat_channel_push_many)(chat_channel_t *channel, std::vector<chat_message_t> *messages);
-    void (*chat_channel_delete)(chat_channel_t *channel);
+    std::string (*chat_channel_get_id)(chat_channel_t channel);
+    std::string (*chat_channel_get_name)(chat_channel_t channel);
+    std::string (*chat_channel_get_provider_id)(chat_channel_t channel);
+    std::string (*chat_channel_get_provider_name)(chat_channel_t channel);
+    chat_channel_info_t (*chat_channel_get_info)(chat_channel_t channel);
+    void (*chat_channel_push_one)(chat_channel_t channel, chat_message_t *message);
+    void (*chat_channel_push_many)(chat_channel_t channel, std::vector<chat_message_t> *messages);
+    void (*chat_channel_delete)(plugin_instance_t plugin, chat_channel_t *channel);
     // Chat subscription
-    std::string (*chat_subscription_get_provider_id)(chat_subscription_t *sub);
-    std::string (*chat_subscription_get_channel_id)(chat_subscription_t *sub);
-    std::vector<chat_message_t> (*chat_subscription_pull)(chat_subscription_t *sub);
-    void (*chat_subscription_unsubscribe)(chat_subscription_t *sub);
-    void (*chat_subscription_delete)(chat_subscription_t *sub);
+    std::string (*chat_subscription_get_provider_id)(chat_subscription_t sub);
+    std::string (*chat_subscription_get_channel_id)(chat_subscription_t sub);
+    std::vector<chat_message_t> (*chat_subscription_pull)(chat_subscription_t sub);
+    void (*chat_subscription_unsubscribe)(chat_subscription_t sub);
+    void (*chat_subscription_delete)(plugin_instance_t plugin, chat_subscription_t *sub);
 };
 
 #endif // PLUGINLINK_H

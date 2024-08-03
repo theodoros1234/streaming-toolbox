@@ -6,6 +6,7 @@
 #include "chatinterface.h"
 #include "logging.h"
 #include <filesystem>
+#include <set>
 
 struct plugin_basic_info_t {
     std::string name, version, author, description, accent_color, website, copyright, license;
@@ -18,16 +19,19 @@ private:
     logging::LogSource log_if, log_pl;
     static plugin_interface_t plugin_interface;
     void *library = nullptr;
-    struct plugin_info_t *info;
+    plugin_info_t info;
     int api_version;
     std::filesystem::path path;
     struct {
         int (*get_api_version)();
         bool (*send_api_version)(int version);
-        struct plugin_info_t* (*exchange_info)(plugin_interface_t* interface);
+        plugin_info_t (*exchange_info)(plugin_interface_t interface, plugin_instance_t instance);
         int (*activate)();
         void (*deactivate)();
     } functions;
+    std::set<ChatProvider*> chat_providers;
+    std::set<ChatChannel*> chat_channels;
+    std::set<ChatSubscription*> chat_subscriptions;
 
 public:
     static ChatInterface *chat_if;
