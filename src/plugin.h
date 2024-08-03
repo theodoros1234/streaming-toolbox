@@ -16,7 +16,6 @@ struct plugin_basic_info_t {
 
 class Plugin {
 private:
-    logging::LogSource log_if, log_pl;
     static plugin_interface_t plugin_interface;
     void *library = nullptr;
     plugin_info_t info;
@@ -34,6 +33,7 @@ private:
     std::set<ChatSubscription*> chat_subscriptions;
 
 public:
+    logging::LogSource log_if, log_pl;
     static ChatInterface *chat_if;
     static void setInterfaces(ChatInterface *chat_if);
     Plugin(std::filesystem::path path);

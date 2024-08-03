@@ -145,13 +145,13 @@ void Plugin::setInterfaces(ChatInterface *chat_if) {
 
 /********** Plugin interface functions **********/
 
-/***** Chat *****/
-
-// Coversions bewteen internal types and plugin types
-
 Plugin* convert(plugin_instance_t in) {
     return reinterpret_cast<Plugin*>(in.ptr);
 }
+
+/***** Chat *****/
+
+// Coversions bewteen internal types and plugin types
 
 ChatMessage convert(chat_message_t &in) {
     return {
@@ -215,7 +215,7 @@ ChatSubscription* convert(chat_subscription_t in) {
     return reinterpret_cast<ChatSubscription*>(in.ptr);
 }
 
-// Chat Interface
+// Chat interface
 
 chat_if_channel_info_t chat_if_get_channel_info() {
     ChatInterfaceChannelInfo info = Plugin::chat_if->getChannelInfo();
@@ -248,7 +248,7 @@ chat_subscription_t chat_if_subscribe(plugin_instance_t plugin, std::string prov
     }
 }
 
-// Chat Provider
+// Chat provider
 
 std::string chat_provider_get_id(chat_provider_t provider) {
     if (!provider.ptr) {
@@ -303,6 +303,8 @@ void chat_provider_delete(plugin_instance_t plugin, chat_provider_t *provider) {
     delete convert(*provider);
     provider->ptr = nullptr;
 }
+
+// Chat channel
 
 std::string chat_channel_get_id(chat_channel_t channel) {
     if (!channel.ptr) {
@@ -378,6 +380,8 @@ void chat_channel_delete(plugin_instance_t plugin, chat_channel_t *channel) {
     channel->ptr = nullptr;
 }
 
+// Chat subscription
+
 std::string chat_subscription_get_provider_id(chat_subscription_t sub) {
     if (!sub.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Subscription pointer is null"});
@@ -427,6 +431,21 @@ void chat_subscription_delete(plugin_instance_t plugin, chat_subscription_t *sub
     sub->ptr = nullptr;
 }
 
+/***** Logging *****/
+
+void log_put(plugin_instance_t plugin, log_level level, std::vector<std::string> message) {
+    if (!plugin.ptr) {
+        global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
+    }
+    std::vector<logging::LogMessagePart> message_cnv;
+    message_cnv.reserve(message.size());
+    for (auto &msg:message)
+        message_cnv.emplace_back(msg);
+    convert(plugin)->log_pl.put((logging::level)level, message_cnv);
+}
+
+/*******************/
+
 plugin_interface_t Plugin::plugin_interface = {
     // Chat Interface
     .chat_if_get_channel_info = chat_if_get_channel_info,
@@ -452,5 +471,7 @@ plugin_interface_t Plugin::plugin_interface = {
     .chat_subscription_get_channel_id = chat_subscription_get_channel_id,
     .chat_subscription_pull = chat_subscription_pull,
     .chat_subscription_unsubscribe = chat_subscription_unsubscribe,
-    .chat_subscription_delete = chat_subscription_delete
+    .chat_subscription_delete = chat_subscription_delete,
+    // Logging
+    .log_put = log_put
 };

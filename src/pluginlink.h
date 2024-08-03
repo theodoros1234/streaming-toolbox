@@ -1,9 +1,11 @@
 #ifndef PLUGINLINK_H
 #define PLUGINLINK_H
 
-#define STRTB_PLUGIN_API_VERSION 2
+#define STRTB_PLUGIN_API_VERSION 3
 
 #include <string>
+#include <vector>
+#include <map>
 #include <QWidget>
 
 // Information about the plugin that will be sent to Stream Toolbox
@@ -67,6 +69,9 @@ struct chat_if_channel_info_t {
     std::vector<chat_provider_info_t> providers;
 };
 
+// Log message level
+enum log_level {LOG_DEBUG, LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_CRITICAL};
+
 // Functions of Stream Toolbox that the plugin can call for various reasons
 // Plugin ===calls==> Stream Toolbox
 struct plugin_interface_t {
@@ -95,6 +100,8 @@ struct plugin_interface_t {
     std::vector<chat_message_t> (*chat_subscription_pull)(chat_subscription_t sub);
     void (*chat_subscription_unsubscribe)(chat_subscription_t sub);
     void (*chat_subscription_delete)(plugin_instance_t plugin, chat_subscription_t *sub);
+    // Logging
+    void (*log_put)(plugin_instance_t plugin, log_level level, std::vector<std::string> message);
 };
 
 #endif // PLUGINLINK_H
