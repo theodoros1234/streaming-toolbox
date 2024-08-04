@@ -25,7 +25,7 @@ private:
     std::mutex lock;
 public:
     ChatProvider(std::string id, std::string name, ChatQueue *queue, DeregistrationInterface<ChatProvider*> *deregister_provider);
-    virtual ~ChatProvider();
+    ~ChatProvider();
     std::string getId();
     std::string getName();
     ChatProviderInfo getInfo();

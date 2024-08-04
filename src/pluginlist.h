@@ -8,6 +8,8 @@
 #include "plugin.h"
 
 class PluginList {
+protected:
+    virtual ~PluginList() = default;
 public:
     virtual std::vector<plugin_basic_info_t> getPlugins() = 0;
     virtual std::string getPluginName(unsigned int index) = 0;
