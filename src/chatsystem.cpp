@@ -154,7 +154,7 @@ ChatSubscription* ChatSystem::subscribe(std::string provider_id, std::string cha
         }
         // Make sure channel exists in subscription map
         auto channel = provider.first->second->emplace(channel_id, nullptr);
-        if (provider.second) {
+        if (channel.second) {
             // Create it if it doesn't
             new_channel = new sub_map_sublist;
             channel.first->second = new_channel;
