@@ -7,6 +7,7 @@
 #include "logging.h"
 #include <filesystem>
 #include <set>
+#include <mutex>
 
 struct plugin_basic_info_t {
     std::string name, version, author, description, accent_color, website, copyright, license;
@@ -28,13 +29,17 @@ private:
         int (*activate)();
         void (*deactivate)();
     } functions;
+
+public:
+    // The following have to be public, in order to be accessible by the plugin interface, but they MUST NOT be used by anything else.
+    logging::LogSource log_if, log_pl;
     std::set<ChatProvider*> chat_providers;
     std::set<ChatChannel*> chat_channels;
     std::set<ChatSubscription*> chat_subscriptions;
-
-public:
-    logging::LogSource log_if, log_pl;
+    std::mutex chat_providers_lock, chat_channels_lock, chat_subscriptions_lock;
     static ChatInterface *chat_if;
+
+    // Regular public members
     static void setInterfaces(ChatInterface *chat_if);
     Plugin(std::filesystem::path path);
     ~Plugin();

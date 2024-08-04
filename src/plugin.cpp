@@ -69,9 +69,38 @@ Plugin::Plugin(fs::path path) : log_if("Plugin Interface"), log_pl("Plugin (not 
 }
 
 Plugin::~Plugin() {
+    // Unload plugin
     this->log_if.put(logging::DEBUG, {"Deactivating and unloading"});
     this->functions.deactivate();
     dlclose(this->library);
+
+    // Clean up any objects abandoned by the plugin
+    this->log_if.put(logging::DEBUG, {"Checking for abandoned objects"});
+    // Chat subscriptions
+    {
+        std::lock_guard<std::mutex> guard(this->chat_subscriptions_lock);
+        for (auto sub:this->chat_subscriptions) {
+            this->log_if.put(logging::WARNING, {"Cleaning up abandoned chat subscription '", sub->getProviderId(), ":", sub->getChannelId(), "'"});
+            sub->unsubscribe();
+            delete sub;
+        }
+    }
+    // Chat channels
+    {
+        std::lock_guard<std::mutex> guard(this->chat_channels_lock);
+        for (auto channel:this->chat_channels) {
+            this->log_if.put(logging::WARNING, {"Cleaning up abandoned chat channel '", channel->getProviderId(), ":", channel->getId(), "'"});
+            delete channel;
+        }
+    }
+    // Chat providers
+    {
+        std::lock_guard<std::mutex> guard(this->chat_providers_lock);
+        for (auto provider:this->chat_providers) {
+            this->log_if.put(logging::WARNING, {"Cleaning up abandoned chat provider '", provider->getId(), "'"});
+            delete provider;
+        }
+    }
 }
 
 void Plugin::activate() {
@@ -228,10 +257,16 @@ chat_provider_t chat_if_register_provider(plugin_instance_t plugin, std::string 
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
         return {};
     }
+    Plugin *pl = convert(plugin);
     try {
-        return {Plugin::chat_if->registerProvider(id, name)};
+        ChatProvider *provider = Plugin::chat_if->registerProvider(id, name);
+        {
+            std::lock_guard<std::mutex> guard(pl->chat_providers_lock);
+            pl->chat_providers.insert(provider);
+        }
+        return {provider};
     } catch (std::exception &e) {
-        global_log.put(logging::ERROR, {"Exception in ", __func__, ": ", e.what()});
+        pl->log_if.put(logging::ERROR, {"Exception in ", __func__, ": ", e.what()});
         return {nullptr};
     }
 }
@@ -241,10 +276,16 @@ chat_subscription_t chat_if_subscribe(plugin_instance_t plugin, std::string prov
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
         return {};
     }
+    Plugin *pl = convert(plugin);
     try {
-        return {Plugin::chat_if->subscribe(provider_id, channel_id)};
+        ChatSubscription *subscription = Plugin::chat_if->subscribe(provider_id, channel_id);
+        {
+            std::lock_guard<std::mutex> guard(pl->chat_subscriptions_lock);
+            pl->chat_subscriptions.insert(subscription);
+        }
+        return {subscription};
     } catch (std::exception &e) {
-        global_log.put(logging::ERROR, {"Could not subscribe to chat due to exception: ", e.what()});
+        pl->log_if.put(logging::ERROR, {"Exception in ", __func__, ": ", e.what()});
         return {nullptr};
     }
 }
@@ -281,14 +322,20 @@ chat_channel_t chat_provider_register_channel(plugin_instance_t plugin, chat_pro
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
         return {};
     }
+    Plugin *pl = convert(plugin);
     if (!provider.ptr) {
-        global_log.put(logging::ERROR, {__func__, ": Provider pointer is null"});
+        pl->log_if.put(logging::ERROR, {__func__, ": Provider pointer is null"});
         return {};
     }
     try {
-        return {convert(provider)->registerChannel(id, name)};
+        ChatChannel *channel = convert(provider)->registerChannel(id, name);
+        {
+            std::lock_guard<std::mutex> guard(pl->chat_channels_lock);
+            pl->chat_channels.insert(channel);
+        }
+        return {channel};
     } catch (std::exception &e) {
-        global_log.put(logging::ERROR, {"Could not register chat channel due to exception: ", e.what()});
+        pl->log_if.put(logging::ERROR, {"Exception in ", __func__, ": ", e.what()});
         return {nullptr};
     }
 }
@@ -296,12 +343,27 @@ chat_channel_t chat_provider_register_channel(plugin_instance_t plugin, chat_pro
 void chat_provider_delete(plugin_instance_t plugin, chat_provider_t *provider) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
-    }
-    if (!provider->ptr) {
-        global_log.put(logging::ERROR, {__func__, ": Provider pointer is null"});
         return;
     }
-    delete convert(*provider);
+    Plugin *pl = convert(plugin);
+    if (!provider) {
+        pl->log_if.put(logging::ERROR, {__func__, ": Provider argument is null"});
+        return;
+    }
+    if (!provider->ptr) {
+        pl->log_if.put(logging::ERROR, {__func__, ": Provider pointer is null"});
+        return;
+    }
+    ChatProvider *provider_c = convert(*provider);
+    int result;
+    {
+        std::lock_guard<std::mutex> guard(pl->chat_providers_lock);
+        result = pl->chat_providers.erase(provider_c);
+    }
+    if (result)
+        delete provider_c;
+    else
+        pl->log_if.put(logging::ERROR, {__func__, ": Tried to delete provider not owned by this plugin"});
     provider->ptr = nullptr;
 }
 
@@ -353,6 +415,10 @@ void chat_channel_push_one(chat_channel_t channel, chat_message_t *message) {
         global_log.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return;
     }
+    if (!message) {
+        global_log.put(logging::ERROR, {__func__, ": Message argument is null"});
+        return;
+    }
     ChatMessage msg_converted = convert(*message);
     convert(channel)->push(msg_converted);
 }
@@ -362,9 +428,13 @@ void chat_channel_push_many(chat_channel_t channel, std::vector<chat_message_t> 
         global_log.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return;
     }
+    if (!messages) {
+        global_log.put(logging::ERROR, {__func__, ": Messages argument is null"});
+        return;
+    }
     std::vector<ChatMessage> messages_converted;
     messages_converted.reserve(messages->size());
-    for (auto msg:*messages)
+    for (auto &msg:*messages)
         messages_converted.push_back(convert(msg));
     convert(channel)->push(messages_converted);
 }
@@ -372,12 +442,27 @@ void chat_channel_push_many(chat_channel_t channel, std::vector<chat_message_t> 
 void chat_channel_delete(plugin_instance_t plugin, chat_channel_t *channel) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
-    }
-    if (!channel->ptr) {
-        global_log.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return;
     }
-    delete convert(*channel);
+    Plugin *pl = convert(plugin);
+    if (!channel) {
+        pl->log_if.put(logging::ERROR, {__func__, ": Channel argument is null"});
+        return;
+    }
+    if (!channel->ptr) {
+        pl->log_if.put(logging::ERROR, {__func__, ": Channel pointer is null"});
+        return;
+    }
+    ChatChannel *channel_c = convert(*channel);
+    int result;
+    {
+        std::lock_guard<std::mutex> guard(pl->chat_channels_lock);
+        result = pl->chat_channels.erase(channel_c);
+    }
+    if (result)
+        delete convert(*channel);
+    else
+        pl->log_if.put(logging::ERROR, {__func__, ": Tried to delete channel not owned by this plugin"});
     channel->ptr = nullptr;
 }
 
@@ -423,12 +508,27 @@ void chat_subscription_unsubscribe(chat_subscription_t sub) {
 void chat_subscription_delete(plugin_instance_t plugin, chat_subscription_t *sub) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
-    }
-    if (!sub->ptr) {
-        global_log.put(logging::ERROR, {__func__, ": Subscription pointer is null"});
         return;
     }
-    delete convert(*sub);
+    Plugin *pl = convert(plugin);
+    if (!sub) {
+        pl->log_if.put(logging::ERROR, {__func__, ": Subscription argument is null"});
+        return;
+    }
+    if (!sub->ptr) {
+        pl->log_if.put(logging::ERROR, {__func__, ": Subscription pointer is null"});
+        return;
+    }
+    ChatSubscription *sub_c = convert(*sub);
+    int result;
+    {
+        std::lock_guard<std::mutex> guard(pl->chat_subscriptions_lock);
+        result = pl->chat_subscriptions.erase(sub_c);
+    }
+    if (result)
+        delete convert(*sub);
+    else
+        pl->log_if.put(logging::ERROR, {__func__, ": Tried to delete subscription not owned by this plugin"});
     sub->ptr = nullptr;
 }
 
@@ -437,6 +537,7 @@ void chat_subscription_delete(plugin_instance_t plugin, chat_subscription_t *sub
 void log_put(plugin_instance_t plugin, log_level level, std::vector<std::string> message) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
+        return;
     }
     std::vector<logging::LogMessagePart> message_cnv;
     message_cnv.reserve(message.size());
