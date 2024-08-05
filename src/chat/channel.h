@@ -1,9 +1,9 @@
-#ifndef CHATCHANNEL_H
-#define CHATCHANNEL_H
+#ifndef CHAT_CHANNEL_H
+#define CHAT_CHANNEL_H
 
-#include "chatqueue.h"
-#include "deregistrationinterface.h"
-#include "logging.h"
+#include "queue.h"
+#include "../deregistrationinterface.h"
+#include "../logging/logging.h"
 #include <vector>
 #include <mutex>
 
@@ -35,4 +35,4 @@ public:
     void push(std::vector<ChatMessage> &messages);
 };
 
-#endif // CHATCHANNEL_H
+#endif // CHAT_CHANNEL_H

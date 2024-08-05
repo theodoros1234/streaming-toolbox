@@ -1,10 +1,10 @@
-#ifndef PLUGINLOADER_H
-#define PLUGINLOADER_H
+#ifndef PLUGINS_LOADER_H
+#define PLUGINS_LOADER_H
 
 #include "plugin.h"
-#include "pluginlist.h"
-#include "chatinterface.h"
-#include "logging.h"
+#include "list.h"
+#include "../chat/interface.h"
+#include "../logging/logging.h"
 #include <string>
 #include <vector>
 #include <mutex>
@@ -35,4 +35,4 @@ public:
 };
 
 
-#endif // PLUGINLOADER_H
+#endif // PLUGINS_LOADER_H

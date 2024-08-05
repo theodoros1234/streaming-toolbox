@@ -1,4 +1,4 @@
-#include "chatchannel.h"
+#include "channel.h"
 
 ChatChannel::ChatChannel(std::string provider_id, std::string provider_name,
                          std::string channel_id, std::string channel_name,

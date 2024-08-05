@@ -1,11 +1,11 @@
-#ifndef CHATQUEUE_H
-#define CHATQUEUE_H
+#ifndef CHAT_QUEUE_H
+#define CHAT_QUEUE_H
 
 #include <vector>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
-#include "chatmessage.h"
+#include "message.h"
 
 class ChatQueue {
 private:
@@ -29,4 +29,4 @@ public:
     void allowDeletion();
 };
 
-#endif // CHATQUEUE_H
+#endif // CHAT_QUEUE_H

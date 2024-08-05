@@ -1,7 +1,7 @@
-#include "mainwindow.h"
-#include "pluginloader.h"
-#include "chatsystem.h"
-#include "logging.h"
+#include "gui/mainwindow.h"
+#include "plugins/loader.h"
+#include "chat/system.h"
+#include "logging/logging.h"
 
 #include <QApplication>
 #include <cstdlib>

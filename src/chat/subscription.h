@@ -1,12 +1,12 @@
-#ifndef CHATSUBSCRIPTION_H
-#define CHATSUBSCRIPTION_H
+#ifndef CHAT_SUBSCRIPTION_H
+#define CHAT_SUBSCRIPTION_H
 
 #include <string>
 #include <vector>
 #include <mutex>
-#include "chatqueue.h"
-#include "deregistrationinterface.h"
-#include "logging.h"
+#include "queue.h"
+#include "../deregistrationinterface.h"
+#include "../logging/logging.h"
 
 class ChatSubscription {
 private:
@@ -29,4 +29,4 @@ public:
     void unsubscribe();
 };
 
-#endif // CHATSUBSCRIPTION_H
+#endif // CHAT_SUBSCRIPTION_H

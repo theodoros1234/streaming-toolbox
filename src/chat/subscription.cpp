@@ -1,4 +1,4 @@
-#include "chatsubscription.h"
+#include "subscription.h"
 
 ChatSubscription::ChatSubscription(std::string provider_id, std::string channel_id,
                                    ChatQueue *queue, DeregistrationInterface<ChatSubscription*> *deregister)

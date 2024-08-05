@@ -1,4 +1,4 @@
-#include "chatqueue.h"
+#include "queue.h"
 
 ChatQueue::ChatQueue() {}
 

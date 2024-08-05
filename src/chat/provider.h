@@ -1,10 +1,10 @@
-#ifndef CHATPROVIDER_H
-#define CHATPROVIDER_H
+#ifndef CHAT_PROVIDER_H
+#define CHAT_PROVIDER_H
 
-#include "chatqueue.h"
-#include "deregistrationinterface.h"
-#include "chatchannel.h"
-#include "logging.h"
+#include "queue.h"
+#include "../deregistrationinterface.h"
+#include "channel.h"
+#include "../logging/logging.h"
 #include <vector>
 #include <map>
 #include <mutex>
@@ -36,4 +36,4 @@ public:
     void deregister(ChatChannel *object);
 };
 
-#endif // CHATPROVIDER_H
+#endif // CHAT_PROVIDER_H

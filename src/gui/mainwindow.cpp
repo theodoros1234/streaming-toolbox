@@ -1,7 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "../plugins/list.h"
 
-#include "pluginlist.h"
 #include <QObject>
 #include <QListWidget>
 #include <QString>

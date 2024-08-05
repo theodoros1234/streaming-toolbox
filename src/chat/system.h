@@ -1,12 +1,12 @@
-#ifndef CHATSYSTEM_H
-#define CHATSYSTEM_H
+#ifndef CHAT_SYSTEM_H
+#define CHAT_SYSTEM_H
 
-#include "chatinterface.h"
-#include "chatqueue.h"
-#include "chatprovider.h"
-#include "chatsubscription.h"
-#include "deregistrationinterface.h"
-#include "logging.h"
+#include "interface.h"
+#include "queue.h"
+#include "provider.h"
+#include "subscription.h"
+#include "../deregistrationinterface.h"
+#include "../logging/logging.h"
 #include <map>
 #include <thread>
 
@@ -37,4 +37,4 @@ public:
     void deregister(ChatSubscription* object);
 };
 
-#endif // CHATSYSTEM_H
+#endif // CHAT_SYSTEM_H

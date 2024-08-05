@@ -1,8 +1,7 @@
-#ifndef CHATMESSAGE_H
-#define CHATMESSAGE_H
+#ifndef CHAT_MESSAGE_H
+#define CHAT_MESSAGE_H
 
 #include <string>
-#include <vector>
 #include <map>
 
 struct ChatMessage {
@@ -12,4 +11,4 @@ struct ChatMessage {
     std::map<std::string, std::string> more_metadata;
 };
 
-#endif // CHATMESSAGE_H
+#endif // CHAT_MESSAGE_H

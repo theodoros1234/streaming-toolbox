@@ -1,10 +1,10 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#ifndef GUI_MAINWINDOW_H
+#define GUI_MAINWINDOW_H
 
 #include <QMainWindow>
 #include <QStringListModel>
 #include <QWidget>
-#include "pluginlist.h"
+#include "../plugins/list.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -29,4 +29,4 @@ private:
 public slots:
     void selectPlugin(int index);
 };
-#endif // MAINWINDOW_H
+#endif // GUI_MAINWINDOW_H

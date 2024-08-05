@@ -1,5 +1,5 @@
-#ifndef LOGGING_H
-#define LOGGING_H
+#ifndef LOGGING_LOGGING_H
+#define LOGGING_LOGGING_H
 
 #include <cstdint>
 #include <filesystem>
@@ -56,4 +56,4 @@ public:
 
 }
 
-#endif // LOGGING_H
+#endif // LOGGING_LOGGING_H

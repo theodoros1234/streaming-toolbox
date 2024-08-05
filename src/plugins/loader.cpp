@@ -1,11 +1,11 @@
-#include "pluginloader.h"
+#include "loader.h"
+#include "plugin.h"
 
 #include <vector>
 #include <string>
 #include <filesystem>
 #include <dlfcn.h>
 #include <exception>
-#include "plugin.h"
 
 namespace fs = std::filesystem;
 

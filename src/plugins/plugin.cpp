@@ -1,5 +1,6 @@
 #include "plugin.h"
-#include "pluginlink.h"
+#include "link.h"
+
 #include <filesystem>
 #include <stdexcept>
 #include <dlfcn.h>

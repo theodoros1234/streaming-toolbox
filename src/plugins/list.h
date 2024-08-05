@@ -1,5 +1,5 @@
-#ifndef PLUGINLIST_H
-#define PLUGINLIST_H
+#ifndef PLUGINS_LIST_H
+#define PLUGINS_LIST_H
 
 #include <QWidget>
 #include <vector>
@@ -26,4 +26,4 @@ public:
     virtual plugin_basic_info_t getPluginInfo(unsigned int index) = 0;
 };
 
-#endif // PLUGINLIST_H
+#endif // PLUGINS_LIST_H

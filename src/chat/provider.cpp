@@ -1,4 +1,4 @@
-#include "chatprovider.h"
+#include "provider.h"
 
 ChatProvider::ChatProvider(std::string id, std::string name, ChatQueue *queue, DeregistrationInterface<ChatProvider*> *deregister)
     : log("Chat Provider: " + id), queue(queue), deregister_provider(deregister), id(id), name(name) {}

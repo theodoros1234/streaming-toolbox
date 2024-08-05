@@ -1,10 +1,10 @@
-#ifndef CHATINTERFACE_H
-#define CHATINTERFACE_H
+#ifndef CHAT_INTERFACE_H
+#define CHAT_INTERFACE_H
 
 #include <string>
 #include <vector>
-#include "chatprovider.h"
-#include "chatsubscription.h"
+#include "provider.h"
+#include "subscription.h"
 
 struct ChatInterfaceChannelInfo {
     int provider_count;
@@ -21,4 +21,4 @@ public:
     virtual ChatSubscription* subscribe(std::string provider_id, std::string channel_id) = 0;
 };
 
-#endif // CHATINTERFACE_H
+#endif // CHAT_INTERFACE_H

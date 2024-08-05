@@ -1,13 +1,13 @@
-#ifndef PLUGIN_H
-#define PLUGIN_H
+#ifndef PLUGINS_PLUGIN_H
+#define PLUGINS_PLUGIN_H
 
-#include "qwidget.h"
-#include "pluginlink.h"
-#include "chatinterface.h"
-#include "logging.h"
+#include "link.h"
+#include "../chat/interface.h"
+#include "../logging/logging.h"
 #include <filesystem>
 #include <set>
 #include <mutex>
+#include <QWidget>
 
 struct plugin_basic_info_t {
     std::string name, version, author, description, accent_color, website, copyright, license;
@@ -58,4 +58,4 @@ public:
     plugin_basic_info_t getInfo();
 };
 
-#endif // PLUGIN_H
+#endif // PLUGINS_PLUGIN_H

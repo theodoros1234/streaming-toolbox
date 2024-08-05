@@ -1,5 +1,5 @@
-#ifndef PLUGINLINK_H
-#define PLUGINLINK_H
+#ifndef PLUGINS_LINK_H
+#define PLUGINS_LINK_H
 
 #define STRTB_PLUGIN_API_VERSION 3
 
@@ -104,4 +104,4 @@ struct plugin_interface_t {
     void (*log_put)(plugin_instance_t plugin, log_level level, std::vector<std::string> message);
 };
 
-#endif // PLUGINLINK_H
+#endif // PLUGINS_LINK_H

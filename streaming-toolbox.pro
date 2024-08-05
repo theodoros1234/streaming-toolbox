@@ -9,35 +9,35 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
-    src/chatchannel.cpp \
-    src/chatprovider.cpp \
-    src/chatqueue.cpp \
-    src/chatsubscription.cpp \
-    src/chatsystem.cpp \
-    src/logging.cpp \
+    src/chat/channel.cpp \
+    src/logging/logging.cpp \
     src/main.cpp \
-    src/mainwindow.cpp \
-    src/plugin.cpp \
-    src/pluginloader.cpp
+    src/gui/mainwindow.cpp \
+    src/plugins/plugin.cpp \
+    src/plugins/loader.cpp \
+    src/chat/provider.cpp \
+    src/chat/queue.cpp \
+    src/chat/subscription.cpp \
+    src/chat/system.cpp
 
 HEADERS += \
-    src/chatchannel.h \
-    src/chatinterface.h \
-    src/chatmessage.h \
-    src/chatprovider.h \
-    src/chatqueue.h \
-    src/chatsubscription.h \
-    src/chatsystem.h \
+    src/chat/channel.h \
+    src/chat/interface.h \
+    src/chat/message.h \
+    src/chat/provider.h \
+    src/chat/queue.h \
+    src/chat/subscription.h \
+    src/chat/system.h \
     src/deregistrationinterface.h \
-    src/logging.h \
-    src/mainwindow.h \
-    src/plugin.h \
-    src/pluginlink.h \
-    src/pluginlist.h \
-    src/pluginloader.h
+    src/logging/logging.h \
+    src/gui/mainwindow.h \
+    src/plugins/plugin.h \
+    src/plugins/link.h \
+    src/plugins/list.h \
+    src/plugins/loader.h
 
 FORMS += \
-    src/mainwindow.ui
+    src/gui/mainwindow.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
