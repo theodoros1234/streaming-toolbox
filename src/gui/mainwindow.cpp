@@ -12,6 +12,8 @@
 
 #define PLUGIN_ACCENT_COLOR_SIZE 16
 
+using namespace gui;
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow) {
@@ -23,7 +25,7 @@ MainWindow::~MainWindow() {
     delete ui;
 }
 
-void MainWindow::getPlugins(PluginList *plugin_list) {
+void MainWindow::getPlugins(plugins::PluginList *plugin_list) {
     // Get list of plugins
     this->plugin_list = plugin_list;
     // Place all plugins into the UI's list
@@ -36,7 +38,7 @@ void MainWindow::getPlugins(PluginList *plugin_list) {
 
 void MainWindow::selectPlugin(int index) {
     // Get info about that plugin and its settings page
-    plugin_basic_info_t info = this->plugin_list->getPluginInfo(index);
+    plugins::plugin_basic_info_t info = this->plugin_list->getPluginInfo(index);
     QWidget *settings = this->plugin_list->getPluginSettingsPage(index);
     // Update UI to match this info
     ui->pluginSettingsLabel->setText(("Settings for " + info.name).c_str());

@@ -7,6 +7,8 @@
 #include <condition_variable>
 #include "message.h"
 
+namespace chat {
+
 class ChatQueue {
 private:
     std::queue<ChatMessage> queue;
@@ -28,5 +30,7 @@ public:
     void blockDeletion();
     void allowDeletion();
 };
+
+}
 
 #endif // CHAT_QUEUE_H

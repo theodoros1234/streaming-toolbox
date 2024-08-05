@@ -9,6 +9,8 @@
 #include <vector>
 #include <mutex>
 
+namespace plugins {
+
 class PluginLoader : public PluginList {
 private:
     logging::LogSource log;
@@ -16,7 +18,7 @@ private:
     std::vector<Plugin*> loaded_plugins;
 
 public:
-    PluginLoader(ChatInterface *chat_if);
+    PluginLoader(chat::ChatInterface *chat_if);
     ~PluginLoader();
     void loadPlugins(std::string path);
     std::vector<plugin_basic_info_t> getPlugins();
@@ -34,5 +36,6 @@ public:
     plugin_basic_info_t getPluginInfo(unsigned int index);
 };
 
+}
 
 #endif // PLUGINS_LOADER_H

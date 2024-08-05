@@ -8,6 +8,8 @@
 #include <map>
 #include <QWidget>
 
+namespace strtb_plugin {
+
 // Information about the plugin that will be sent to Stream Toolbox
 struct plugin_info_t {
     // User-visible info; will be visible to user in about page
@@ -103,5 +105,7 @@ struct plugin_interface_t {
     // Logging
     void (*log_put)(plugin_instance_t plugin, log_level level, std::vector<std::string> message);
 };
+
+}
 
 #endif // PLUGINS_LINK_H

@@ -2,6 +2,8 @@
 #include <thread>
 #include <vector>
 
+using namespace chat;
+
 ChatSystem::ChatSystem() : log("Chat System") {
     // Start incoming message thread
     this->incoming = new ChatQueue();

@@ -1,5 +1,7 @@
 #include "queue.h"
 
+using namespace chat;
+
 ChatQueue::ChatQueue() {}
 
 ChatQueue::~ChatQueue() {

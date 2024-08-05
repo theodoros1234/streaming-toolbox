@@ -2,12 +2,14 @@
 #define CHAT_PROVIDER_H
 
 #include "queue.h"
-#include "../deregistrationinterface.h"
+#include "../common/deregistrationinterface.h"
 #include "channel.h"
 #include "../logging/logging.h"
 #include <vector>
 #include <map>
 #include <mutex>
+
+namespace chat {
 
 struct ChatProviderInfo {
     std::string id, name;
@@ -15,7 +17,7 @@ struct ChatProviderInfo {
     std::vector<ChatChannelInfo> channels;
 };
 
-class ChatProvider : DeregistrationInterface<ChatChannel*> {
+class ChatProvider : common::DeregistrationInterface<ChatChannel*> {
 private:
     logging::LogSource log;
     ChatQueue *queue;
@@ -35,5 +37,7 @@ public:
     ChatChannel* registerChannel(std::string id, std::string name);
     void deregister(ChatChannel *object);
 };
+
+}
 
 #endif // CHAT_PROVIDER_H

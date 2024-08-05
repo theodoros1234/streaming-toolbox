@@ -1,7 +1,9 @@
 #include "subscription.h"
 
+using namespace chat;
+
 ChatSubscription::ChatSubscription(std::string provider_id, std::string channel_id,
-                                   ChatQueue *queue, DeregistrationInterface<ChatSubscription*> *deregister)
+                                   ChatQueue *queue, common::DeregistrationInterface<ChatSubscription*> *deregister)
     : log("Chat Subscription: " + provider_id + ":" + channel_id), provider_id(provider_id), channel_id(channel_id), queue(queue), deregister(deregister) {}
 
 std::string ChatSubscription::getProviderId() {

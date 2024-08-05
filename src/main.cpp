@@ -17,9 +17,9 @@ int main(int argc, char *argv[]) {
     logging::LogSource log("Main");
     // Init other things
     QApplication a(argc, argv);
-    ChatSystem chat_system;
-    PluginLoader plugin_loader((ChatInterface*)&chat_system);
-    MainWindow w;
+    chat::ChatSystem chat_system;
+    plugins::PluginLoader plugin_loader((chat::ChatInterface*)&chat_system);
+    gui::MainWindow w;
 
     // Load user plugins
     if (home_path != NULL)

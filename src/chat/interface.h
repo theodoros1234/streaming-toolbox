@@ -6,6 +6,8 @@
 #include "provider.h"
 #include "subscription.h"
 
+namespace chat {
+
 struct ChatInterfaceChannelInfo {
     int provider_count;
     int channel_count;
@@ -20,5 +22,7 @@ public:
     virtual ChatProvider* registerProvider(std::string id, std::string name) = 0;
     virtual ChatSubscription* subscribe(std::string provider_id, std::string channel_id) = 0;
 };
+
+}
 
 #endif // CHAT_INTERFACE_H

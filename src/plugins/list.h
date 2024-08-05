@@ -7,6 +7,8 @@
 #include <filesystem>
 #include "plugin.h"
 
+namespace plugins {
+
 class PluginList {
 protected:
     virtual ~PluginList() = default;
@@ -25,5 +27,7 @@ public:
     virtual int getPluginAPIVersion(unsigned int index) = 0;
     virtual plugin_basic_info_t getPluginInfo(unsigned int index) = 0;
 };
+
+}
 
 #endif // PLUGINS_LIST_H

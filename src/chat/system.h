@@ -5,12 +5,14 @@
 #include "queue.h"
 #include "provider.h"
 #include "subscription.h"
-#include "../deregistrationinterface.h"
+#include "../common/deregistrationinterface.h"
 #include "../logging/logging.h"
 #include <map>
 #include <thread>
 
-class ChatSystem : ChatInterface, DeregistrationInterface<ChatProvider*>, DeregistrationInterface<ChatSubscription*> {
+namespace chat {
+
+class ChatSystem : ChatInterface, common::DeregistrationInterface<ChatProvider*>, common::DeregistrationInterface<ChatSubscription*> {
 private:
     // Types for subscription map
     typedef std::map<ChatSubscription*, ChatQueue*> sub_map_sublist;
@@ -36,5 +38,7 @@ public:
     void deregister(ChatProvider* object);
     void deregister(ChatSubscription* object);
 };
+
+}
 
 #endif // CHAT_SYSTEM_H

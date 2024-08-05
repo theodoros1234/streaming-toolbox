@@ -8,8 +8,9 @@
 #include <exception>
 
 namespace fs = std::filesystem;
+using namespace plugins;
 
-PluginLoader::PluginLoader(ChatInterface *chat_if) : log("Plugin Loader") {
+PluginLoader::PluginLoader(chat::ChatInterface *chat_if) : log("Plugin Loader") {
     loaded_plugins = std::vector<Plugin*>();
     Plugin::setInterfaces(chat_if);
 }

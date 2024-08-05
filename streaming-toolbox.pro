@@ -28,7 +28,7 @@ HEADERS += \
     src/chat/queue.h \
     src/chat/subscription.h \
     src/chat/system.h \
-    src/deregistrationinterface.h \
+    src/common/deregistrationinterface.h \
     src/logging/logging.h \
     src/gui/mainwindow.h \
     src/plugins/plugin.h \
