@@ -82,10 +82,30 @@ ChatSystem::~ChatSystem() {
     this->incoming_thread->join();
     delete this->incoming_thread;
 
-    // Check for providers that have been abandoned
-    std::lock_guard<std::mutex> guard(provider_lock);
-    for (auto p_itr:this->providers)
-        this->log.put(logging::WARNING, {"Deleting self with provider ", p_itr.second->getId(), " still in it. This could lead to memory leaks or a crash!"});
+    // Check for providers that will be abandoned
+    {
+        std::lock_guard<std::mutex> guard(this->provider_lock);
+        for (auto p_itr : this->providers)
+            // Notify them that they're being abandoned, to prevent a future crash
+            p_itr.second->abandon();
+    }
+
+    // Delete subscription maps and check for subscriptions that will be abandoned
+    {
+        std::lock_guard<std::mutex> guard(this->subscription_lock);
+        for (auto sub_pr_itr : this->subscriptions) {
+            for (auto sub_ch_itr : *sub_pr_itr.second) {
+                for (auto sub_in_itr : *sub_ch_itr.second) {
+                    // Notify subscription that it's being abandoned
+                    sub_in_itr.first->abandon();
+                    // Delete its queue
+                    delete sub_in_itr.second;
+                }
+                delete sub_ch_itr.second;
+            }
+            delete sub_pr_itr.second;
+        }
+    }
 }
 
 ChatInterfaceChannelInfo ChatSystem::getChannelInfo() {

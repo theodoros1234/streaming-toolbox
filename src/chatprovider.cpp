@@ -28,6 +28,11 @@ ChatChannel* ChatProvider::registerChannel(std::string id, std::string name) {
     std::lock_guard<std::mutex> guard(this->lock);
     this->log.put(logging::DEBUG, {"Registering new channel: ", id});
     ChatChannel* channel;
+    // Stop if this provider was abandoned by parent
+    if (!this->queue) {
+        this->log.put(logging::ERROR, {"Can't register new channel when abandoned by parent"});
+        throw std::runtime_error("Can't register new channel when abandoned by parent");
+    }
     // Don't allow a blank id
     if (id.size() == 0) {
         this->log.put(logging::ERROR, {"Channel registration: Channel ID can't be blank"});
@@ -56,11 +61,25 @@ void ChatProvider::deregister(ChatChannel *object) {
         this->channels.erase(itr);
 }
 
+void ChatProvider::abandon() {
+    this->log.put(logging::WARNING, {"Abandoned by parent"});
+    std::lock_guard<std::mutex> guard(this->lock);
+    // Our parent has abandoned us, so we and our children shouldn't do any more actions that communicate with the parent to avoid crashes
+    this->queue = nullptr;
+    this->deregister_provider = nullptr;
+    for (auto c_itr:this->channels)
+        c_itr.second->abandon();
+}
+
 ChatProvider::~ChatProvider() {
     std::lock_guard<std::mutex> guard(this->lock);
+    // Skip if abandoned by parent
+    if (!this->deregister_provider)
+        return;
     // Deregister from chat interface
     this->deregister_provider->deregister(this);
-    // Check for channels that have been abandoned
+    // Check for channels that will be abandoned
     for (auto c_itr:this->channels)
-        this->log.put(logging::WARNING, {"Deleting self with channel '", c_itr.second->getId(), "' still in it. This could lead to memory leaks or a crash!"});
+        // Notify them that they're being abandoned, to prevent a future crash
+        c_itr.second->abandon();
 }

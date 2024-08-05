@@ -23,6 +23,9 @@ private:
     std::string id, name;
     std::map<std::string, ChatChannel*> channels;
     std::mutex lock;
+protected:
+    friend class ChatSystem;
+    void abandon();
 public:
     ChatProvider(std::string id, std::string name, ChatQueue *queue, DeregistrationInterface<ChatProvider*> *deregister_provider);
     ~ChatProvider();
