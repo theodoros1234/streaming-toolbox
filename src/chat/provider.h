@@ -2,7 +2,7 @@
 #define CHAT_PROVIDER_H
 
 #include "queue.h"
-#include "../common/deregistrationinterface.h"
+#include "../common/deregistration_interface.h"
 #include "channel.h"
 #include "../logging/logging.h"
 #include <vector>
@@ -11,31 +11,31 @@
 
 namespace chat {
 
-struct ChatProviderInfo {
+struct provider_info {
     std::string id, name;
     int channel_count;
-    std::vector<ChatChannelInfo> channels;
+    std::vector<channel_info> channels;
 };
 
-class ChatProvider : common::DeregistrationInterface<ChatChannel*> {
+class provider : common::deregistration_interface<channel*> {
 private:
-    logging::LogSource log;
-    ChatQueue *queue;
-    DeregistrationInterface<ChatProvider*> *deregister_provider;
+    logging::source log;
+    class queue *queue;
+    deregistration_interface<provider*> *deregister_provider;
     std::string id, name;
-    std::map<std::string, ChatChannel*> channels;
+    std::map<std::string, channel*> channels;
     std::mutex lock;
 protected:
-    friend class ChatSystem;
+    friend class system;
     void abandon();
 public:
-    ChatProvider(std::string id, std::string name, ChatQueue *queue, DeregistrationInterface<ChatProvider*> *deregister_provider);
-    ~ChatProvider();
-    std::string getId();
-    std::string getName();
-    ChatProviderInfo getInfo();
-    ChatChannel* registerChannel(std::string id, std::string name);
-    void deregister(ChatChannel *object);
+    provider(std::string id, std::string name, class queue *queue, deregistration_interface<provider*> *deregister_provider);
+    ~provider();
+    std::string get_id();
+    std::string get_name();
+    provider_info get_info();
+    channel* register_channel(std::string id, std::string name);
+    void deregister(channel *object);
 };
 
 }

@@ -9,9 +9,9 @@ namespace fs = std::filesystem;
 
 namespace plugins {
 
-chat::ChatInterface* Plugin::chat_if;
+chat::interface* plugin::chat_if;
 
-Plugin::Plugin(fs::path path) : log_if("Plugin Interface"), log_pl("Plugin (not initialized)") {
+plugin::plugin(fs::path path) : log_if("Plugin Interface"), log_pl("Plugin (not initialized)") {
     this->path = path;
 
     // Load the plugin
@@ -59,19 +59,19 @@ Plugin::Plugin(fs::path path) : log_if("Plugin Interface"), log_pl("Plugin (not 
         throw std::runtime_error("Missing functions");
     }
 
-    this->functions.exchange_info = reinterpret_cast<strtb_plugin::plugin_info_t (*)(strtb_plugin::plugin_interface_t, strtb_plugin::plugin_instance_t)>(ptr_exchange_info);
+    this->functions.exchange_info = reinterpret_cast<strtb_plugin::plugin_info (*)(strtb_plugin::plugin_interface, strtb_plugin::plugin_instance)>(ptr_exchange_info);
     this->functions.activate = reinterpret_cast<int (*)()>(ptr_activate);
     this->functions.deactivate = reinterpret_cast<void (*)()>(ptr_deactivate);
 
     // Exchange basic info with plugin
-    this->info = this->functions.exchange_info(Plugin::plugin_interface, {.ptr=this});
-    this->log_if = logging::LogSource("Plugin Interface: " + this->info.name);
-    this->log_pl = logging::LogSource("Plugin: " + this->info.name);
+    this->info = this->functions.exchange_info(plugin::plugin_interface, {.ptr=this});
+    this->log_if = logging::source("Plugin Interface: " + this->info.name);
+    this->log_pl = logging::source("Plugin: " + this->info.name);
     this->log_if.put(logging::DEBUG, {"Loaded"});
     this->activate();
 }
 
-Plugin::~Plugin() {
+plugin::~plugin() {
     // Unload plugin
     this->log_if.put(logging::DEBUG, {"Deactivating and unloading"});
     this->functions.deactivate();
@@ -82,8 +82,8 @@ Plugin::~Plugin() {
     // Chat subscriptions
     {
         std::lock_guard<std::mutex> guard(this->chat_subscriptions_lock);
-        for (auto sub:this->chat_subscriptions) {
-            this->log_if.put(logging::WARNING, {"Cleaning up abandoned chat subscription '", sub->getProviderId(), ":", sub->getChannelId(), "'"});
+        for (auto sub : this->chat_subscriptions) {
+            this->log_if.put(logging::WARNING, {"Cleaning up abandoned chat subscription '", sub->get_provider_id(), ":", sub->get_channel_id(), "'"});
             sub->unsubscribe();
             delete sub;
         }
@@ -91,74 +91,74 @@ Plugin::~Plugin() {
     // Chat channels
     {
         std::lock_guard<std::mutex> guard(this->chat_channels_lock);
-        for (auto channel:this->chat_channels) {
-            this->log_if.put(logging::WARNING, {"Cleaning up abandoned chat channel '", channel->getProviderId(), ":", channel->getId(), "'"});
+        for (auto channel : this->chat_channels) {
+            this->log_if.put(logging::WARNING, {"Cleaning up abandoned chat channel '", channel->get_provider_id(), ":", channel->get_id(), "'"});
             delete channel;
         }
     }
     // Chat providers
     {
         std::lock_guard<std::mutex> guard(this->chat_providers_lock);
-        for (auto provider:this->chat_providers) {
-            this->log_if.put(logging::WARNING, {"Cleaning up abandoned chat provider '", provider->getId(), "'"});
+        for (auto provider : this->chat_providers) {
+            this->log_if.put(logging::WARNING, {"Cleaning up abandoned chat provider '", provider->get_id(), "'"});
             delete provider;
         }
     }
 }
 
-void Plugin::activate() {
+void plugin::activate() {
     if (this->functions.activate()) {
         this->log_if.put(logging::ERROR, {"Couldn't activate"});
         throw std::runtime_error("Couldn't activate");
     }
 }
 
-std::string Plugin::getName() {
+std::string plugin::get_name() {
     return this->info.name;
 }
 
-std::string Plugin::getVersion() {
+std::string plugin::get_version() {
     return this->info.version;
 }
 
-std::string Plugin::getAuthor() {
+std::string plugin::get_author() {
     return this->info.author;
 }
 
-std::string Plugin::getDescription() {
+std::string plugin::get_description() {
     return this->info.description;
 }
 
-std::string Plugin::getAccentColor() {
+std::string plugin::get_accent_color() {
     return this->info.accent_color;
 }
 
-std::string Plugin::getWebsite() {
+std::string plugin::get_website() {
     return this->info.website;
 }
 
-std::string Plugin::getCopyright() {
+std::string plugin::get_copyright() {
     return this->info.copyright;
 }
 
-std::string Plugin::getLicense() {
+std::string plugin::get_license() {
     return this->info.license;
 }
 
-std::filesystem::path Plugin::getPath() {
+std::filesystem::path plugin::get_path() {
     return this->path;
 }
 
-QWidget* Plugin::getSettingsPage() {
+QWidget* plugin::get_settings_page() {
     return this->info.settings_page;
 }
 
-int Plugin::getAPIVersion() {
+int plugin::get_api_version() {
     return this->api_version;
 }
 
-plugin_basic_info_t Plugin::getInfo() {
-    return plugin_basic_info_t {
+plugin_basic_info plugin::get_info() {
+    return plugin_basic_info {
         .name = info.name,
         .version = info.version,
         .author = info.author,
@@ -172,26 +172,26 @@ plugin_basic_info_t Plugin::getInfo() {
     };
 }
 
-void Plugin::setInterfaces(chat::ChatInterface *chat_if) {
-    Plugin::chat_if = chat_if;
+void plugin::set_interfaces(chat::interface *chat_if) {
+    plugin::chat_if = chat_if;
 }
 
 }
 
-/********** Plugin interface functions **********/
+/********** plugin interface functions **********/
 namespace strtb_plugin {
 
-logging::LogSource global_log("Plugin Interface");
+logging::source global_log("Plugin Interface");
 
-plugins::Plugin* convert(plugin_instance_t in) {
-    return reinterpret_cast<plugins::Plugin*>(in.ptr);
+plugins::plugin* convert(plugin_instance in) {
+    return reinterpret_cast<plugins::plugin*>(in.ptr);
 }
 
 /***** Chat *****/
 
 // Coversions bewteen internal types and plugin types
 
-chat::ChatMessage convert(chat_message_t &in) {
+chat::message convert(chat_message &in) {
     return {
         .provider_id = in.provider_id,
         .provider_name = in.provider_name,
@@ -206,7 +206,7 @@ chat::ChatMessage convert(chat_message_t &in) {
     };
 }
 
-chat_message_t convert(chat::ChatMessage &in) {
+chat_message convert(chat::message &in) {
     return {
         .provider_id = in.provider_id,
         .provider_name = in.provider_name,
@@ -221,53 +221,53 @@ chat_message_t convert(chat::ChatMessage &in) {
     };
 }
 
-chat_channel_info_t convert(chat::ChatChannelInfo &in) {
+chat_channel_info convert(chat::channel_info &in) {
     return {.id = in.id, .name = in.name};
 }
 
-chat_provider_info_t convert(chat::ChatProviderInfo &in) {
-    std::vector<chat_channel_info_t> channels;
+chat_provider_info convert(chat::provider_info &in) {
+    std::vector<chat_channel_info> channels;
     channels.reserve(in.channels.size());
-    for (auto c:in.channels)
+    for (auto c : in.channels)
         channels.push_back(convert(c));
     return {.id=in.id, .name=in.name, .channel_count=in.channel_count, .channels=channels};
 }
 
-chat_if_channel_info_t convert(chat::ChatInterfaceChannelInfo &in) {
-    std::vector<chat_provider_info_t> providers;
+chat_if_channel_info convert(chat::interface_channel_info &in) {
+    std::vector<chat_provider_info> providers;
     providers.reserve(in.providers.size());
-    for (auto p:in.providers)
+    for (auto p : in.providers)
         providers.push_back(convert(p));
     return {.provider_count=in.provider_count, .channel_count=in.channel_count, .providers=providers};
 }
 
-chat::ChatProvider* convert(chat_provider_t in) {
-    return reinterpret_cast<chat::ChatProvider*>(in.ptr);
+chat::provider* convert(chat_provider in) {
+    return reinterpret_cast<chat::provider*>(in.ptr);
 }
 
-chat::ChatChannel* convert(chat_channel_t in) {
-    return reinterpret_cast<chat::ChatChannel*>(in.ptr);
+chat::channel* convert(chat_channel in) {
+    return reinterpret_cast<chat::channel*>(in.ptr);
 }
 
-chat::ChatSubscription* convert(chat_subscription_t in) {
-    return reinterpret_cast<chat::ChatSubscription*>(in.ptr);
+chat::subscription* convert(chat_subscription in) {
+    return reinterpret_cast<chat::subscription*>(in.ptr);
 }
 
 // Chat interface
 
-chat_if_channel_info_t chat_if_get_channel_info() {
-    chat::ChatInterfaceChannelInfo info = plugins::Plugin::chat_if->getChannelInfo();
+chat_if_channel_info chat_if_get_channel_info() {
+    chat::interface_channel_info info = plugins::plugin::chat_if->get_channel_info();
     return convert(info);
 }
 
-chat_provider_t chat_if_register_provider(plugin_instance_t plugin, std::string id, std::string name) {
+chat_provider chat_if_register_provider(plugin_instance plugin, std::string id, std::string name) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
         return {};
     }
-    plugins::Plugin *pl = convert(plugin);
+    plugins::plugin *pl = convert(plugin);
     try {
-        chat::ChatProvider *provider = plugins::Plugin::chat_if->registerProvider(id, name);
+        chat::provider *provider = plugins::plugin::chat_if->register_provider(id, name);
         {
             std::lock_guard<std::mutex> guard(pl->chat_providers_lock);
             pl->chat_providers.insert(provider);
@@ -279,14 +279,14 @@ chat_provider_t chat_if_register_provider(plugin_instance_t plugin, std::string 
     }
 }
 
-chat_subscription_t chat_if_subscribe(plugin_instance_t plugin, std::string provider_id, std::string channel_id) {
+chat_subscription chat_if_subscribe(plugin_instance plugin, std::string provider_id, std::string channel_id) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
         return {};
     }
-    plugins::Plugin *pl = convert(plugin);
+    plugins::plugin *pl = convert(plugin);
     try {
-        chat::ChatSubscription *subscription = plugins::Plugin::chat_if->subscribe(provider_id, channel_id);
+        chat::subscription *subscription = plugins::plugin::chat_if->subscribe(provider_id, channel_id);
         {
             std::lock_guard<std::mutex> guard(pl->chat_subscriptions_lock);
             pl->chat_subscriptions.insert(subscription);
@@ -300,43 +300,43 @@ chat_subscription_t chat_if_subscribe(plugin_instance_t plugin, std::string prov
 
 // Chat provider
 
-std::string chat_provider_get_id(chat_provider_t provider) {
+std::string chat_provider_get_id(chat_provider provider) {
     if (!provider.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Provider pointer is null"});
         return "";
     }
-    return convert(provider)->getId();
+    return convert(provider)->get_id();
 }
 
-std::string chat_provider_get_name(chat_provider_t provider) {
+std::string chat_provider_get_name(chat_provider provider) {
     if (!provider.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Provider pointer is null"});
         return "";
     }
-    return convert(provider)->getName();
+    return convert(provider)->get_name();
 }
 
-chat_provider_info_t chat_provider_get_info(chat_provider_t provider) {
+chat_provider_info chat_provider_get_info(chat_provider provider) {
     if (!provider.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Provider pointer is null"});
         return {};
     }
-    chat::ChatProviderInfo info = convert(provider)->getInfo();
+    chat::provider_info info = convert(provider)->get_info();
     return convert(info);
 }
 
-chat_channel_t chat_provider_register_channel(plugin_instance_t plugin, chat_provider_t provider, std::string id, std::string name) {
+chat_channel chat_provider_register_channel(plugin_instance plugin, chat_provider provider, std::string id, std::string name) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
         return {};
     }
-    plugins::Plugin *pl = convert(plugin);
+    plugins::plugin *pl = convert(plugin);
     if (!provider.ptr) {
         pl->log_if.put(logging::ERROR, {__func__, ": Provider pointer is null"});
         return {};
     }
     try {
-        chat::ChatChannel *channel = convert(provider)->registerChannel(id, name);
+        chat::channel *channel = convert(provider)->register_channel(id, name);
         {
             std::lock_guard<std::mutex> guard(pl->chat_channels_lock);
             pl->chat_channels.insert(channel);
@@ -348,12 +348,12 @@ chat_channel_t chat_provider_register_channel(plugin_instance_t plugin, chat_pro
     }
 }
 
-void chat_provider_delete(plugin_instance_t plugin, chat_provider_t *provider) {
+void chat_provider_delete(plugin_instance plugin, chat_provider *provider) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
         return;
     }
-    plugins::Plugin *pl = convert(plugin);
+    plugins::plugin *pl = convert(plugin);
     if (!provider) {
         pl->log_if.put(logging::ERROR, {__func__, ": Provider argument is null"});
         return;
@@ -362,7 +362,7 @@ void chat_provider_delete(plugin_instance_t plugin, chat_provider_t *provider) {
         pl->log_if.put(logging::ERROR, {__func__, ": Provider pointer is null"});
         return;
     }
-    chat::ChatProvider *provider_c = convert(*provider);
+    chat::provider *provider_c = convert(*provider);
     int result;
     {
         std::lock_guard<std::mutex> guard(pl->chat_providers_lock);
@@ -377,48 +377,48 @@ void chat_provider_delete(plugin_instance_t plugin, chat_provider_t *provider) {
 
 // Chat channel
 
-std::string chat_channel_get_id(chat_channel_t channel) {
+std::string chat_channel_get_id(chat_channel channel) {
     if (!channel.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return "";
     }
-    return convert(channel)->getId();
+    return convert(channel)->get_id();
 }
 
-std::string chat_channel_get_name(chat_channel_t channel) {
+std::string chat_channel_get_name(chat_channel channel) {
     if (!channel.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return "";
     }
-    return convert(channel)->getName();
+    return convert(channel)->get_name();
 }
 
-std::string chat_channel_get_provider_id(chat_channel_t channel) {
+std::string chat_channel_get_provider_id(chat_channel channel) {
     if (!channel.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return "";
     }
-    return convert(channel)->getProviderId();
+    return convert(channel)->get_provider_id();
 }
 
-std::string chat_channel_get_provider_name(chat_channel_t channel) {
+std::string chat_channel_get_provider_name(chat_channel channel) {
     if (!channel.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return "";
     }
-    return convert(channel)->getProviderName();
+    return convert(channel)->get_provider_name();
 }
 
-chat_channel_info_t chat_channel_get_info(chat_channel_t channel) {
+chat_channel_info chat_channel_get_info(chat_channel channel) {
     if (!channel.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return {};
     }
-    chat::ChatChannelInfo info = convert(channel)->getInfo();
+    chat::channel_info info = convert(channel)->get_info();
     return convert(info);
 }
 
-void chat_channel_push_one(chat_channel_t channel, chat_message_t *message) {
+void chat_channel_push_one(chat_channel channel, chat_message *message) {
     if (!channel.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return;
@@ -427,11 +427,11 @@ void chat_channel_push_one(chat_channel_t channel, chat_message_t *message) {
         global_log.put(logging::ERROR, {__func__, ": Message argument is null"});
         return;
     }
-    chat::ChatMessage msg_converted = convert(*message);
+    chat::message msg_converted = convert(*message);
     convert(channel)->push(msg_converted);
 }
 
-void chat_channel_push_many(chat_channel_t channel, std::vector<chat_message_t> *messages) {
+void chat_channel_push_many(chat_channel channel, std::vector<chat_message> *messages) {
     if (!channel.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return;
@@ -440,19 +440,19 @@ void chat_channel_push_many(chat_channel_t channel, std::vector<chat_message_t> 
         global_log.put(logging::ERROR, {__func__, ": Messages argument is null"});
         return;
     }
-    std::vector<chat::ChatMessage> messages_converted;
+    std::vector<chat::message> messages_converted;
     messages_converted.reserve(messages->size());
-    for (auto &msg:*messages)
+    for (auto &msg : *messages)
         messages_converted.push_back(convert(msg));
     convert(channel)->push(messages_converted);
 }
 
-void chat_channel_delete(plugin_instance_t plugin, chat_channel_t *channel) {
+void chat_channel_delete(plugin_instance plugin, chat_channel *channel) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
         return;
     }
-    plugins::Plugin *pl = convert(plugin);
+    plugins::plugin *pl = convert(plugin);
     if (!channel) {
         pl->log_if.put(logging::ERROR, {__func__, ": Channel argument is null"});
         return;
@@ -461,7 +461,7 @@ void chat_channel_delete(plugin_instance_t plugin, chat_channel_t *channel) {
         pl->log_if.put(logging::ERROR, {__func__, ": Channel pointer is null"});
         return;
     }
-    chat::ChatChannel *channel_c = convert(*channel);
+    chat::channel *channel_c = convert(*channel);
     int result;
     {
         std::lock_guard<std::mutex> guard(pl->chat_channels_lock);
@@ -476,36 +476,36 @@ void chat_channel_delete(plugin_instance_t plugin, chat_channel_t *channel) {
 
 // Chat subscription
 
-std::string chat_subscription_get_provider_id(chat_subscription_t sub) {
+std::string chat_subscription_get_provider_id(chat_subscription sub) {
     if (!sub.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Subscription pointer is null"});
         return "";
     }
-    return convert(sub)->getProviderId();
+    return convert(sub)->get_provider_id();
 }
 
-std::string chat_subscription_get_channel_id(chat_subscription_t sub) {
+std::string chat_subscription_get_channel_id(chat_subscription sub) {
     if (!sub.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Subscription pointer is null"});
         return "";
     }
-    return convert(sub)->getChannelId();
+    return convert(sub)->get_channel_id();
 }
 
-std::vector<chat_message_t> chat_subscription_pull(chat_subscription_t sub) {
+std::vector<chat_message> chat_subscription_pull(chat_subscription sub) {
     if (!sub.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Subscription pointer is null"});
         return {};
     }
-    std::vector<chat::ChatMessage> messages = convert(sub)->pull();
-    std::vector<chat_message_t> messages_converted;
+    std::vector<chat::message> messages = convert(sub)->pull();
+    std::vector<chat_message> messages_converted;
     messages_converted.reserve(messages.size());
-    for (auto msg:messages)
+    for (auto msg : messages)
         messages_converted.push_back(convert(msg));
     return messages_converted;
 }
 
-void chat_subscription_unsubscribe(chat_subscription_t sub) {
+void chat_subscription_unsubscribe(chat_subscription sub) {
     if (!sub.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Subscription pointer is null"});
         return;
@@ -513,12 +513,12 @@ void chat_subscription_unsubscribe(chat_subscription_t sub) {
     convert(sub)->unsubscribe();
 }
 
-void chat_subscription_delete(plugin_instance_t plugin, chat_subscription_t *sub) {
+void chat_subscription_delete(plugin_instance plugin, chat_subscription *sub) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
         return;
     }
-    plugins::Plugin *pl = convert(plugin);
+    plugins::plugin *pl = convert(plugin);
     if (!sub) {
         pl->log_if.put(logging::ERROR, {__func__, ": Subscription argument is null"});
         return;
@@ -527,7 +527,7 @@ void chat_subscription_delete(plugin_instance_t plugin, chat_subscription_t *sub
         pl->log_if.put(logging::ERROR, {__func__, ": Subscription pointer is null"});
         return;
     }
-    chat::ChatSubscription *sub_c = convert(*sub);
+    chat::subscription *sub_c = convert(*sub);
     int result;
     {
         std::lock_guard<std::mutex> guard(pl->chat_subscriptions_lock);
@@ -542,14 +542,14 @@ void chat_subscription_delete(plugin_instance_t plugin, chat_subscription_t *sub
 
 /***** Logging *****/
 
-void log_put(plugin_instance_t plugin, log_level level, std::vector<std::string> message) {
+void log_put(plugin_instance plugin, log_level level, std::vector<std::string> message) {
     if (!plugin.ptr) {
         global_log.put(logging::ERROR, {__func__, ": Plugin instance pointer is null"});
         return;
     }
-    std::vector<logging::LogMessagePart> message_cnv;
+    std::vector<logging::message_part> message_cnv;
     message_cnv.reserve(message.size());
-    for (auto &msg:message)
+    for (auto &msg : message)
         message_cnv.emplace_back(msg);
     convert(plugin)->log_pl.put((logging::level)level, message_cnv);
 }
@@ -557,7 +557,7 @@ void log_put(plugin_instance_t plugin, log_level level, std::vector<std::string>
 }
 /*******************/
 
-strtb_plugin::plugin_interface_t plugins::Plugin::plugin_interface = {
+strtb_plugin::plugin_interface plugins::plugin::plugin_interface = {
     // Chat Interface
     .chat_if_get_channel_info = strtb_plugin::chat_if_get_channel_info,
     .chat_if_register_provider = strtb_plugin::chat_if_register_provider,

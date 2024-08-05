@@ -10,12 +10,12 @@
 namespace fs = std::filesystem;
 using namespace plugins;
 
-PluginLoader::PluginLoader(chat::ChatInterface *chat_if) : log("Plugin Loader") {
-    loaded_plugins = std::vector<Plugin*>();
-    Plugin::setInterfaces(chat_if);
+loader::loader(chat::interface *chat_if) : log("Plugin Loader") {
+    loaded_plugins = std::vector<plugin*>();
+    plugin::set_interfaces(chat_if);
 }
 
-void PluginLoader::loadPlugins(std::string path) {
+void loader::load_plugins(std::string path) {
     std::lock_guard guard(this->lock);
     // Check that path exists
     const fs::path path_obj(path);
@@ -33,7 +33,7 @@ void PluginLoader::loadPlugins(std::string path) {
                 if (fs::exists(plugin_exec_path) && fs::is_regular_file(plugin_exec_path)) {
                     try {
                         // Try to load plugin
-                        Plugin *plugin = new Plugin(plugin_exec_path);
+                        class plugin *plugin = new class plugin(plugin_exec_path);
                         loaded_plugins.push_back(plugin);
                     } catch (std::exception& e) {/* Skip on error */}
                 }
@@ -42,7 +42,7 @@ void PluginLoader::loadPlugins(std::string path) {
     }
 }
 
-PluginLoader::~PluginLoader() {
+loader::~loader() {
     std::lock_guard guard(this->lock);
     this->log.put(logging::DEBUG, {"Deactivating and unloading plugins"});
     // Deactivate and unload all plugins
@@ -52,106 +52,106 @@ PluginLoader::~PluginLoader() {
     }
 }
 
-std::vector<plugin_basic_info_t> PluginLoader::getPlugins() {
+std::vector<plugin_basic_info> loader::get_plugins() {
     std::lock_guard guard(lock);
-    std::vector<plugin_basic_info_t> basic_info;
-    for (auto p:this->loaded_plugins)
-        basic_info.push_back(p->getInfo());
+    std::vector<plugin_basic_info> basic_info;
+    for (auto p : this->loaded_plugins)
+        basic_info.push_back(p->get_info());
     return basic_info;
 }
 
-std::string PluginLoader::getPluginName(unsigned int index) {
+std::string loader::get_plugin_name(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getName();
+        return this->loaded_plugins[index]->get_name();
     else
         return "";
 }
 
-std::string PluginLoader::getPluginVersion(unsigned int index) {
+std::string loader::get_plugin_version(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getVersion();
+        return this->loaded_plugins[index]->get_version();
     else
         return "";
 }
 
-std::string PluginLoader::getPluginAuthor(unsigned int index) {
+std::string loader::get_plugin_author(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getAuthor();
+        return this->loaded_plugins[index]->get_author();
     else
         return "";
 }
 
-std::string PluginLoader::getPluginDescription(unsigned int index) {
+std::string loader::get_plugin_description(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getDescription();
+        return this->loaded_plugins[index]->get_description();
     else
         return "";
 }
 
-std::string PluginLoader::getPluginAccentColor(unsigned int index) {
+std::string loader::get_plugin_accent_color(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getAccentColor();
+        return this->loaded_plugins[index]->get_accent_color();
     else
         return "";
 }
 
-std::string PluginLoader::getPluginWebsite(unsigned int index) {
+std::string loader::get_plugin_website(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getWebsite();
+        return this->loaded_plugins[index]->get_website();
     else
         return "";
 }
 
-std::string PluginLoader::getPluginCopyright(unsigned int index) {
+std::string loader::get_plugin_copyright(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getCopyright();
+        return this->loaded_plugins[index]->get_copyright();
     else
         return "";
 }
 
-std::string PluginLoader::getPluginLicense(unsigned int index) {
+std::string loader::get_plugin_license(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getLicense();
+        return this->loaded_plugins[index]->get_license();
     else
         return "";
 }
 
-std::filesystem::path PluginLoader::getPluginPath(unsigned int index) {
+std::filesystem::path loader::get_plugin_path(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getPath();
+        return this->loaded_plugins[index]->get_path();
     else
         return "";
 }
 
-QWidget* PluginLoader::getPluginSettingsPage(unsigned int index) {
+QWidget* loader::get_plugin_settings_page(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getSettingsPage();
+        return this->loaded_plugins[index]->get_settings_page();
     else
         return nullptr;
 }
 
-int PluginLoader::getPluginAPIVersion(unsigned int index) {
+int loader::get_plugin_api_version(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getAPIVersion();
+        return this->loaded_plugins[index]->get_api_version();
     else
         return 0;
 }
 
-plugin_basic_info_t PluginLoader::getPluginInfo(unsigned int index) {
+plugin_basic_info loader::get_plugin_info(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->getInfo();
+        return this->loaded_plugins[index]->get_info();
     else
-        return plugin_basic_info_t();
+        return plugin_basic_info();
 }

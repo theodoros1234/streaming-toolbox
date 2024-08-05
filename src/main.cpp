@@ -1,4 +1,4 @@
-#include "gui/mainwindow.h"
+#include "gui/main_window.h"
 #include "plugins/loader.h"
 #include "chat/system.h"
 #include "logging/logging.h"
@@ -11,22 +11,22 @@
 int main(int argc, char *argv[]) {
     char* home_path = getenv("HOME");
     // Configure logging system
-    logging::addOutputStream(&std::clog, logging::INFO, logging::LINUX, true, logging::ANSI_ESCAPE_CODES);
+    logging::add_output_stream(&std::clog, logging::INFO, logging::LINUX, true, logging::ANSI_ESCAPE_CODES);
     if (home_path != NULL)
-        logging::addOutputFile(std::string(home_path) + "/.local/share/streaming-toolbox/streaming-toolbox.log", logging::INFO, logging::LINUX, false, logging::NONE);
-    logging::LogSource log("Main");
+        logging::add_output_file(std::string(home_path) + "/.local/share/streaming-toolbox/streaming-toolbox.log", logging::INFO, logging::LINUX, false, logging::NONE);
+    logging::source log("Main");
     // Init other things
     QApplication a(argc, argv);
-    chat::ChatSystem chat_system;
-    plugins::PluginLoader plugin_loader((chat::ChatInterface*)&chat_system);
-    gui::MainWindow w;
+    chat::system chat_system;
+    plugins::loader plugin_loader((chat::interface*)&chat_system);
+    gui::main_window w;
 
     // Load user plugins
     if (home_path != NULL)
-        plugin_loader.loadPlugins(std::string(home_path) + "/.local/share/streaming-toolbox/plugins");
+        plugin_loader.load_plugins(std::string(home_path) + "/.local/share/streaming-toolbox/plugins");
 
     // Start GUI
-    w.getPlugins(&plugin_loader);
+    w.get_plugins(&plugin_loader);
     w.show();
     return a.exec();
 }

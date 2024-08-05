@@ -1,5 +1,5 @@
-#ifndef GUI_MAINWINDOW_H
-#define GUI_MAINWINDOW_H
+#ifndef GUI_MAIN_WINDOW_H
+#define GUI_MAIN_WINDOW_H
 
 #include <QMainWindow>
 #include <QStringListModel>
@@ -14,24 +14,24 @@ QT_END_NAMESPACE
 
 namespace gui {
 
-class MainWindow : public QMainWindow {
+class main_window : public QMainWindow {
     Q_OBJECT
 
 public:
-    MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
-    void getPlugins(plugins::PluginList *plugin_list);
+    main_window(QWidget *parent = nullptr);
+    ~main_window();
+    void get_plugins(plugins::list *plugin_list);
 
 private:
     Ui::MainWindow *ui;
-    plugins::PluginList *plugin_list;
+    plugins::list *plugin_list;
     QWidget empty_plugin_settings_page;
 
 
 public slots:
-    void selectPlugin(int index);
+    void select_plugin(int index);
 };
 
 }
 
-#endif // GUI_MAINWINDOW_H
+#endif // GUI_MAIN_WINDOW_H

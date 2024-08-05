@@ -24,7 +24,7 @@ std::string level_name[] = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"};
 std::string level_ansi_color[] = {"\e[32m", "\e[34m", "\e[33m", "\e[31m", "\e[35m"};
 int min_level = CRITICAL+1;
 
-void addOutputStream(std::ostream *stream, level log_level, endline_type endline_type, bool force_flush, formatting_method formatting) {
+void add_output_stream(std::ostream *stream, level log_level, endline_type endline_type, bool force_flush, formatting_method formatting) {
     std::lock_guard<std::mutex> guard(lock);
     output_streams.push_back({
         .stream = stream,
@@ -37,7 +37,7 @@ void addOutputStream(std::ostream *stream, level log_level, endline_type endline
         min_level = log_level;
 }
 
-void addOutputFile(std::string path, level log_level, endline_type endline_type, bool force_flush, formatting_method formatting) {
+void add_output_file(std::string path, level log_level, endline_type endline_type, bool force_flush, formatting_method formatting) {
     std::ostream *stream;
     {
         // Open file
@@ -46,65 +46,65 @@ void addOutputFile(std::string path, level log_level, endline_type endline_type,
         stream = &output_files.back();
     }
     // Add file into output streams
-    addOutputStream(stream, log_level, endline_type, force_flush, formatting);
+    add_output_stream(stream, log_level, endline_type, force_flush, formatting);
 }
 
-LogMessagePart::LogMessagePart(std::string value) {
+message_part::message_part(std::string value) {
     v_str = value;
     type = STR;
 }
 
-LogMessagePart::LogMessagePart(const char *value) {
+message_part::message_part(const char *value) {
     v.c_str = value;
     type = C_STR;
 }
 
-LogMessagePart::LogMessagePart(char value) {
+message_part::message_part(char value) {
     v.c = value;
     type = CHAR;
 }
 
-LogMessagePart::LogMessagePart(int32_t value) {
+message_part::message_part(int32_t value) {
     v.int32 = value;
     type = INT32;
 }
 
-LogMessagePart::LogMessagePart(uint32_t value) {
+message_part::message_part(uint32_t value) {
     v.uint32 = value;
     type = UINT32;
 }
 
-LogMessagePart::LogMessagePart(int64_t value) {
+message_part::message_part(int64_t value) {
     v.int64 = value;
     type = INT64;
 }
 
-LogMessagePart::LogMessagePart(uint64_t value) {
+message_part::message_part(uint64_t value) {
     v.uint64 = value;
     type = UINT64;
 }
 
-LogMessagePart::LogMessagePart(float value) {
+message_part::message_part(float value) {
     v.fl = value;
     type = FLOAT;
 }
 
-LogMessagePart::LogMessagePart(double value) {
+message_part::message_part(double value) {
     v.db = value;
     type = DOUBLE;
 }
 
-LogMessagePart::LogMessagePart(void *value) {
+message_part::message_part(void *value) {
     v.ptr = value;
     type = PTR;
 }
 
-LogMessagePart::LogMessagePart(std::filesystem::path value) {
+message_part::message_part(std::filesystem::path value) {
     v_path = value;
     type = PATH;
 }
 
-void LogMessagePart::putIntoStream(std::ostream *stream) {
+void message_part::put_into_stream(std::ostream *stream) {
     switch (type) {
     case STR:
         *stream << v_str;
@@ -142,11 +142,11 @@ void LogMessagePart::putIntoStream(std::ostream *stream) {
     }
 }
 
-LogSource::LogSource(std::string name) {
+source::source(std::string name) {
     this->name = name;
 }
 
-void LogSource::put(level type, std::vector<LogMessagePart> message) {
+void source::put(level type, std::vector<message_part> message) {
     // Skip if no outputs accept this level
     if (type < min_level)
         return;
@@ -161,7 +161,7 @@ void LogSource::put(level type, std::vector<LogMessagePart> message) {
     strftime(timestamp_buffer, 32, "%Y-%m-%d %H:%M:%S", &current_time_split);
 
     // Find output streams with appropriate log level and no errors
-    for (auto &output:output_streams) {
+    for (auto &output : output_streams) {
         if (output.log_level <= type && output.stream->good()) {
             // Color and format message appropriately: print timestamp, log level and object name
             switch (output.formatting) {
@@ -173,8 +173,8 @@ void LogSource::put(level type, std::vector<LogMessagePart> message) {
                 break;
             }
             // Print actual message
-            for (auto &part:message)
-                part.putIntoStream(output.stream);
+            for (auto &part : message)
+                part.put_into_stream(output.stream);
             // Endline and force flush if needed
             *output.stream << output.endline;
             if (output.force_flush)

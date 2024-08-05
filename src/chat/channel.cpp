@@ -2,33 +2,33 @@
 
 using namespace chat;
 
-ChatChannel::ChatChannel(std::string provider_id, std::string provider_name,
+channel::channel(std::string provider_id, std::string provider_name,
                          std::string channel_id, std::string channel_name,
-                         ChatQueue *queue, common::DeregistrationInterface<ChatChannel*> *deregister)
+                         class queue *queue, common::deregistration_interface<channel*> *deregister)
     : log("Chat Channel: " + provider_id + ":" + channel_id), queue(queue), deregister(deregister),
     provider_id(provider_id), provider_name(provider_name), channel_id(channel_id), channel_name(channel_name) {}
 
-std::string ChatChannel::getId() {
+std::string channel::get_id() {
     return this->channel_id;
 }
 
-std::string ChatChannel::getName() {
+std::string channel::get_name() {
     return this->channel_name;
 }
 
-std::string ChatChannel::getProviderId() {
+std::string channel::get_provider_id() {
     return this->provider_id;
 }
 
-std::string ChatChannel::getProviderName() {
+std::string channel::get_provider_name() {
     return this->provider_name;
 }
 
-ChatChannelInfo ChatChannel::getInfo() {
+channel_info channel::get_info() {
     return {.id=this->channel_id, .name=this->channel_name};
 }
 
-void ChatChannel::push(ChatMessage &message) {
+void channel::push(message &message) {
     // Add channel and provider info to message
     message.channel_id = this->channel_id;
     message.channel_name = this->channel_name;
@@ -44,9 +44,9 @@ void ChatChannel::push(ChatMessage &message) {
     }
 }
 
-void ChatChannel::push(std::vector<ChatMessage> &messages) {
+void channel::push(std::vector<message> &messages) {
     // Add channel and provider info to messages
-    for (auto &msg:messages) {
+    for (auto &msg : messages) {
         msg.channel_id = this->channel_id;
         msg.channel_name = this->channel_name;
         msg.provider_id = this->provider_id;
@@ -62,7 +62,7 @@ void ChatChannel::push(std::vector<ChatMessage> &messages) {
     }
 }
 
-void ChatChannel::abandon() {
+void channel::abandon() {
     this->log.put(logging::WARNING, {"Abandoned by parent"});
     std::lock_guard<std::mutex> guard(this->lock);
     // Our parent has abandoned us, so we shouldn't do any more actions that communicate with the parent to avoid crashes
@@ -70,7 +70,7 @@ void ChatChannel::abandon() {
     this->deregister = nullptr;
 }
 
-ChatChannel::~ChatChannel() {
+channel::~channel() {
     std::lock_guard<std::mutex> guard(this->lock);
     // Deregister ourselves from parent, unless abandoned
     if (this->deregister)

@@ -4,22 +4,22 @@
 
 using namespace chat;
 
-ChatSystem::ChatSystem() : log("Chat System") {
+system::system() : log("Chat System") {
     // Start incoming message thread
-    this->incoming = new ChatQueue();
-    this->incoming->blockDeletion();
-    this->incoming_thread = new std::thread(this->incomingHandler, this);
+    this->incoming = new queue();
+    this->incoming->block_deletion();
+    this->incoming_thread = new std::thread(this->incoming_handler, this);
 }
 
-void ChatSystem::incomingHandler(ChatSystem *target) {
-    std::vector<ChatMessage> messages;
+void system::incoming_handler(system *target) {
+    std::vector<message> messages;
     // Keep getting messages until the queue is deleted
     do {
         // Wait for messages
         messages = target->incoming->pull();
         // Relay messages to subscribers
         std::lock_guard<std::mutex> guard(target->subscription_lock);
-        for (auto &msg:messages) {
+        for (auto &msg : messages) {
             {
                 // Find wanted provider
                 auto provider = target->subscriptions.find(msg.provider_id);
@@ -28,7 +28,7 @@ void ChatSystem::incomingHandler(ChatSystem *target) {
                         // Find wanted channel
                         auto channel = provider->second->find(msg.channel_id);
                         if (channel != provider->second->end()) {
-                            for (auto sub:*channel->second) {
+                            for (auto sub : *channel->second) {
                                 // Push to all subscribers of this channel
                                 sub.second->push(msg);
                             }
@@ -38,7 +38,7 @@ void ChatSystem::incomingHandler(ChatSystem *target) {
                         // Also push to channel-agnostic subscribers
                         auto channel_all = provider->second->find("");
                         if (channel_all != provider->second->end()) {
-                            for (auto sub:*channel_all->second) {
+                            for (auto sub : *channel_all->second) {
                                 // Push to all channel-agnostic subscribers of this provider
                                 sub.second->push(msg);
                             }
@@ -54,7 +54,7 @@ void ChatSystem::incomingHandler(ChatSystem *target) {
                         // Find wanted channel
                         auto channel = provider_all->second->find(msg.channel_id);
                         if (channel != provider_all->second->end()) {
-                            for (auto sub:*channel->second) {
+                            for (auto sub : *channel->second) {
                                 // Push to all subscribers of this channel
                                 sub.second->push(msg);
                             }
@@ -64,7 +64,7 @@ void ChatSystem::incomingHandler(ChatSystem *target) {
                         // Also push to channel-agnostic subscribers
                         auto channel_all = provider_all->second->find("");
                         if (channel_all != provider_all->second->end()) {
-                            for (auto sub:*channel_all->second) {
+                            for (auto sub : *channel_all->second) {
                                 // Push to all channel-agnostic subscribers of this provider
                                 sub.second->push(msg);
                             }
@@ -75,10 +75,10 @@ void ChatSystem::incomingHandler(ChatSystem *target) {
         }
     } while (!messages.empty());
     // Allow the queue to be deleted when we finish
-    target->incoming->allowDeletion();
+    target->incoming->allow_deletion();
 }
 
-ChatSystem::~ChatSystem() {
+system::~system() {
     // Stop queue and wait for it to be deleted
     delete this->incoming;
     this->incoming_thread->join();
@@ -110,13 +110,13 @@ ChatSystem::~ChatSystem() {
     }
 }
 
-ChatInterfaceChannelInfo ChatSystem::getChannelInfo() {
-    ChatInterfaceChannelInfo info;
+interface_channel_info system::get_channel_info() {
+    interface_channel_info info;
     info.provider_count = this->providers.size();
     info.channel_count = 0;
     // Get info from all providers
-    for (auto p_itr:this->providers) {
-        ChatProviderInfo p_info = p_itr.second->getInfo();
+    for (auto p_itr : this->providers) {
+        provider_info p_info = p_itr.second->get_info();
         info.providers.push_back(p_info);
         // Also count total amount of channels
         info.channel_count += p_info.channel_count;
@@ -124,7 +124,7 @@ ChatInterfaceChannelInfo ChatSystem::getChannelInfo() {
     return info;
 }
 
-ChatProvider* ChatSystem::registerProvider(std::string id, std::string name) {
+provider* system::register_provider(std::string id, std::string name) {
     this->log.put(logging::DEBUG, {"Registering new provider: ", id});
     std::lock_guard<std::mutex> guard(this->provider_lock);
     // Don't allow a blank id
@@ -138,13 +138,13 @@ ChatProvider* ChatSystem::registerProvider(std::string id, std::string name) {
         throw std::runtime_error("Provider already exists");
     }
     // Register new provider and return it
-    ChatProvider* provider = new ChatProvider(id, name, this->incoming, this);
+    provider* provider = new class provider(id, name, this->incoming, this);
     this->providers[id] = provider;
     return provider;
 }
 
-void ChatSystem::deregister(ChatProvider* object) {
-    std::string id = object->getId();
+void system::deregister(provider* object) {
+    std::string id = object->get_id();
     this->log.put(logging::DEBUG, {"Deregistering provider: ", id});
     std::lock_guard<std::mutex> guard(this->provider_lock);
     auto itr = this->providers.find(id);
@@ -155,7 +155,7 @@ void ChatSystem::deregister(ChatProvider* object) {
         this->providers.erase(itr);
 }
 
-ChatSubscription* ChatSystem::subscribe(std::string provider_id, std::string channel_id) {
+subscription* system::subscribe(std::string provider_id, std::string channel_id) {
     // Friendlier message when subscribing to any provider or any channel (which are empty ID strings)
     std::string provider_id_log = provider_id.empty() ? "(any)" : provider_id;
     std::string channel_id_log = channel_id.empty() ? "(any)" : channel_id;
@@ -163,8 +163,8 @@ ChatSubscription* ChatSystem::subscribe(std::string provider_id, std::string cha
     // Keep track of newly created stuff, so we can backtrack on errors
     sub_map_channels *new_provider = nullptr;
     sub_map_sublist *new_channel = nullptr;
-    ChatQueue *queue = nullptr;
-    ChatSubscription *sub = nullptr;
+    queue *queue = nullptr;
+    subscription *sub = nullptr;
     try {
         std::lock_guard<std::mutex> guard(this->subscription_lock);
         // Make sure provider exists in subscription map
@@ -182,8 +182,8 @@ ChatSubscription* ChatSystem::subscribe(std::string provider_id, std::string cha
             channel.first->second = new_channel;
         }
         // Create channel and its message queue
-        queue = new ChatQueue();
-        sub = new ChatSubscription(provider_id, channel_id, queue, this);
+        queue = new class queue();
+        sub = new subscription(provider_id, channel_id, queue, this);
         // Put the sub in the submap
         channel.first->second->emplace(sub, queue);
         return sub;
@@ -202,9 +202,9 @@ ChatSubscription* ChatSystem::subscribe(std::string provider_id, std::string cha
     }
 }
 
-void ChatSystem::deregister(ChatSubscription* object) {
-    std::string provider_id = object->getProviderId();
-    std::string channel_id = object->getChannelId();
+void system::deregister(subscription* object) {
+    std::string provider_id = object->get_provider_id();
+    std::string channel_id = object->get_channel_id();
     // Friendlier message when subscribing to any provider or any channel (which are empty ID strings)
     std::string provider_id_log = provider_id.empty() ? "(any)" : provider_id;
     std::string channel_id_log = channel_id.empty() ? "(any)" : channel_id;

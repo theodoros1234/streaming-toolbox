@@ -10,9 +10,9 @@ CONFIG += c++17
 
 SOURCES += \
     src/chat/channel.cpp \
+    src/gui/main_window.cpp \
     src/logging/logging.cpp \
     src/main.cpp \
-    src/gui/mainwindow.cpp \
     src/plugins/plugin.cpp \
     src/plugins/loader.cpp \
     src/chat/provider.cpp \
@@ -28,16 +28,16 @@ HEADERS += \
     src/chat/queue.h \
     src/chat/subscription.h \
     src/chat/system.h \
-    src/common/deregistrationinterface.h \
+    src/common/deregistration_interface.h \
+    src/gui/main_window.h \
     src/logging/logging.h \
-    src/gui/mainwindow.h \
     src/plugins/plugin.h \
     src/plugins/link.h \
     src/plugins/list.h \
     src/plugins/loader.h
 
 FORMS += \
-    src/gui/mainwindow.ui
+    src/gui/main_window.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

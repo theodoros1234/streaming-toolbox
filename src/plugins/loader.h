@@ -11,29 +11,29 @@
 
 namespace plugins {
 
-class PluginLoader : public PluginList {
+class loader : public list {
 private:
-    logging::LogSource log;
+    logging::source log;
     std::mutex lock;
-    std::vector<Plugin*> loaded_plugins;
+    std::vector<plugin*> loaded_plugins;
 
 public:
-    PluginLoader(chat::ChatInterface *chat_if);
-    ~PluginLoader();
-    void loadPlugins(std::string path);
-    std::vector<plugin_basic_info_t> getPlugins();
-    std::string getPluginName(unsigned int index);
-    std::string getPluginVersion(unsigned int index);
-    std::string getPluginAuthor(unsigned int index);
-    std::string getPluginDescription(unsigned int index);
-    std::string getPluginAccentColor(unsigned int index);
-    std::string getPluginWebsite(unsigned int index);
-    std::string getPluginCopyright(unsigned int index);
-    std::string getPluginLicense(unsigned int index);
-    std::filesystem::path getPluginPath(unsigned int index);
-    QWidget* getPluginSettingsPage(unsigned int index);
-    int getPluginAPIVersion(unsigned int index);
-    plugin_basic_info_t getPluginInfo(unsigned int index);
+    loader(chat::interface *chat_if);
+    ~loader();
+    void load_plugins(std::string path);
+    std::vector<plugin_basic_info> get_plugins();
+    std::string get_plugin_name(unsigned int index);
+    std::string get_plugin_version(unsigned int index);
+    std::string get_plugin_author(unsigned int index);
+    std::string get_plugin_description(unsigned int index);
+    std::string get_plugin_accent_color(unsigned int index);
+    std::string get_plugin_website(unsigned int index);
+    std::string get_plugin_copyright(unsigned int index);
+    std::string get_plugin_license(unsigned int index);
+    std::filesystem::path get_plugin_path(unsigned int index);
+    QWidget* get_plugin_settings_page(unsigned int index);
+    int get_plugin_api_version(unsigned int index);
+    plugin_basic_info get_plugin_info(unsigned int index);
 };
 
 }

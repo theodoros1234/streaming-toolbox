@@ -5,29 +5,29 @@
 #include <vector>
 #include <mutex>
 #include "queue.h"
-#include "../common/deregistrationinterface.h"
+#include "../common/deregistration_interface.h"
 #include "../logging/logging.h"
 
 namespace chat {
 
-class ChatSubscription {
+class subscription {
 private:
-    logging::LogSource log;
+    logging::source log;
     std::string provider_id, channel_id;
-    ChatQueue *queue;
+    class queue *queue;
     bool subscribed = true;
     std::mutex lock;
-    common::DeregistrationInterface<ChatSubscription*> *deregister;
+    common::deregistration_interface<subscription*> *deregister;
 protected:
-    friend class ChatSystem;
+    friend class system;
     void abandon();
 public:
-    ChatSubscription(std::string provider_id, std::string channel_id,
-                     ChatQueue *queue, common::DeregistrationInterface<ChatSubscription*> *deregister);
-    ~ChatSubscription() = default;
-    std::string getProviderId();
-    std::string getChannelId();
-    std::vector<ChatMessage> pull();
+    subscription(std::string provider_id, std::string channel_id,
+                     class queue *queue, common::deregistration_interface<subscription*> *deregister);
+    ~subscription() = default;
+    std::string get_provider_id();
+    std::string get_channel_id();
+    std::vector<message> pull();
     void unsubscribe();
 };
 

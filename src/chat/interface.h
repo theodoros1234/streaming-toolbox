@@ -8,19 +8,19 @@
 
 namespace chat {
 
-struct ChatInterfaceChannelInfo {
+struct interface_channel_info {
     int provider_count;
     int channel_count;
-    std::vector<ChatProviderInfo> providers;
+    std::vector<provider_info> providers;
 };
 
-class ChatInterface {
+class interface {
 protected:
-    virtual ~ChatInterface() = default;
+    virtual ~interface() = default;
 public:
-    virtual ChatInterfaceChannelInfo getChannelInfo() = 0;
-    virtual ChatProvider* registerProvider(std::string id, std::string name) = 0;
-    virtual ChatSubscription* subscribe(std::string provider_id, std::string channel_id) = 0;
+    virtual interface_channel_info get_channel_info() = 0;
+    virtual provider* register_provider(std::string id, std::string name) = 0;
+    virtual subscription* subscribe(std::string provider_id, std::string channel_id) = 0;
 };
 
 }

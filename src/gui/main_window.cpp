@@ -1,5 +1,5 @@
-#include "mainwindow.h"
-#include "ui_mainwindow.h"
+#include "main_window.h"
+#include "ui_main_window.h"
 #include "../plugins/list.h"
 
 #include <QObject>
@@ -14,32 +14,32 @@
 
 using namespace gui;
 
-MainWindow::MainWindow(QWidget *parent)
+main_window::main_window(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow) {
     ui->setupUi(this);
-    QObject::connect(ui->pluginList, &QListWidget::currentRowChanged, this, &MainWindow::selectPlugin);
+    QObject::connect(ui->pluginList, &QListWidget::currentRowChanged, this, &main_window::select_plugin);
 }
 
-MainWindow::~MainWindow() {
+main_window::~main_window() {
     delete ui;
 }
 
-void MainWindow::getPlugins(plugins::PluginList *plugin_list) {
+void main_window::get_plugins(plugins::list *plugin_list) {
     // Get list of plugins
     this->plugin_list = plugin_list;
     // Place all plugins into the UI's list
-    for (auto plugin:plugin_list->getPlugins()) {
+    for (auto plugin : plugin_list->get_plugins()) {
         QPixmap color_pix(PLUGIN_ACCENT_COLOR_SIZE, PLUGIN_ACCENT_COLOR_SIZE);
         color_pix.fill(QColor(plugin.accent_color.c_str()));
         ui->pluginList->addItem(new QListWidgetItem(QIcon(color_pix), plugin.name.c_str(), ui->pluginList));
     }
 }
 
-void MainWindow::selectPlugin(int index) {
+void main_window::select_plugin(int index) {
     // Get info about that plugin and its settings page
-    plugins::plugin_basic_info_t info = this->plugin_list->getPluginInfo(index);
-    QWidget *settings = this->plugin_list->getPluginSettingsPage(index);
+    plugins::plugin_basic_info info = this->plugin_list->get_plugin_info(index);
+    QWidget *settings = this->plugin_list->get_plugin_settings_page(index);
     // Update UI to match this info
     ui->pluginSettingsLabel->setText(("Settings for " + info.name).c_str());
     // Show plugin's settings page, or a blank page if it doesn't have one
