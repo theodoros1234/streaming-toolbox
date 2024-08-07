@@ -14,11 +14,13 @@
 
 using namespace gui;
 
-main_window::main_window(QWidget *parent)
+main_window::main_window(chat::interface *chat_if, QWidget *parent)
     : QMainWindow(parent)
-    , ui(new Ui::MainWindow) {
+    , ui(new Ui::MainWindow)
+    , chat_tab(chat_if, this) {
     ui->setupUi(this);
     QObject::connect(ui->pluginList, &QListWidget::currentRowChanged, this, &main_window::select_plugin);
+    ui->tabChat->layout()->addWidget(&chat_tab);
 }
 
 main_window::~main_window() {

@@ -18,8 +18,8 @@ int main(int argc, char *argv[]) {
     // Init other things
     QApplication a(argc, argv);
     chat::system chat_system;
-    plugins::loader plugin_loader((chat::interface*)&chat_system);
-    gui::main_window w;
+    plugins::loader plugin_loader(&chat_system);
+    gui::main_window w(&chat_system);
 
     // Load user plugins
     if (home_path != NULL)

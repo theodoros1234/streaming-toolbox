@@ -10,6 +10,8 @@ CONFIG += c++17
 
 SOURCES += \
     src/chat/channel.cpp \
+    src/gui/chat_subscription_thread.cpp \
+    src/gui/chat_tab.cpp \
     src/gui/main_window.cpp \
     src/logging/logging.cpp \
     src/main.cpp \
@@ -29,6 +31,8 @@ HEADERS += \
     src/chat/subscription.h \
     src/chat/system.h \
     src/common/deregistration_interface.h \
+    src/gui/chat_subscription_thread.h \
+    src/gui/chat_tab.h \
     src/gui/main_window.h \
     src/logging/logging.h \
     src/plugins/plugin.h \
@@ -37,6 +41,7 @@ HEADERS += \
     src/plugins/loader.h
 
 FORMS += \
+    src/gui/chat_tab.ui \
     src/gui/main_window.ui
 
 # Default rules for deployment.

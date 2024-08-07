@@ -12,7 +12,7 @@
 
 namespace chat {
 
-class system : interface, common::deregistration_interface<provider*>, common::deregistration_interface<subscription*> {
+class system : public interface, common::deregistration_interface<provider*>, common::deregistration_interface<subscription*> {
 private:
     // Types for subscription map
     typedef std::map<subscription*, queue*> sub_map_sublist;

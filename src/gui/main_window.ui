@@ -102,11 +102,7 @@ li.checked::marker { content: &quot;\2612&quot;; }
        <attribute name="title">
         <string>Chat</string>
        </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_4">
-        <item>
-         <widget class="QListView" name="listView_3"/>
-        </item>
-       </layout>
+       <layout class="QVBoxLayout" name="verticalLayout_4"/>
       </widget>
      </widget>
     </item>
