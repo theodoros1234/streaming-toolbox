@@ -19,14 +19,13 @@ int main(int argc, char *argv[]) {
     QApplication a(argc, argv);
     chat::system chat_system;
     plugins::loader plugin_loader(&chat_system);
-    gui::main_window w(&chat_system);
 
     // Load user plugins
     if (home_path != NULL)
         plugin_loader.load_plugins(std::string(home_path) + "/.local/share/streaming-toolbox/plugins");
 
     // Start GUI
-    w.get_plugins(&plugin_loader);
+    gui::main_window w(&plugin_loader, &chat_system);
     w.show();
     return a.exec();
 }

@@ -13,6 +13,7 @@ SOURCES += \
     src/gui/chat_subscription_thread.cpp \
     src/gui/chat_tab.cpp \
     src/gui/main_window.cpp \
+    src/gui/plugin_tab.cpp \
     src/logging/logging.cpp \
     src/main.cpp \
     src/plugins/plugin.cpp \
@@ -34,6 +35,7 @@ HEADERS += \
     src/gui/chat_subscription_thread.h \
     src/gui/chat_tab.h \
     src/gui/main_window.h \
+    src/gui/plugin_tab.h \
     src/logging/logging.h \
     src/plugins/plugin.h \
     src/plugins/link.h \
@@ -42,7 +44,8 @@ HEADERS += \
 
 FORMS += \
     src/gui/chat_tab.ui \
-    src/gui/main_window.ui
+    src/gui/main_window.ui \
+    src/gui/plugin_tab.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
