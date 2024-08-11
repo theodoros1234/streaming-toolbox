@@ -1,0 +1,11 @@
+#include "value_int.h"
+
+using namespace json;
+
+value_int::value_int(const long long value) : json::value(VAL_INT), _value(value) {}
+
+long long value_int::value() const {return _value;}
+
+void value_int::set_value(const long long value) {_value = value;}
+
+value* value_int::copy() const {return new value_int(_value);}

@@ -14,6 +14,14 @@ SOURCES += \
     src/gui/chat_tab.cpp \
     src/gui/main_window.cpp \
     src/gui/plugin_tab.cpp \
+    src/json/value.cpp \
+    src/json/value_array.cpp \
+    src/json/value_bool.cpp \
+    src/json/value_float.cpp \
+    src/json/value_int.cpp \
+    src/json/value_null.cpp \
+    src/json/value_object.cpp \
+    src/json/value_string.cpp \
     src/logging/logging.cpp \
     src/main.cpp \
     src/plugins/plugin.cpp \
@@ -36,6 +44,14 @@ HEADERS += \
     src/gui/chat_tab.h \
     src/gui/main_window.h \
     src/gui/plugin_tab.h \
+    src/json/value.h \
+    src/json/value_array.h \
+    src/json/value_bool.h \
+    src/json/value_float.h \
+    src/json/value_int.h \
+    src/json/value_null.h \
+    src/json/value_object.h \
+    src/json/value_string.h \
     src/logging/logging.h \
     src/plugins/plugin.h \
     src/plugins/link.h \
