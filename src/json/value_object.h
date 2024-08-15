@@ -3,6 +3,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 #include "value.h"
 
 namespace json {
@@ -20,6 +21,8 @@ public:
     void set_contents(const std::map<std::string, value*> &contents);
     void clear();
     size_t size() const;
+    std::vector<std::string> keys() const;
+    bool exists(const std::string &key) const;
     value& at(const std::string &key) const;
     value* get(const std::string &key) const;
     void set(const std::string &key);
@@ -29,7 +32,9 @@ public:
     void set(const std::string &key, const char* new_val);
     void set(const std::string &key, const std::string &new_val);
     void set(const std::string &key, const value* new_val);
+    void set_move(const std::string &key, value* new_val);
     void erase(const std::string &key);
+    virtual void write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline = "\n") const;
 };
 
 }

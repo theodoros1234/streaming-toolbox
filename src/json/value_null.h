@@ -9,6 +9,7 @@ class value_null : public value {
 public:
     virtual value* copy() const;
     value_null();
+    virtual void write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline) const;
 };
 
 }

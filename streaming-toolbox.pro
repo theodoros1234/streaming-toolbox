@@ -14,6 +14,7 @@ SOURCES += \
     src/gui/chat_tab.cpp \
     src/gui/main_window.cpp \
     src/gui/plugin_tab.cpp \
+    src/json/parser.cpp \
     src/json/value.cpp \
     src/json/value_array.cpp \
     src/json/value_bool.cpp \
@@ -44,6 +45,7 @@ HEADERS += \
     src/gui/chat_tab.h \
     src/gui/main_window.h \
     src/gui/plugin_tab.h \
+    src/json/parser.h \
     src/json/value.h \
     src/json/value_array.h \
     src/json/value_bool.h \

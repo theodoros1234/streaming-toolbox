@@ -29,6 +29,7 @@ public:
     void set(const size_t pos, const char* new_val);
     void set(const size_t pos, const std::string &new_val);
     void set(const size_t pos, const value* new_val);
+    void set_move(const size_t pos, value* new_val);
     value& at_back();
     value* back();
     void push_back();
@@ -38,6 +39,7 @@ public:
     void push_back(const char* new_val);
     void push_back(const std::string &new_val);
     void push_back(const value* new_val);
+    void push_back_move(value* new_val);
     void pop_back();
     void insert(const size_t pos);
     void insert(const size_t pos, const bool new_val);
@@ -46,7 +48,9 @@ public:
     void insert(const size_t pos, const char* new_val);
     void insert(const size_t pos, const std::string &new_val);
     void insert(const size_t pos, const value* new_val);
+    void insert_move(const size_t pos, value* new_val);
     void erase(const size_t pos);
+    virtual void write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline = "\n") const;
 };
 
 }

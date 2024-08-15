@@ -9,3 +9,7 @@ long long value_int::value() const {return _value;}
 void value_int::set_value(const long long value) {_value = value;}
 
 value* value_int::copy() const {return new value_int(_value);}
+
+void value_int::write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline) const {
+    stream << _value;
+}
