@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "../logging/logging.h"
+#include "../unicode/unicode.h"
 
 #include <sstream>
 #include <locale>
@@ -177,8 +178,8 @@ static json::value* parse_string(std::istream &stream) {
     std::string str;
     bool escape = false;
     int hex_pos = -1;
-    char hex_char;
     bool keep_reading = true;
+    uint32_t hex_codepoint = 0;
 
     // Get first quotation mark
     if (stream.get() != '"')
@@ -189,7 +190,7 @@ static json::value* parse_string(std::istream &stream) {
         int c = stream.get();
 
         if (hex_pos != -1) {            // HEX ESCAPE CODE
-            char hex_digit;                 // convert hex digit char to number
+            uint32_t hex_digit;             // convert hex digit char to number
             if ('0' <= c && c <= '9')
                 hex_digit = c - '0';
             else if ('A' <= c && c <= 'F')
@@ -199,24 +200,15 @@ static json::value* parse_string(std::istream &stream) {
             else
                 throw invalid_json((size_t)stream.tellg()-1);
 
-            // NOTE: This is wrong and won't work with Unicode. Will fix after I add Unicode conversion functions.
-            switch (hex_pos) {              // handle each hex digit
-            case 0:
-                hex_pos++;
-                break;
-            case 1:
-                hex_pos++;
-                break;
-            case 2:
-                hex_char = hex_digit;
-                hex_pos++;
-                break;
-            case 3:
-                str.push_back((hex_char << 4) | hex_digit);
+            hex_codepoint = hex_codepoint | (hex_digit << hex_pos);   // set appropriate bits for this hex digit
+            if (hex_pos) {
+                // Get next char
+                hex_pos -= 4;
+            } else {
+                // Hex segment finished, put unicode character into string
+                str.append(unicode::codepoint_to_utf8(hex_codepoint));
+                hex_codepoint = 0;
                 hex_pos = -1;
-                break;
-            default:                        // bug in this code or hardware failure
-                throw std::runtime_error("JSON parser reached a normally unreachable state");
             }
         } else if (escape) {            // SIMPLE ESCAPE CODE
             escape = false;
@@ -242,7 +234,7 @@ static json::value* parse_string(std::istream &stream) {
                 str.push_back('\t');
                 break;
             case 'u':                       // hex escape code
-                hex_pos = 0;
+                hex_pos = 12;
                 break;
             default:                        // invalid escape code
                 throw invalid_json((size_t)stream.tellg()-1);

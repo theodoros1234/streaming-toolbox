@@ -30,7 +30,8 @@ SOURCES += \
     src/chat/provider.cpp \
     src/chat/queue.cpp \
     src/chat/subscription.cpp \
-    src/chat/system.cpp
+    src/chat/system.cpp \
+    src/unicode/unicode.cpp
 
 HEADERS += \
     src/chat/channel.h \
@@ -58,7 +59,8 @@ HEADERS += \
     src/plugins/plugin.h \
     src/plugins/link.h \
     src/plugins/list.h \
-    src/plugins/loader.h
+    src/plugins/loader.h \
+    src/unicode/unicode.h
 
 FORMS += \
     src/gui/chat_tab.ui \
