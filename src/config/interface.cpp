@@ -31,12 +31,12 @@ category_filesystem_error::category_filesystem_error(const std::string &what) : 
 
 const char* category_filesystem_error::what() const noexcept {return _what.c_str();}
 
-broken_path::broken_path(const path_type &path_until_break) : _path_until_break(path_until_break) {
+broken_path::broken_path(const std::string &category_name, const path_type &path_until_break)
+    : _category_name(category_name), _path_until_break(path_until_break) {
     _what = "Broken path; the last piece wasn't found or is of wrong type: ";
-    bool first = true;
+    _what.append(common::string_escape(category_name));
     for (auto &item : _path_until_break) {
-        if (!first)
-            _what.push_back('>');
+        _what.push_back('/');
         switch (item.type()) {
         case json::VAL_OBJECT:
             _what.append(common::string_escape(item.key()));
@@ -50,7 +50,8 @@ broken_path::broken_path(const path_type &path_until_break) : _path_until_break(
     }
 }
 
-broken_path::broken_path(const path_type &path, size_t break_point) {
+broken_path::broken_path(const std::string &category_name, const path_type &path, size_t break_point)
+    : _category_name(category_name) {
     // Get path until breaking point
     _path_until_break.reserve(break_point+1);
     for (size_t i=0; i<=break_point && i<path.size(); i++)
@@ -58,13 +59,12 @@ broken_path::broken_path(const path_type &path, size_t break_point) {
 
     // Message
     _what = "Broken path; the last piece wasn't found or is of wrong type: ";
-    bool first = true;
+    _what.append(common::string_escape(category_name));
     for (auto &item : _path_until_break) {
-        if (!first)
-            _what.push_back('>');
+        _what.push_back('/');
         switch (item.type()) {
         case json::VAL_OBJECT:
-            _what.append(item.key());
+            _what.append(common::string_escape(item.key()));
             break;
         case json::VAL_ARRAY:
             _what.append(std::to_string(item.pos()));
@@ -76,6 +76,8 @@ broken_path::broken_path(const path_type &path, size_t break_point) {
 }
 
 const char* broken_path::what() const noexcept {return _what.c_str();}
+
+const std::string& broken_path::category_name() const {return _category_name;}
 
 const path_type& broken_path::path_until_break() const {return _path_until_break;}
 

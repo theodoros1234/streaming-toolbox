@@ -41,11 +41,13 @@ public:
 class broken_path : public std::exception {
 private:
     std::string _what;
+    std::string _category_name;
     path_type _path_until_break;
 public:
-    broken_path(const path_type &path_until_break);
-    broken_path(const path_type &path, size_t break_point);
+    broken_path(const std::string &category_name, const path_type &path_until_break);
+    broken_path(const std::string &category_name, const path_type &path, size_t break_point);
     const char* what() const noexcept;
+    const std::string& category_name() const;
     const path_type& path_until_break() const;
 };
 

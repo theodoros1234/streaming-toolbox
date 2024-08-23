@@ -72,7 +72,7 @@ json::value* system::follow_path(const std::string &category_name, const path_ty
             }
         }
     } catch (std::out_of_range &e) {
-        throw broken_path(path, pos);
+        throw broken_path(category_name, path, pos);
     }
 
     return current;
@@ -294,7 +294,7 @@ void system::set_value(const std::string &category_name, const path_type &path, 
             throw std::runtime_error("Reached an unreachable state. This is either a very weird bug, or your hardware is unstable.");
         }
     } catch (std::out_of_range &e) {
-        throw broken_path(path);
+        throw broken_path(category_name, path);
     }
 
     find_category(category_name).changed = true;
@@ -328,7 +328,7 @@ void system::set_value(const std::string &category_name, const path_type &path, 
             throw std::runtime_error("Reached an unreachable state. This is either a very weird bug, or your hardware is unstable.");
         }
     } catch (std::out_of_range &e) {
-        throw broken_path(path);
+        throw broken_path(category_name, path);
     }
 
     find_category(category_name).changed = true;
@@ -362,7 +362,7 @@ void system::set_value_move(const std::string &category_name, const path_type &p
             throw std::runtime_error("Reached an unreachable state. This is either a very weird bug, or your hardware is unstable.");
         }
     } catch (std::out_of_range &e) {
-        throw broken_path(path);
+        throw broken_path(category_name, path);
     }
 
     find_category(category_name).changed = true;
@@ -394,7 +394,7 @@ void system::erase_value(const std::string &category_name, const path_type &path
             throw std::runtime_error("Reached an unreachable state. This is either a very weird bug, or your hardware is unstable.");
         }
     } catch (std::out_of_range &e) {
-        throw broken_path(path);
+        throw broken_path(category_name, path);
     }
 
     find_category(category_name).changed = true;
