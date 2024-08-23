@@ -2,6 +2,8 @@
 
 using namespace json;
 
+value_int::value_int() : json::value(VAL_INT), _value(0) {};
+
 value_int::value_int(const long long value) : json::value(VAL_INT), _value(value) {}
 
 long long value_int::value() const {return _value;}

@@ -1,9 +1,5 @@
 #include "value_object.h"
-#include "value_null.h"
-#include "value_bool.h"
-#include "value_int.h"
-#include "value_float.h"
-#include "value_string.h"
+#include "../common/strescape.h"
 #include <stdexcept>
 
 using namespace json;
@@ -62,89 +58,25 @@ bool value_object::exists(const std::string &key) const {return _contents.find(k
 
 value* value_object::get(const std::string &key) const {return at(key).copy();}
 
-void value_object::set(const std::string &key) {
+void value_object::set(const std::string &key, val_type type) {
     auto itr = _contents.find(key);
     if (itr == _contents.end()) {
-        // Create new key with this value
-        _contents[key] = new value_null();
+        // Create new key with default value
+        _contents[key] = value_utils::new_default(type);
     } else {
-        // Delete existing value and replace it
-        delete itr->second;
-        itr->second = new value_null();
+        // Replace existing value
+        value_utils::change_default(&itr->second, type);
     }
 }
 
-void value_object::set(const std::string &key, const bool new_val) {
+void value_object::set(const std::string &key, const value_auto &new_val) {
     auto itr = _contents.find(key);
     if (itr == _contents.end()) {
         // Create new key with this value
-        _contents[key] = new value_bool(new_val);
+        _contents[key] = value_utils::new_auto(new_val);
     } else {
-        // Delete existing value and replace it
-        delete itr->second;
-        itr->second = new value_bool(new_val);
-    }
-}
-
-void value_object::set(const std::string &key, const long long new_val) {
-    auto itr = _contents.find(key);
-    if (itr == _contents.end()) {
-        // Create new key with this value
-        _contents[key] = new value_int(new_val);
-    } else {
-        // Delete existing value and replace it
-        delete itr->second;
-        itr->second = new value_int(new_val);
-    }
-}
-
-void value_object::set(const std::string &key, const double new_val) {
-    auto itr = _contents.find(key);
-    if (itr == _contents.end()) {
-        // Create new key with this value
-        _contents[key] = new value_float(new_val);
-    } else {
-        // Delete existing value and replace it
-        delete itr->second;
-        itr->second = new value_float(new_val);
-    }
-}
-
-void value_object::set(const std::string &key, const char* new_val) {
-    auto itr = _contents.find(key);
-    if (itr == _contents.end()) {
-        // Create new key with this value
-        _contents[key] = new value_string(new_val);
-    } else {
-        // Delete existing value and replace it
-        delete itr->second;
-        itr->second = new value_string(new_val);
-    }
-}
-
-void value_object::set(const std::string &key, const std::string &new_val) {
-    auto itr = _contents.find(key);
-    if (itr == _contents.end()) {
-        // Create new key with this value
-        _contents[key] = new value_string(new_val);
-    } else {
-        // Delete existing value and replace it
-        delete itr->second;
-        itr->second = new value_string(new_val);
-    }
-}
-
-void value_object::set(const std::string &key, const value* new_val) {
-    if (!new_val)
-        throw std::runtime_error("nullptr was given in arguments");
-    auto itr = _contents.find(key);
-    if (itr == _contents.end()) {
-        // Create new key with this value
-        _contents[key] = new_val->copy();
-    } else {
-        // Delete existing value and replace it
-        delete itr->second;
-        itr->second = new_val->copy();
+        // Replace existing value
+        value_utils::change_auto(&itr->second, new_val);
     }
 }
 
@@ -185,9 +117,8 @@ void value_object::write_to_stream(std::ostream &stream, int pretty_print, int p
                 for (int i=0; i<pretty_print_level + pretty_print; i++)
                     stream << ' ';
             }
-            // Key as value_string object (for proper formatting)
-            value_string key(val.first);
-            key.write_to_stream(stream, pretty_print, pretty_print_level + pretty_print, newline);
+            // Key
+            stream << common::string_escape(val.first);
             // Colon separator
             stream << ": ";
             // Value

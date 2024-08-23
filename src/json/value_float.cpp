@@ -4,6 +4,8 @@
 
 using namespace json;
 
+value_float::value_float() : json::value(VAL_FLOAT), _value(0) {};
+
 value_float::value_float(const double value) : json::value(VAL_FLOAT), _value(value) {deinf();}
 
 double value_float::value() const {return _value;}

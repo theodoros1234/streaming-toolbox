@@ -3,6 +3,7 @@ QT       += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++17
+CONFIG += object_parallel_to_source
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -10,6 +11,10 @@ CONFIG += c++17
 
 SOURCES += \
     src/chat/channel.cpp \
+    src/common/strescape.cpp \
+    src/config/id_type.cpp \
+    src/config/interface.cpp \
+    src/config/system.cpp \
     src/gui/chat_subscription_thread.cpp \
     src/gui/chat_tab.cpp \
     src/gui/main_window.cpp \
@@ -23,6 +28,7 @@ SOURCES += \
     src/json/value_null.cpp \
     src/json/value_object.cpp \
     src/json/value_string.cpp \
+    src/json/value_utils.cpp \
     src/logging/logging.cpp \
     src/main.cpp \
     src/plugins/plugin.cpp \
@@ -42,6 +48,11 @@ HEADERS += \
     src/chat/subscription.h \
     src/chat/system.h \
     src/common/deregistration_interface.h \
+    src/common/strescape.h \
+    src/common/version.h \
+    src/config/id_type.h \
+    src/config/interface.h \
+    src/config/system.h \
     src/gui/chat_subscription_thread.h \
     src/gui/chat_tab.h \
     src/gui/main_window.h \
@@ -55,6 +66,7 @@ HEADERS += \
     src/json/value_null.h \
     src/json/value_object.h \
     src/json/value_string.h \
+    src/json/value_utils.h \
     src/logging/logging.h \
     src/plugins/plugin.h \
     src/plugins/link.h \
@@ -71,3 +83,5 @@ FORMS += \
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+DISTFILES +=

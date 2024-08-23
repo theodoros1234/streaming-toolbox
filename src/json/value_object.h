@@ -1,10 +1,12 @@
 #ifndef VALUE_OBJECT_H
 #define VALUE_OBJECT_H
 
+#include "value.h"
+#include "value_utils.h"
+
 #include <map>
 #include <string>
 #include <vector>
-#include "value.h"
 
 namespace json {
 
@@ -25,13 +27,8 @@ public:
     bool exists(const std::string &key) const;
     value& at(const std::string &key) const;
     value* get(const std::string &key) const;
-    void set(const std::string &key);
-    void set(const std::string &key, const bool new_val);
-    void set(const std::string &key, const long long new_val);
-    void set(const std::string &key, const double new_val);
-    void set(const std::string &key, const char* new_val);
-    void set(const std::string &key, const std::string &new_val);
-    void set(const std::string &key, const value* new_val);
+    void set(const std::string &key, val_type type);
+    void set(const std::string &key, const value_auto &value);
     void set_move(const std::string &key, value* new_val);
     void erase(const std::string &key);
     virtual void write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline = "\n") const;

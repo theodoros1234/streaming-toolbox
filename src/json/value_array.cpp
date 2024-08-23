@@ -53,41 +53,12 @@ value& value_array::at(const size_t pos) const {return *_contents.at(pos);}
 
 value* value_array::get(const size_t pos) const {return at(pos).copy();}
 
-void value_array::set(const size_t pos) {
-    delete _contents.at(pos);
-    _contents.at(pos) = new value_null();
+void value_array::set(const size_t pos, val_type type) {
+    value_utils::change_default(&_contents.at(pos), type);
 }
 
-void value_array::set(const size_t pos, const bool new_val) {
-    delete _contents.at(pos);
-    _contents.at(pos) = new value_bool(new_val);
-}
-
-void value_array::set(const size_t pos, const long long new_val) {
-    delete _contents.at(pos);
-    _contents.at(pos) = new value_int(new_val);
-}
-
-void value_array::set(const size_t pos, const double new_val) {
-    delete _contents.at(pos);
-    _contents.at(pos) = new value_float(new_val);
-}
-
-void value_array::set(const size_t pos, const char* new_val) {
-    delete _contents.at(pos);
-    _contents.at(pos) = new value_string(new_val);
-}
-
-void value_array::set(const size_t pos, const std::string &new_val) {
-    delete _contents.at(pos);
-    _contents.at(pos) = new value_string(new_val);
-}
-
-void value_array::set(const size_t pos, const value* new_val) {
-    if (!new_val)
-        throw std::runtime_error("nullptr was given in arguments");
-    delete _contents.at(pos);
-    _contents.at(pos) = new_val->copy();
+void value_array::set(const size_t pos, const value_auto &new_val) {
+    value_utils::change_auto(&_contents.at(pos), new_val);
 }
 
 void value_array::set_move(const size_t pos, value* new_val) {
@@ -105,8 +76,8 @@ value& value_array::at_back() {
 
 value* value_array::back() {return at_back().copy();}
 
-void value_array::push_back() {
-    value* new_obj = new value_null;
+void value_array::push_back(val_type type) {
+    value* new_obj = value_utils::new_default(type);
     try {
         _contents.push_back(new_obj);
     } catch (...) {
@@ -115,60 +86,8 @@ void value_array::push_back() {
     }
 }
 
-void value_array::push_back(const bool new_val) {
-    value* new_obj = new value_bool(new_val);
-    try {
-        _contents.push_back(new_obj);
-    } catch (...) {
-        delete new_obj;
-        throw;
-    }
-}
-
-void value_array::push_back(const long long new_val) {
-    value* new_obj = new value_int(new_val);
-    try {
-        _contents.push_back(new_obj);
-    } catch (...) {
-        delete new_obj;
-        throw;
-    }
-}
-
-void value_array::push_back(const double new_val) {
-    value* new_obj = new value_float(new_val);
-    try {
-        _contents.push_back(new_obj);
-    } catch (...) {
-        delete new_obj;
-        throw;
-    }
-}
-
-void value_array::push_back(const char* new_val) {
-    value* new_obj = new value_string(new_val);
-    try {
-        _contents.push_back(new_obj);
-    } catch (...) {
-        delete new_obj;
-        throw;
-    }
-}
-
-void value_array::push_back(const std::string &new_val) {
-    value* new_obj = new value_string(new_val);
-    try {
-        _contents.push_back(new_obj);
-    } catch (...) {
-        delete new_obj;
-        throw;
-    }
-}
-
-void value_array::push_back(const value* new_val) {
-    if (!new_val)
-        throw std::runtime_error("nullptr was given in arguments");
-    value* new_obj = new_val->copy();
+void value_array::push_back(const value_auto &new_val) {
+    value* new_obj = value_utils::new_auto(new_val);
     try {
         _contents.push_back(new_obj);
     } catch (...) {
@@ -190,10 +109,10 @@ void value_array::pop_back() {
     _contents.pop_back();
 }
 
-void value_array::insert(const size_t pos) {
+void value_array::insert(const size_t pos, val_type type) {
     if (pos > _contents.size())
         throw std::out_of_range("Out of range");
-    value* new_obj = new value_null();
+    value* new_obj = value_utils::new_default(type);
     try {
         _contents.insert(_contents.begin()+pos, new_obj);
     } catch (...) {
@@ -202,72 +121,10 @@ void value_array::insert(const size_t pos) {
     }
 }
 
-void value_array::insert(const size_t pos, const bool new_val) {
+void value_array::insert(const size_t pos, const value_auto &new_val) {
     if (pos > _contents.size())
         throw std::out_of_range("Out of range");
-    value* new_obj = new value_bool(new_val);
-    try {
-        _contents.insert(_contents.begin()+pos, new_obj);
-    } catch (...) {
-        delete new_obj;
-        throw;
-    }
-}
-
-void value_array::insert(const size_t pos, const long long new_val) {
-    if (pos > _contents.size())
-        throw std::out_of_range("Out of range");
-    value* new_obj = new value_int(new_val);
-    try {
-        _contents.insert(_contents.begin()+pos, new_obj);
-    } catch (...) {
-        delete new_obj;
-        throw;
-    }
-}
-
-void value_array::insert(const size_t pos, const double new_val) {
-    if (pos > _contents.size())
-        throw std::out_of_range("Out of range");
-    value* new_obj = new value_float(new_val);
-    try {
-        _contents.insert(_contents.begin()+pos, new_obj);
-    } catch (...) {
-        delete new_obj;
-        throw;
-    }
-}
-
-void value_array::insert(const size_t pos, const char* new_val) {
-    if (pos > _contents.size())
-        throw std::out_of_range("Out of range");
-    value* new_obj = new value_string(new_val);
-    try {
-        _contents.insert(_contents.begin()+pos, new_obj);
-    } catch (...) {
-        delete new_obj;
-        throw;
-    }
-}
-
-void value_array::insert(const size_t pos, const std::string &new_val) {
-    if (pos > _contents.size())
-        throw std::out_of_range("Out of range");
-    value* new_obj = new value_string(new_val);
-    try {
-        _contents.insert(_contents.begin()+pos, new_obj);
-    } catch (...) {
-        delete new_obj;
-        throw;
-    }
-}
-
-void value_array::insert(const size_t pos, const value* new_val) {
-    if (pos > _contents.size())
-        throw std::out_of_range("Out of range");
-    if (!new_val)
-        throw std::runtime_error("nullptr was given in arguments");
-    value* new_obj = new_val->copy();
+    value* new_obj = value_utils::new_auto(new_val);
     try {
         _contents.insert(_contents.begin()+pos, new_obj);
     } catch (...) {

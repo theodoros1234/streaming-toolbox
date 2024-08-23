@@ -10,8 +10,9 @@ private:
     double _value;
     void deinf();
 public:
-    virtual value* copy() const;
+    value_float();
     value_float(const double value);
+    virtual value* copy() const;
     double value() const;
     void set_value(const double value);
     virtual void write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline) const;

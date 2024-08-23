@@ -14,6 +14,7 @@ void value::write_to_stream(std::ostream &stream, int pretty_print, const char* 
 
 void value::write_to_file(const char *path, int pretty_print, const char* newline) const {
     std::ofstream output_file(path, std::ofstream::out);
+    output_file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
     write_to_stream(output_file, pretty_print, 0, newline);
 }
 

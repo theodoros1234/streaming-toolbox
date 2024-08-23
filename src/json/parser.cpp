@@ -9,11 +9,11 @@
 
 using namespace json::parser;
 
-invalid_json::invalid_json(const size_t pos) : _what("Error at position " + std::to_string(pos)) {}
+invalid_json::invalid_json(const size_t pos) : _what("invalid JSON at position " + std::to_string(pos)) {}
 
 const char* invalid_json::what() const noexcept {return _what.c_str();}
 
-logging::source log("JSON Parser");
+static logging::source log("JSON Parser");
 
 // Helper functions (declarations only)
 static void eat_whitespace(std::istream &stream);
@@ -29,7 +29,22 @@ static json::value* parse_value(std::istream &stream);
 
 // Public functions (definitions)
 json::value* json::parser::from_stream(std::istream &stream) {
-    return parse_value(stream);
+    try {
+        value* val = parse_value(stream);
+        if (!stream.eof())
+            // There's extra stuff after what was parsed, meaning the file has invalid JSON
+            throw invalid_json((size_t) stream.tellg());
+        return val;
+    } catch (std::istream::failure &e) {
+        // MUST FIX - THIS CAUSES MORE EXCEPTIONS - CALLING TELLG AFTER ERROR CAUSES PROBLEMS
+        log.put(logging::CRITICAL, {"Caught std::istream::failure at tellg ", (size_t)stream.tellg(), " : ", e.what()});
+        if (stream.eof())
+            // Failure exeptions can be thrown by reading after EOF, in which case the JSON file ended prematurely and is invalid
+            throw invalid_json((size_t) stream.tellg());
+        else
+            // Otherwise, it's just a general I/O error.
+            throw;
+    }
 }
 
 json::value* json::parser::from_string(const std::string &str) {
@@ -39,6 +54,7 @@ json::value* json::parser::from_string(const std::string &str) {
 
 json::value* json::parser::from_file(const char* path) {
     std::ifstream file(path, std::ifstream::in);
+    file.exceptions(std::istream::failbit | std::ifstream::badbit);
     return from_stream(file);
 }
 
@@ -388,7 +404,7 @@ static json::value* parse_value(std::istream &stream) {
     try {
         eat_whitespace(stream);
     } catch (...) {
-        // On exception, delete the object we created before rethrowing it
+        // On exception, delete the object we created before rethrowing
         delete val;
         throw;
     }

@@ -10,9 +10,10 @@ class value_string : public value {
 private:
     std::string _value;
 public:
-    virtual value* copy() const;
+    value_string();
     value_string(const char* value);
     value_string(const std::string &value);
+    virtual value* copy() const;
     std::string value() const;
     void set_value(const char* value);
     void set_value(const std::string &value);
