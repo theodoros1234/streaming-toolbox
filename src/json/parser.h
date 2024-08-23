@@ -19,7 +19,7 @@ class invalid_json : public std::exception {
 private:
     std::string _what;
 public:
-    invalid_json(const size_t pos);
+    invalid_json(size_t line, size_t col);
     const char* what() const noexcept;
 };
 
