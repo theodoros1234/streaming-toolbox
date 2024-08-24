@@ -10,7 +10,7 @@
 #include <map>
 #include <thread>
 
-namespace chat {
+namespace strtb::chat {
 
 class system : public interface, common::deregistration_interface<provider*>, common::deregistration_interface<subscription*> {
 private:

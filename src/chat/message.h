@@ -4,7 +4,7 @@
 #include <string>
 #include <map>
 
-namespace chat {
+namespace strtb::chat {
 
 struct message {
     std::string provider_id, provider_name, channel_id, channel_name, user_id, user_name, user_color, message;

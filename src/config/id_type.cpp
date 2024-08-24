@@ -1,6 +1,7 @@
 #include "id_type.h"
 
-using namespace config;
+using namespace strtb;
+using namespace strtb::config;
 
 id_type::id_type(int pos) : _pos(pos), _type(json::VAL_ARRAY) {}
 

@@ -7,7 +7,7 @@
 #include <vector>
 #include <mutex>
 
-namespace chat {
+namespace strtb::chat {
 
 struct channel_info {
     std::string id, name;

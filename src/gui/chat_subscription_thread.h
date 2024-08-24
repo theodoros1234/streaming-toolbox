@@ -6,6 +6,8 @@
 #include <QThread>
 #include <QString>
 
+namespace strtb::gui {
+
 class chat_subscription_thread : public QThread {
     Q_OBJECT
 
@@ -20,5 +22,7 @@ private:
 signals:
     void messages_received(std::vector<QString>);
 };
+
+}
 
 #endif // CHAT_SUBSCRIPTION_THREAD_H

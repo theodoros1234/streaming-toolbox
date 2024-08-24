@@ -6,7 +6,7 @@
 #include "provider.h"
 #include "subscription.h"
 
-namespace chat {
+namespace strtb::chat {
 
 struct interface_channel_info {
     int provider_count;

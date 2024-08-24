@@ -9,7 +9,7 @@
 #include <vector>
 #include <exception>
 
-namespace config {
+namespace strtb::config {
 
 typedef std::vector<id_type> path_type;
 

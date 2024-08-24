@@ -1,6 +1,7 @@
 #include "unicode.h"
 
-using namespace unicode;
+using namespace strtb;
+using namespace strtb::unicode;
 
 std::string unicode::codepoint_to_utf8(uint32_t codepoint) {
     if (0xD800 <= codepoint && codepoint <= 0xDFFF) {

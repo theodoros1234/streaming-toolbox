@@ -8,7 +8,7 @@
 #include "../common/deregistration_interface.h"
 #include "../logging/logging.h"
 
-namespace chat {
+namespace strtb::chat {
 
 class subscription {
 private:

@@ -9,7 +9,7 @@
 #include <map>
 #include <mutex>
 
-namespace chat {
+namespace strtb::chat {
 
 struct provider_info {
     std::string id, name;

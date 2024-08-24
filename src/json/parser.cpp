@@ -7,7 +7,8 @@
 #include <limits>
 #include <fstream>
 
-using namespace json::parser;
+using namespace strtb;
+using namespace strtb::json::parser;
 
 invalid_json::invalid_json(size_t line, size_t col) : _what("invalid JSON at line " + std::to_string(line) + ", col " + std::to_string(col)) {}
 

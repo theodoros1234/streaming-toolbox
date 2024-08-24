@@ -4,7 +4,8 @@
 #include <iomanip>
 #include <sstream>
 
-using namespace common;
+using namespace strtb;
+using namespace strtb::common;
 
 std::string common::char_escape(char c, char escape_quote_char, bool quoted) {
     std::string escaped;

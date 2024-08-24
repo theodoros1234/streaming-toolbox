@@ -9,7 +9,7 @@
 #include <mutex>
 #include <QWidget>
 
-namespace plugins {
+namespace strtb::plugins {
 
 struct plugin_basic_info {
     std::string name, version, author, description, accent_color, website, copyright, license;

@@ -2,7 +2,8 @@
 #include <fstream>
 #include <sstream>
 
-using namespace json;
+using namespace strtb;
+using namespace strtb::json;
 
 value::value(val_type type) : _type(type) {}
 

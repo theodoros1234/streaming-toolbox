@@ -9,8 +9,9 @@
 
 #include <stdexcept>
 
-using namespace json;
-using namespace json::value_utils;
+using namespace strtb;
+using namespace strtb::json;
+using namespace strtb::json::value_utils;
 
 value_auto::value_auto(bool v) : _type(VAL_BOOL) {_value.b = v;}
 value_auto::value_auto(int v) : _type(VAL_INT) {_value.i = v;}

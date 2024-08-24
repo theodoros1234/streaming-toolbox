@@ -1,7 +1,8 @@
 #include "interface.h"
 #include "../common/strescape.h"
 
-using namespace config;
+using namespace strtb;
+using namespace strtb::config;
 
 invalid_category_name::invalid_category_name(const std::string &invalid_name, char invalid_char) {
     _what = "Invalid category name ";

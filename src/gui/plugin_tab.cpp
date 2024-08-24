@@ -3,7 +3,8 @@
 
 #define PLUGIN_ACCENT_COLOR_SIZE 16
 
-using namespace gui;
+using namespace strtb;
+using namespace strtb::gui;
 
 plugin_tab::plugin_tab(plugins::list *plugin_list, QWidget *parent)
     : QWidget(parent)

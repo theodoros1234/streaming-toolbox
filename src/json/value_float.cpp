@@ -2,7 +2,8 @@
 #include <limits>
 #include <sstream>
 
-using namespace json;
+using namespace strtb;
+using namespace strtb::json;
 
 value_float::value_float() : json::value(VAL_FLOAT), _value(0) {};
 

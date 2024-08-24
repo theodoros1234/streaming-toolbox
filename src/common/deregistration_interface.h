@@ -1,7 +1,7 @@
 #ifndef COMMON_DEREGISTRATION_INTERFACE_H
 #define COMMON_DEREGISTRATION_INTERFACE_H
 
-namespace common {
+namespace strtb::common {
 
 template <class identifier> class deregistration_interface {
 protected:

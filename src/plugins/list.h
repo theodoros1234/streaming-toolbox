@@ -7,7 +7,7 @@
 #include <filesystem>
 #include "plugin.h"
 
-namespace plugins {
+namespace strtb::plugins {
 
 class list {
 protected:

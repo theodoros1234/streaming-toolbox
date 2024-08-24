@@ -6,7 +6,7 @@
 #include <mutex>
 #include <time.h>
 
-namespace logging {
+namespace strtb::logging {
 
 struct LogStreamInstance {
     std::ostream *stream;

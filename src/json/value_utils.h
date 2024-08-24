@@ -7,7 +7,7 @@
 #include <vector>
 #include <map>
 
-namespace json {
+namespace strtb::json {
 
 class value_auto {
 private:

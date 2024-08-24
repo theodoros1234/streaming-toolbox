@@ -2,7 +2,8 @@
 #include "../common/strescape.h"
 #include <stdexcept>
 
-using namespace json;
+using namespace strtb;
+using namespace strtb::json;
 
 value_object::value_object() : json::value(VAL_OBJECT) {}
 

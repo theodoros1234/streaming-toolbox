@@ -2,7 +2,8 @@
 #include <thread>
 #include <vector>
 
-using namespace chat;
+using namespace strtb;
+using namespace strtb::chat;
 
 system::system() : log("Chat System") {
     // Start incoming message thread

@@ -7,7 +7,8 @@
 #include <QApplication>
 #include <cstdlib>
 #include <string>
-#include <iostream>
+
+using namespace strtb;
 
 int main(int argc, char *argv[]) {
     char* home_path = getenv("HOME");

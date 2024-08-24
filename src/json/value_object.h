@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace json {
+namespace strtb::json {
 
 class value_object : public value {
 private:

@@ -11,7 +11,8 @@
 #include <QPixmap>
 #include <QColor>
 
-using namespace gui;
+using namespace strtb;
+using namespace strtb::gui;
 
 main_window::main_window(plugins::list *plugin_list, chat::interface *chat_if, QWidget *parent)
     : QMainWindow(parent)

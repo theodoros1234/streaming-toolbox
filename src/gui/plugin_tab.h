@@ -10,7 +10,7 @@ namespace Ui {
 class plugin_tab;
 }
 
-namespace gui {
+namespace strtb::gui {
 
 class plugin_tab : public QWidget {
     Q_OBJECT

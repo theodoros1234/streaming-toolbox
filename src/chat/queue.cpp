@@ -1,6 +1,7 @@
 #include "queue.h"
 
-using namespace chat;
+using namespace strtb;
+using namespace strtb::chat;
 
 queue::queue() {}
 

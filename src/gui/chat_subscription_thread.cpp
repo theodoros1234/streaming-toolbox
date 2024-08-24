@@ -1,5 +1,8 @@
 #include "chat_subscription_thread.h"
 
+using namespace strtb;
+using namespace strtb::gui;
+
 chat_subscription_thread::chat_subscription_thread(logging::source *log, chat::subscription *sub) : log(log), sub(sub) {}
 
 void chat_subscription_thread::run() {

@@ -7,7 +7,7 @@
 #include <vector>
 #include <string>
 
-namespace json {
+namespace strtb::json {
 
 class value_array : public value {
 private:

@@ -1,6 +1,7 @@
 #include "provider.h"
 
-using namespace chat;
+using namespace strtb;
+using namespace strtb::chat;
 
 provider::provider(std::string id, std::string name, class queue *queue, deregistration_interface<provider*> *deregister)
     : log("Chat Provider: " + id), queue(queue), deregister_provider(deregister), id(id), name(name) {}

@@ -8,7 +8,8 @@
 #include <exception>
 
 namespace fs = std::filesystem;
-using namespace plugins;
+using namespace strtb;
+using namespace strtb::plugins;
 
 loader::loader(chat::interface *chat_if) : log("Plugin Loader") {
     loaded_plugins = std::vector<plugin*>();

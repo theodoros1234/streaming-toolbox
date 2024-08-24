@@ -6,7 +6,8 @@
 
 #include <fstream>
 
-using namespace config;
+using namespace strtb;
+using namespace strtb::config;
 
 std::string system::to_lowercase(const std::string &category_name) {
     std::string result;

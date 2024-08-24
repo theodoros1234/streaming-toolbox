@@ -3,7 +3,8 @@
 
 #include <QScrollBar>
 
-using namespace gui;
+using namespace strtb;
+using namespace strtb::gui;
 
 chat_tab::chat_tab(chat::interface *chat_if, QWidget *parent)
     : QWidget(parent), log("GUI: Chat tab"), ui(new Ui::chat_tab) {

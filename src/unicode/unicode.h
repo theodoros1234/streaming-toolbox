@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-namespace unicode {
+namespace strtb::unicode {
 
 std::string codepoint_to_utf8(uint32_t codepoint);
 

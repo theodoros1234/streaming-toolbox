@@ -1,6 +1,7 @@
 #include "value_int.h"
 
-using namespace json;
+using namespace strtb;
+using namespace strtb::json;
 
 value_int::value_int() : json::value(VAL_INT), _value(0) {};
 

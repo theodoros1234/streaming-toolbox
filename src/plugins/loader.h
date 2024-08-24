@@ -9,7 +9,7 @@
 #include <vector>
 #include <mutex>
 
-namespace plugins {
+namespace strtb::plugins {
 
 class loader : public list {
 private:

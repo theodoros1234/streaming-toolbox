@@ -1,6 +1,7 @@
 #include "value_null.h"
 
-using namespace json;
+using namespace strtb;
+using namespace strtb::json;
 
 value_null::value_null() : value(VAL_NULL) {}
 

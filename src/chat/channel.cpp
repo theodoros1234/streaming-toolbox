@@ -1,6 +1,7 @@
 #include "channel.h"
 
-using namespace chat;
+using namespace strtb;
+using namespace strtb::chat;
 
 channel::channel(std::string provider_id, std::string provider_name,
                          std::string channel_id, std::string channel_name,

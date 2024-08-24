@@ -16,7 +16,7 @@ class MainWindow;
 }
 QT_END_NAMESPACE
 
-namespace gui {
+namespace strtb::gui {
 
 class main_window : public QMainWindow {
     Q_OBJECT

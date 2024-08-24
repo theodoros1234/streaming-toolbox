@@ -13,7 +13,7 @@ namespace Ui {
 class chat_tab;
 }
 
-namespace gui {
+namespace strtb::gui {
 
 class chat_tab : public QWidget {
     Q_OBJECT

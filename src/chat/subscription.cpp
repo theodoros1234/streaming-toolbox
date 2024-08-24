@@ -1,6 +1,7 @@
 #include "subscription.h"
 
-using namespace chat;
+using namespace strtb;
+using namespace strtb::chat;
 
 subscription::subscription(std::string provider_id, std::string channel_id,
                                    class queue *queue, common::deregistration_interface<subscription*> *deregister)

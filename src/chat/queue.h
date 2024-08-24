@@ -7,7 +7,7 @@
 #include <condition_variable>
 #include "message.h"
 
-namespace chat {
+namespace strtb::chat {
 
 class queue {
 private:

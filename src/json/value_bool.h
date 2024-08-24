@@ -3,7 +3,7 @@
 
 #include "value.h"
 
-namespace json {
+namespace strtb::json {
 
 class value_bool : public value {
 private:

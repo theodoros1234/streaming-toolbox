@@ -4,7 +4,7 @@
 #include "value.h"
 #include <string>
 
-namespace json {
+namespace strtb::json {
 
 class value_string : public value {
 private:

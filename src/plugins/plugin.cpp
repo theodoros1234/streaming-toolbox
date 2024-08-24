@@ -6,8 +6,9 @@
 #include <dlfcn.h>
 
 namespace fs = std::filesystem;
+using namespace strtb;
 
-namespace plugins {
+namespace strtb::plugins {
 
 chat::interface* plugin::chat_if;
 

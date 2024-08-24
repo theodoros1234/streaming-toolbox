@@ -6,7 +6,7 @@
 #include <ostream>
 #include <vector>
 
-namespace logging {
+namespace strtb::logging {
 
 enum level {DEBUG, INFO, WARNING, ERROR, CRITICAL};
 enum endline_type {WINDOWS, MAC, LINUX};

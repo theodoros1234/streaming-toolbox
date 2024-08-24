@@ -4,7 +4,7 @@
 #include "../json/value.h"
 #include <string>
 
-namespace config {
+namespace strtb::config {
 
 class id_type {
 private:

@@ -1,6 +1,7 @@
 #include "value_bool.h"
 
-using namespace json;
+using namespace strtb;
+using namespace strtb::json;
 
 value_bool::value_bool() : json::value(VAL_BOOL), _value(false) {};
 

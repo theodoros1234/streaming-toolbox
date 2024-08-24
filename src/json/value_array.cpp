@@ -6,7 +6,8 @@
 #include "value_string.h"
 #include <stdexcept>
 
-using namespace json;
+using namespace strtb;
+using namespace strtb::json;
 
 value_array::value_array() : json::value(VAL_ARRAY) {}
 

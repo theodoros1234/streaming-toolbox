@@ -9,7 +9,7 @@
 #include <map>
 #include <mutex>
 
-namespace config {
+namespace strtb::config {
 
 class system : public interface {
 private:

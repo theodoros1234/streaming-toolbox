@@ -1,7 +1,8 @@
 #include "value_string.h"
 #include "../common/strescape.h"
 
-using namespace json;
+using namespace strtb;
+using namespace strtb::json;
 
 value_string::value_string() : json::value(VAL_STRING) {};
 

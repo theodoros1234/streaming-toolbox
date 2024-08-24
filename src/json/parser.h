@@ -13,7 +13,7 @@
 #include <iostream>
 #include <string>
 
-namespace json::parser {
+namespace strtb::json::parser {
 
 class invalid_json : public std::exception {
 private:
