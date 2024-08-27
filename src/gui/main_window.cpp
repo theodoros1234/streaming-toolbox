@@ -20,7 +20,7 @@ main_window::main_window(plugins::list *plugin_list, chat::interface *chat_if, Q
     , plugin_tab(plugin_list)
     , chat_tab(chat_if) {
     ui->setupUi(this);
-    ui->statusbar->showMessage("v" STRTB_VERSION_FULL);
+    ui->statusbar->showMessage(common::get_libstrtb_version_string());
     ui->tabChat->layout()->addWidget(&chat_tab);
     ui->tabPlugins->layout()->addWidget(&plugin_tab);
 }
