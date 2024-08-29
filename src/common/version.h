@@ -1,10 +1,11 @@
 #ifndef VERSION_H
 #define VERSION_H
 
-#define STRTB_SRC_VERSION_MAJOR 0
-#define STRTB_SRC_VERSION_MINOR 2
-#define STRTB_SRC_VERSION_PATCH 2
-#define STRTB_SRC_VERSION_PHASE "alpha"
+/* NOTE: In semantic versioning, a major version increment indicates incompatible API changes.
+ * However, I'm making an exception for STRTB while it's in alpha, due to continuous changes.
+ * The major version will stay at 0 during the alpha phase, despite API incompatibilities.
+ * When it leaves the alpha phase, the usual rules for semantic versioning should be followed.
+ */
 
 namespace strtb::common {
 
@@ -15,6 +16,8 @@ struct version {
 
 version get_libstrtb_version();
 const char* get_libstrtb_version_string();
+
+bool versions_equal(version a, version b);
 
 }
 

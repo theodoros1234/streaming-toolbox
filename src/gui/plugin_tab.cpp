@@ -19,7 +19,7 @@ plugin_tab::plugin_tab(plugins::list *plugin_list, QWidget *parent)
     // Get list of plugins
     this->plugin_list = plugin_list;
     // Place all plugins into the UI's list
-    for (auto plugin : plugin_list->get_plugins()) {
+    for (auto plugin : plugin_list->plugins()) {
         QPixmap color_pix(PLUGIN_ACCENT_COLOR_SIZE, PLUGIN_ACCENT_COLOR_SIZE);
         color_pix.fill(QColor(plugin.accent_color.c_str()));
         ui->pluginList->addItem(new QListWidgetItem(QIcon(color_pix), plugin.name.c_str(), ui->pluginList));
@@ -37,8 +37,8 @@ plugin_tab::~plugin_tab() {
 
 void plugin_tab::select_plugin(int index) {
     // Get info about that plugin and its settings page
-    plugins::plugin_basic_info info = this->plugin_list->get_plugin_info(index);
-    QWidget *settings = this->plugin_list->get_plugin_settings_page(index);
+    plugins::plugin_basic_info info = this->plugin_list->plugin_info(index);
+    QWidget *settings = this->plugin_list->plugin_settings_page(index);
 
     // Update title
     ui->pluginSettingsLabel->setText(("Settings for " + info.name).c_str());
@@ -97,10 +97,7 @@ void plugin_tab::select_plugin(int index) {
     if (!info.path.empty()) {
         about_text.append("<b>Path:</b> ");
         about_text.append(QString(info.path.c_str()).toHtmlEscaped());
-        about_text.append("<br><br>");
     }
-    about_text.append("<b>API Version:</b> ");
-    about_text.append(QString(std::to_string(info.api_version).c_str()));
-    ui->pluginAboutText->setHtml(about_text);
+    ui->pluginAboutText->setText(about_text);
 }
 

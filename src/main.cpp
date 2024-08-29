@@ -8,7 +8,6 @@
 #include <QApplication>
 #include <cstdlib>
 #include <string>
-#include <cstring>
 #include <QMessageBox>
 
 using namespace strtb;
@@ -28,9 +27,9 @@ int main(int argc, char *argv[]) {
     logging::source log("Main");
 
     // Check libstrtb version
-    common::version libstrtb_v = common::get_libstrtb_version();
-    if (std::strcmp(libstrtb_v.phase, STRTB_SRC_VERSION_PHASE) || libstrtb_v.major != STRTB_SRC_VERSION_MAJOR ||
-        libstrtb_v.minor != STRTB_SRC_VERSION_MINOR || libstrtb_v.patch != STRTB_SRC_VERSION_PATCH) {
+    if (!common::versions_equal(common::get_libstrtb_version(),
+                                {.major=STRTB_SRC_VERSION_MAJOR, .minor=STRTB_SRC_VERSION_MINOR,
+                                 .patch=STRTB_SRC_VERSION_PATCH, .phase=STRTB_SRC_VERSION_PHASE})) {
         // Print to log
         log.put(logging::CRITICAL, {"Version mismatch between Streaming Toolbox (v",
                                     STRTB_SRC_VERSION_MAJOR, ".", STRTB_SRC_VERSION_MINOR, ".", STRTB_SRC_VERSION_PATCH, "-", STRTB_SRC_VERSION_PHASE,
@@ -67,7 +66,8 @@ int main(int argc, char *argv[]) {
 
     // Init other things
     chat::system chat_system;
-    plugins::loader plugin_loader(&chat_system);
+    plugins::plugin::set_interfaces(&chat_system, &config_system);
+    plugins::loader plugin_loader;
 
     // Load user plugins
     if (home_path != NULL)

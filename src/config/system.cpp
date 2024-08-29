@@ -241,7 +241,7 @@ bool system::exists(const std::string &category_name, const path_type &path) {
     } catch (category_not_found &e) {
         // False if category doesn't exist
         return false;
-    } catch (std::out_of_range &e) {
+    } catch (broken_path &e) {
         // False if something in the path doesn't exist
         return false;
     }

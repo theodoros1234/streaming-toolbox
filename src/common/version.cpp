@@ -1,5 +1,6 @@
 #include "version.h"
 #include <cstdio>
+#include <cstring>
 
 using namespace strtb;
 using namespace strtb::common;
@@ -20,4 +21,8 @@ const char* common::get_libstrtb_version_string() {
         std::snprintf(version_string, 32, "v%d.%d.%d-%s", STRTB_SRC_VERSION_MAJOR, STRTB_SRC_VERSION_MINOR, STRTB_SRC_VERSION_PATCH, STRTB_SRC_VERSION_PHASE);
 
     return version_string;
+}
+
+bool common::versions_equal(version a, version b) {
+    return a.major == b.major && a.minor == b.minor && a.patch == b.patch && !std::strcmp(a.phase, b.phase);
 }

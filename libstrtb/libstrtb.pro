@@ -7,7 +7,7 @@ CONFIG += object_parallel_to_source
 TEMPLATE = lib
 TARGET = strtb
 
-VERSION = 0.2.2
+include( ../version.pri )
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -63,7 +63,17 @@ HEADERS += \
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
-else: unix:!android: target.path = /opt/$${TARGET}/bin
+else: unix:!android: target.path = /usr/lib64
 !isEmpty(target.path): INSTALLS += target
 
 DISTFILES +=
+
+# Header files for plugin development
+HEADER_INCLUDE_DIR = /usr/include/$${TARGET}
+for(header, HEADERS) {
+    header_r = $$replace(header, "../src/", ""))
+    header_r_dir = $$dirname(header_r)
+    eval(header_include_dir_$${header_r_dir}.path = $${HEADER_INCLUDE_DIR}/$${header_r_dir}))
+    eval(header_include_dir_$${header_r_dir}.files += $$header))
+    eval(INSTALLS *= header_include_dir_$${header_r_dir})
+}

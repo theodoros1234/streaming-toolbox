@@ -11,10 +11,7 @@ namespace fs = std::filesystem;
 using namespace strtb;
 using namespace strtb::plugins;
 
-loader::loader(chat::interface *chat_if) : log("Plugin Loader") {
-    loaded_plugins = std::vector<plugin*>();
-    plugin::set_interfaces(chat_if);
-}
+loader::loader() : log("Plugin Loader") {}
 
 void loader::load_plugins(std::string path) {
     std::lock_guard guard(this->lock);
@@ -53,106 +50,98 @@ loader::~loader() {
     }
 }
 
-std::vector<plugin_basic_info> loader::get_plugins() {
+std::vector<plugin_basic_info> loader::plugins() {
     std::lock_guard guard(lock);
     std::vector<plugin_basic_info> basic_info;
     for (auto p : this->loaded_plugins)
-        basic_info.push_back(p->get_info());
+        basic_info.push_back(p->info());
     return basic_info;
 }
 
-std::string loader::get_plugin_name(unsigned int index) {
+std::string loader::plugin_name(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_name();
+        return this->loaded_plugins[index]->name();
     else
         return "";
 }
 
-std::string loader::get_plugin_version(unsigned int index) {
+std::string loader::plugin_version(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_version();
+        return this->loaded_plugins[index]->version();
     else
         return "";
 }
 
-std::string loader::get_plugin_author(unsigned int index) {
+std::string loader::plugin_author(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_author();
+        return this->loaded_plugins[index]->author();
     else
         return "";
 }
 
-std::string loader::get_plugin_description(unsigned int index) {
+std::string loader::plugin_description(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_description();
+        return this->loaded_plugins[index]->description();
     else
         return "";
 }
 
-std::string loader::get_plugin_accent_color(unsigned int index) {
+std::string loader::plugin_accent_color(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_accent_color();
+        return this->loaded_plugins[index]->accent_color();
     else
         return "";
 }
 
-std::string loader::get_plugin_website(unsigned int index) {
+std::string loader::plugin_website(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_website();
+        return this->loaded_plugins[index]->website();
     else
         return "";
 }
 
-std::string loader::get_plugin_copyright(unsigned int index) {
+std::string loader::plugin_copyright(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_copyright();
+        return this->loaded_plugins[index]->copyright();
     else
         return "";
 }
 
-std::string loader::get_plugin_license(unsigned int index) {
+std::string loader::plugin_license(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_license();
+        return this->loaded_plugins[index]->license();
     else
         return "";
 }
 
-std::filesystem::path loader::get_plugin_path(unsigned int index) {
+std::filesystem::path loader::plugin_path(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_path();
+        return this->loaded_plugins[index]->path();
     else
         return "";
 }
 
-QWidget* loader::get_plugin_settings_page(unsigned int index) {
+QWidget* loader::plugin_settings_page(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_settings_page();
+        return this->loaded_plugins[index]->settings_page();
     else
         return nullptr;
 }
 
-int loader::get_plugin_api_version(unsigned int index) {
+plugin_basic_info loader::plugin_info(unsigned int index) {
     std::lock_guard guard(lock);
     if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_api_version();
-    else
-        return 0;
-}
-
-plugin_basic_info loader::get_plugin_info(unsigned int index) {
-    std::lock_guard guard(lock);
-    if (index < this->loaded_plugins.size())
-        return this->loaded_plugins[index]->get_info();
+        return this->loaded_plugins[index]->info();
     else
         return plugin_basic_info();
 }

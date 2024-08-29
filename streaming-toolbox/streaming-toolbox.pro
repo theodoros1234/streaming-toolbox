@@ -7,7 +7,7 @@ CONFIG += object_parallel_to_source
 TARGET = streaming-toolbox
 LIBS += -L../libstrtb -lstrtb
 
-VERSION = 0.2.2
+include( ../version.pri )
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -66,7 +66,7 @@ FORMS += \
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
-else: unix:!android: target.path = /opt/$${TARGET}/bin
+else: unix:!android: target.path = /usr/bin
 !isEmpty(target.path): INSTALLS += target
 
 DISTFILES +=
