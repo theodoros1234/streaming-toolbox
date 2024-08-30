@@ -122,6 +122,7 @@ void system::load_category(const std::string &category_name) {
         // These Windows-specific things are done, regardless of the current platform, for portability reasons.
         category_instance instance {
             .path = _config_dir / ("config_" + cat_lower + ".json"),
+            .path_bak = _config_dir / ("config_" + cat_lower + ".json.bak"),
             .root = nullptr // silences a compiler warning
         };
 
@@ -135,17 +136,30 @@ void system::load_category(const std::string &category_name) {
                     log.put(logging::DEBUG, {"Loaded category ", common::string_escape(cat_lower)});
                     break;
                 } catch (json::parser::invalid_json &e) {
-                    log.put(logging::WARNING, {"Failed to load category ", common::string_escape(cat_lower), ": ", e.what(), ". Backing up config file and creating a new empty one."});
+                    log.put(logging::WARNING, {"Failed to load category ", common::string_escape(cat_lower), ": ", e.what(),
+                                               ". Backing up config file and trying to load previous backup."});
                     std::filesystem::rename(instance.path, std::string(instance.path) + "-invalid.bak");
                 }
 
             case std::filesystem::file_type::not_found:
-                // Config file doesn't exist, create it.
+                // Config file doesn't exist, or previous case failed (invalid json), try to load backup.
+                if (std::filesystem::status(instance.path_bak).type() == std::filesystem::file_type::regular) {
+                    try {
+                        instance.root = json::parser::from_file(instance.path_bak.c_str());
+                        log.put(logging::WARNING, {"Loaded category ", common::string_escape(cat_lower), " from backup"});
+                        break;
+                    } catch (json::parser::invalid_json &e) {
+                        log.put(logging::WARNING, {"Failed to load category ", common::string_escape(cat_lower), " from backup: ",
+                                                   e.what(), ". Creating a new config file."});
+                    }
+                }
+
+                // Config file doesn't exist, or previous cases failed (inavlid json and failed backup), create new file.
                 {
                     // Make sure we can actually create the file
                     std::ofstream test_out(instance.path);
                     test_out.exceptions(std::ostream::failbit | std::ostream::badbit);
-                    test_out << std::endl;
+                    test_out << "{}" << std::endl;
                     test_out.close();
                 }
                 instance.root = new json::value_object();
@@ -172,8 +186,17 @@ void system::save_category(const std::string &category_name, bool force) {
     std::lock_guard<std::mutex> guard(_lock);
     category_instance &cat = find_category(category_name);
     // Only save if there are changes or if force=true
-    if (cat.changed || force)
+    if (cat.changed || force) {
+        // Make backup and then save
+        if (std::filesystem::exists(cat.path)) {
+            try {
+                std::filesystem::rename(cat.path, cat.path_bak);
+            } catch (std::exception &e) {
+                log.put(logging::WARNING, {"Failed to make backup of category ", category_name, " before saving it: ", e.what()});
+            }
+        }
         cat.root->write_to_file(cat.path.c_str(), 4);
+    }
     cat.changed = false;
 }
 

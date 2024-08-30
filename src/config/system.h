@@ -14,7 +14,7 @@ namespace strtb::config {
 class system : public interface {
 private:
     struct category_instance {
-        std::filesystem::path path;
+        std::filesystem::path path, path_bak;
         json::value* root;
         bool changed = false;
     };
