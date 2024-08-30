@@ -106,6 +106,11 @@ invalid_target::invalid_target(const std::string &action, json::val_type type) {
     case json::VAL_OBJECT:
         _what.append("json::value_object");
         break;
+    case json::VAL_UNDEFINED:
+        _what.append("(undefined)");
+        break;
+    default:
+        _what.append("(unknown)");
     }
     _what.append("\" for config action ");
     _what.append(common::string_escape(action));

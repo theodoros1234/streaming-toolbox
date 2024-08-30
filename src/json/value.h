@@ -2,10 +2,17 @@
 #define STRTB_JSON_VALUE_H
 
 #include <iostream>
+#include <exception>
+#include <string>
 
 namespace strtb::json {
 
 enum val_type {VAL_NULL, VAL_BOOL, VAL_INT, VAL_FLOAT, VAL_STRING, VAL_ARRAY, VAL_OBJECT, VAL_UNDEFINED};
+
+class invalid_type : public std::exception {
+public:
+    const char* what() const noexcept;
+};
 
 class value {
 private:

@@ -61,8 +61,8 @@ value* value_utils::new_default(val_type type) {
     case VAL_OBJECT:
         return new value_object();
         break;
-    default: // This is here to suppress compiler warnings, and to error out on any unexpected situations that are normally impossible.
-        throw std::runtime_error("Reached an unreachable state. This is either a very weird bug, or your hardware is unstable.");
+    default:
+        throw json::invalid_type();
     }
 }
 
@@ -89,8 +89,8 @@ value* value_utils::new_auto(const value_auto &val) {
         return new value_array(val.value_as_array());
     case VAL_OBJECT:
         return new value_object(val.value_as_object());
-    default: // This is here to suppress compiler warnings, and to error out on any unexpected situations that are normally impossible.
-        throw std::runtime_error("Reached an unreachable state. This is either a very weird bug, or your hardware is unstable.");
+    default:
+        throw json::invalid_type();
     }
 }
 
@@ -157,6 +157,9 @@ void value_utils::change_default(value** old_val, val_type type) {
             *old_val = new value_object();
         }
         break;
+
+    default:
+        throw json::invalid_type();
     }
 }
 
@@ -235,7 +238,7 @@ void value_utils::change_auto(value** old_val, const value_auto &new_val) {
         }
         break;
 
-    default: // This is here to suppress compiler warnings, and to error out on any unexpected situations that are normally impossible.
-        throw std::runtime_error("Reached an unreachable state. This is either a very weird bug, or your hardware is unstable.");
+    default:
+        throw json::invalid_type();
     }
 }
