@@ -1,5 +1,5 @@
-#ifndef STRESCAPE_H
-#define STRESCAPE_H
+#ifndef STRTB_COMMON_STRESCAPE_H
+#define STRTB_COMMON_STRESCAPE_H
 
 #include <string>
 
@@ -11,4 +11,4 @@ std::string string_escape(const std::string &str, char escape_quote_char = '"', 
 
 }
 
-#endif // STRESCAPE_H
+#endif // STRTB_COMMON_STRESCAPE_H

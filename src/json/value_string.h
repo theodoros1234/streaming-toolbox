@@ -1,5 +1,5 @@
-#ifndef VALUE_STRING_H
-#define VALUE_STRING_H
+#ifndef STRTB_JSON_VALUE_STRING_H
+#define STRTB_JSON_VALUE_STRING_H
 
 #include "value.h"
 #include <string>
@@ -22,4 +22,4 @@ public:
 
 }
 
-#endif // VALUE_STRING_H
+#endif // STRTB_JSON_VALUE_STRING_H

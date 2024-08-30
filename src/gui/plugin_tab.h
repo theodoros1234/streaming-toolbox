@@ -1,5 +1,5 @@
-#ifndef PLUGIN_TAB_H
-#define PLUGIN_TAB_H
+#ifndef STRTB_GUI_PLUGIN_TAB_H
+#define STRTB_GUI_PLUGIN_TAB_H
 
 #include "../plugins/list.h"
 
@@ -30,4 +30,4 @@ private slots:
 
 }
 
-#endif // PLUGIN_TAB_H
+#endif // STRTB_GUI_PLUGIN_TAB_H

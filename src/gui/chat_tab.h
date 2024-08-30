@@ -1,5 +1,5 @@
-#ifndef CHAT_TAB_H
-#define CHAT_TAB_H
+#ifndef STRTB_GUI_CHAT_TAB_H
+#define STRTB_GUI_CHAT_TAB_H
 
 #include "../chat/interface.h"
 #include "../chat/subscription.h"
@@ -39,4 +39,4 @@ private slots:
 
 }
 
-#endif // CHAT_TAB_H
+#endif // STRTB_GUI_CHAT_TAB_H

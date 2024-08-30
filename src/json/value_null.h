@@ -1,5 +1,5 @@
-#ifndef VALUE_NULL_H
-#define VALUE_NULL_H
+#ifndef STRTB_JSON_VALUE_NULL_H
+#define STRTB_JSON_VALUE_NULL_H
 
 #include "value.h"
 
@@ -14,4 +14,4 @@ public:
 
 }
 
-#endif // VALUE_NULL_H
+#endif // STRTB_JSON_VALUE_NULL_H

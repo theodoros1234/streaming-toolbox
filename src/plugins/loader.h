@@ -1,5 +1,5 @@
-#ifndef PLUGINS_LOADER_H
-#define PLUGINS_LOADER_H
+#ifndef STRTB_PLUGINS_LOADER_H
+#define STRTB_PLUGINS_LOADER_H
 
 #include "plugin.h"
 #include "list.h"

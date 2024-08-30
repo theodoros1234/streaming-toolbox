@@ -1,5 +1,5 @@
-#ifndef PLUGINS_LINK_H
-#define PLUGINS_LINK_H
+#ifndef STRTB_PLUGINS_LINK_H
+#define STRTB_PLUGINS_LINK_H
 
 #include <string>
 #include <map>
@@ -18,4 +18,4 @@ typedef std::map<interfaces, void*> plugin_interface_map;
 
 }
 
-#endif // PLUGINS_LINK_H
+#endif // STRTB_PLUGINS_LINK_H

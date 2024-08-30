@@ -1,5 +1,5 @@
-#ifndef PLUGINS_LIST_H
-#define PLUGINS_LIST_H
+#ifndef STRTB_PLUGINS_LIST_H
+#define STRTB_PLUGINS_LIST_H
 
 #include <QWidget>
 #include <vector>

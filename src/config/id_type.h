@@ -1,5 +1,5 @@
-#ifndef ID_TYPE_H
-#define ID_TYPE_H
+#ifndef STRTB_CONFIG_ID_TYPE_H
+#define STRTB_CONFIG_ID_TYPE_H
 
 #include "../json/value.h"
 #include <string>
@@ -27,4 +27,4 @@ public:
 
 }
 
-#endif // ID_TYPE_H
+#endif // STRTB_CONFIG_ID_TYPE_H

@@ -1,5 +1,5 @@
-#ifndef SYSTEM_H
-#define SYSTEM_H
+#ifndef STRTB_CONFIG_SYSTEM_H
+#define STRTB_CONFIG_SYSTEM_H
 
 #include "interface.h"
 #include "../json/value.h"
@@ -73,4 +73,4 @@ public:
 
 }
 
-#endif // SYSTEM_H
+#endif // STRTB_CONFIG_SYSTEM_H

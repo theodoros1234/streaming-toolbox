@@ -1,5 +1,5 @@
-#ifndef UNICODE_H
-#define UNICODE_H
+#ifndef STRTB_UNICODE_UNICODE_H
+#define STRTB_UNICODE_UNICODE_H
 
 #include <cstdint>
 #include <string>
@@ -10,4 +10,4 @@ std::string codepoint_to_utf8(uint32_t codepoint);
 
 }
 
-#endif // UNICODE_H
+#endif // STRTB_UNICODE_UNICODE_H

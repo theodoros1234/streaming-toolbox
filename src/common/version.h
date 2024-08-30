@@ -1,5 +1,5 @@
-#ifndef VERSION_H
-#define VERSION_H
+#ifndef STRTB_COMMON_VERSION_H
+#define STRTB_COMMON_VERSION_H
 
 /* NOTE: In semantic versioning, a major version increment indicates incompatible API changes.
  * However, I'm making an exception for STRTB while it's in alpha, due to continuous changes.
@@ -21,4 +21,4 @@ bool versions_equal(version a, version b);
 
 }
 
-#endif // VERSION_H
+#endif // STRTB_COMMON_VERSION_H

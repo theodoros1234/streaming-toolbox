@@ -1,5 +1,5 @@
-#ifndef VALUE_OBJECT_H
-#define VALUE_OBJECT_H
+#ifndef STRTB_JSON_VALUE_OBJECT_H
+#define STRTB_JSON_VALUE_OBJECT_H
 
 #include "value.h"
 #include "value_utils.h"
@@ -36,4 +36,4 @@ public:
 
 }
 
-#endif // VALUE_OBJECT_H
+#endif // STRTB_JSON_VALUE_OBJECT_H

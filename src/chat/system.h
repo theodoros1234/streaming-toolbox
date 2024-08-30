@@ -1,5 +1,5 @@
-#ifndef CHAT_SYSTEM_H
-#define CHAT_SYSTEM_H
+#ifndef STRTB_CHAT_SYSTEM_H
+#define STRTB_CHAT_SYSTEM_H
 
 #include "interface.h"
 #include "queue.h"
@@ -41,4 +41,4 @@ public:
 
 }
 
-#endif // CHAT_SYSTEM_H
+#endif // STRTB_CHAT_SYSTEM_H

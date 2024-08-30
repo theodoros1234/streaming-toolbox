@@ -1,5 +1,5 @@
-#ifndef CHAT_CHANNEL_H
-#define CHAT_CHANNEL_H
+#ifndef STRTB_CHAT_CHANNEL_H
+#define STRTB_CHAT_CHANNEL_H
 
 #include "queue.h"
 #include "../common/deregistration_interface.h"
@@ -39,4 +39,4 @@ public:
 
 }
 
-#endif // CHAT_CHANNEL_H
+#endif // STRTB_CHAT_CHANNEL_H

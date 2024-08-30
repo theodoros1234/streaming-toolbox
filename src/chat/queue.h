@@ -1,5 +1,5 @@
-#ifndef CHAT_QUEUE_H
-#define CHAT_QUEUE_H
+#ifndef STRTB_CHAT_QUEUE_H
+#define STRTB_CHAT_QUEUE_H
 
 #include <vector>
 #include <queue>
@@ -33,4 +33,4 @@ public:
 
 }
 
-#endif // CHAT_QUEUE_H
+#endif // STRTB_CHAT_QUEUE_H

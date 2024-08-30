@@ -1,5 +1,5 @@
-#ifndef VALUE_ARRAY_H
-#define VALUE_ARRAY_H
+#ifndef STRTB_JSON_VALUE_ARRAY_H
+#define STRTB_JSON_VALUE_ARRAY_H
 
 #include "value.h"
 #include "value_utils.h"
@@ -42,4 +42,4 @@ public:
 
 }
 
-#endif // VALUE_ARRAY_H
+#endif // STRTB_JSON_VALUE_ARRAY_H

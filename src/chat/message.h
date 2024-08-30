@@ -1,5 +1,5 @@
-#ifndef CHAT_MESSAGE_H
-#define CHAT_MESSAGE_H
+#ifndef STRTB_CHAT_MESSAGE_H
+#define STRTB_CHAT_MESSAGE_H
 
 #include <string>
 #include <map>
@@ -15,4 +15,4 @@ struct message {
 
 }
 
-#endif // CHAT_MESSAGE_H
+#endif // STRTB_CHAT_MESSAGE_H

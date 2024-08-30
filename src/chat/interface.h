@@ -1,5 +1,5 @@
-#ifndef CHAT_INTERFACE_H
-#define CHAT_INTERFACE_H
+#ifndef STRTB_CHAT_INTERFACE_H
+#define STRTB_CHAT_INTERFACE_H
 
 #include <string>
 #include <vector>
@@ -25,4 +25,4 @@ public:
 
 }
 
-#endif // CHAT_INTERFACE_H
+#endif // STRTB_CHAT_INTERFACE_H

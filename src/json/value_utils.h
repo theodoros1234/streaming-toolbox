@@ -1,5 +1,5 @@
-#ifndef VALUE_UTILS_H
-#define VALUE_UTILS_H
+#ifndef STRTB_JSON_VALUE_UTILS_H
+#define STRTB_JSON_VALUE_UTILS_H
 
 #include "value.h"
 
@@ -62,4 +62,4 @@ void change_auto(value** old_val, const value_auto &new_val);
 
 }
 
-#endif // VALUE_UTILS_H
+#endif // STRTB_JSON_VALUE_UTILS_H

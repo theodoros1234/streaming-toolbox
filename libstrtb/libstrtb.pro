@@ -47,6 +47,7 @@ HEADERS += \
     ../src/common/version.h \
     ../src/config/id_type.h \
     ../src/config/interface.h \
+    ../src/json/all_value_types.h \
     ../src/json/parser.h \
     ../src/json/value.h \
     ../src/json/value_array.h \

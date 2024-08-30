@@ -1,5 +1,5 @@
-#ifndef VALUE_BOOL_H
-#define VALUE_BOOL_H
+#ifndef STRTB_JSON_VALUE_BOOL_H
+#define STRTB_JSON_VALUE_BOOL_H
 
 #include "value.h"
 
@@ -19,4 +19,4 @@ public:
 
 }
 
-#endif // VALUE_BOOL_H
+#endif // STRTB_JSON_VALUE_BOOL_H

@@ -1,5 +1,5 @@
-#ifndef GUI_MAIN_WINDOW_H
-#define GUI_MAIN_WINDOW_H
+#ifndef STRTB_GUI_MAIN_WINDOW_H
+#define STRTB_GUI_MAIN_WINDOW_H
 
 #include "../plugins/list.h"
 #include "../chat/interface.h"
@@ -34,4 +34,4 @@ private:
 
 }
 
-#endif // GUI_MAIN_WINDOW_H
+#endif // STRTB_GUI_MAIN_WINDOW_H

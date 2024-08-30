@@ -1,5 +1,5 @@
-#ifndef VALUE_FLOAT_H
-#define VALUE_FLOAT_H
+#ifndef STRTB_JSON_VALUE_FLOAT_H
+#define STRTB_JSON_VALUE_FLOAT_H
 
 #include "value.h"
 
@@ -20,4 +20,4 @@ public:
 
 }
 
-#endif // VALUE_FLOAT_H
+#endif // STRTB_JSON_VALUE_FLOAT_H

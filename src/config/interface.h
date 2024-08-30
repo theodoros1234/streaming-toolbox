@@ -1,8 +1,8 @@
-#ifndef INTERFACE_H
-#define INTERFACE_H
+#ifndef STRTB_CONFIG_INTERFACE_H
+#define STRTB_CONFIG_INTERFACE_H
 
 #include "id_type.h"
-#include "../json/value.h"
+#include "../json/all_value_types.h"
 #include "../json/value_utils.h"
 
 #include <string>
@@ -106,4 +106,4 @@ public:
 
 }
 
-#endif // INTERFACE_H
+#endif // STRTB_CONFIG_INTERFACE_H

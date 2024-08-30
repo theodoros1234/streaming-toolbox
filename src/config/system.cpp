@@ -1,6 +1,5 @@
 #include "system.h"
-#include "../json/value_array.h"
-#include "../json/value_object.h"
+#include "../json/all_value_types.h"
 #include "../json/parser.h"
 #include "../common/strescape.h"
 

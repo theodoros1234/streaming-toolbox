@@ -1,5 +1,5 @@
-#ifndef CHAT_SUBSCRIPTION_H
-#define CHAT_SUBSCRIPTION_H
+#ifndef STRTB_CHAT_SUBSCRIPTION_H
+#define STRTB_CHAT_SUBSCRIPTION_H
 
 #include <string>
 #include <vector>
@@ -33,4 +33,4 @@ public:
 
 }
 
-#endif // CHAT_SUBSCRIPTION_H
+#endif // STRTB_CHAT_SUBSCRIPTION_H

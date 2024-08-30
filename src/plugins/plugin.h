@@ -1,5 +1,5 @@
-#ifndef PLUGINS_PLUGIN_H
-#define PLUGINS_PLUGIN_H
+#ifndef STRTB_PLUGINS_PLUGIN_H
+#define STRTB_PLUGINS_PLUGIN_H
 
 #include "link.h"
 #include "../chat/interface.h"

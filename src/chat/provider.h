@@ -1,5 +1,5 @@
-#ifndef CHAT_PROVIDER_H
-#define CHAT_PROVIDER_H
+#ifndef STRTB_CHAT_PROVIDER_H
+#define STRTB_CHAT_PROVIDER_H
 
 #include "queue.h"
 #include "../common/deregistration_interface.h"
@@ -40,4 +40,4 @@ public:
 
 }
 
-#endif // CHAT_PROVIDER_H
+#endif // STRTB_CHAT_PROVIDER_H
