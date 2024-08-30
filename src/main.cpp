@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
         plugin_loader.load_plugins(std::string(home_path) + "/.local/share/streaming-toolbox/plugins");
 
     // Start GUI
-    gui::main_window w(&plugin_loader, &chat_system);
+    gui::main_window w(&plugin_loader, &chat_system, &config_system);
     w.show();
     return a.exec();
 }

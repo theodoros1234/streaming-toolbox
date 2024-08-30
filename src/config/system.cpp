@@ -133,7 +133,7 @@ void system::load_category(const std::string &category_name) {
                 // Config file exists, load it.
                 try {
                     instance.root = json::parser::from_file(instance.path.c_str());
-                    log.put(logging::DEBUG, {"Loaded category ", common::string_escape(cat_lower)});
+                    log.put(logging::INFO, {"Loaded category ", common::string_escape(cat_lower)});
                     break;
                 } catch (json::parser::invalid_json &e) {
                     log.put(logging::WARNING, {"Failed to load category ", common::string_escape(cat_lower), ": ", e.what(),
@@ -183,6 +183,7 @@ void system::load_category(const std::string &category_name) {
 }
 
 void system::save_category(const std::string &category_name, bool force) {
+    log.put(logging::DEBUG, {"Saving category ", common::string_escape(category_name)});
     std::lock_guard<std::mutex> guard(_lock);
     category_instance &cat = find_category(category_name);
     // Only save if there are changes or if force=true
@@ -192,10 +193,14 @@ void system::save_category(const std::string &category_name, bool force) {
             try {
                 std::filesystem::rename(cat.path, cat.path_bak);
             } catch (std::exception &e) {
-                log.put(logging::WARNING, {"Failed to make backup of category ", category_name, " before saving it: ", e.what()});
+                log.put(logging::WARNING, {"Failed to make backup of category ", common::string_escape(category_name), " before saving it: ", e.what()});
             }
         }
-        cat.root->write_to_file(cat.path.c_str(), 4);
+        try {
+            cat.root->write_to_file(cat.path.c_str(), 4);
+        } catch (std::exception &e) {
+            log.put(logging::ERROR, {"Failed to save category ", common::string_escape(category_name), ": ", e.what()});
+        }
     }
     cat.changed = false;
 }
