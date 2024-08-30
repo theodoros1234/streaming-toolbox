@@ -5,7 +5,7 @@
 
 namespace strtb::json {
 
-enum val_type {VAL_NULL, VAL_BOOL, VAL_INT, VAL_FLOAT, VAL_STRING, VAL_ARRAY, VAL_OBJECT};
+enum val_type {VAL_NULL, VAL_BOOL, VAL_INT, VAL_FLOAT, VAL_STRING, VAL_ARRAY, VAL_OBJECT, VAL_UNDEFINED};
 
 class value {
 private:

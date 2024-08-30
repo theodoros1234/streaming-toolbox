@@ -254,7 +254,13 @@ json::val_type system::get_type(const std::string &category_name, const path_typ
         return get_category_root_type(category_name);
 
     std::lock_guard<std::mutex> guard(_lock);
-    return follow_path(category_name, path)->type();
+    try {
+        // Return type
+        return follow_path(category_name, path)->type();
+    } catch (broken_path &e) {
+        // Undefined type, if it doesn't exist
+        return json::VAL_UNDEFINED;
+    }
 }
 
 json::value* system::get_value(const std::string &category_name, const path_type &path) {
