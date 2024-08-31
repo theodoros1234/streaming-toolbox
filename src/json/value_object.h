@@ -13,6 +13,8 @@ namespace strtb::json {
 class value_object : public value {
 private:
     std::map<std::string, value*> _contents;
+    typedef std::map<std::string, value*>::iterator iterator;
+    typedef std::map<std::string, value*>::const_iterator const_iterator;
 public:
     value_object();
     value_object(const std::map<std::string, value*> &contents);
@@ -30,7 +32,15 @@ public:
     void set(const std::string &key, val_type type);
     void set(const std::string &key, const value_auto &value);
     void set_move(const std::string &key, value* new_val);
+    void set(iterator pos, val_type type);
+    void set(iterator pos, const value_auto &value);
+    void set_move(iterator pos, value* new_val);
     void erase(const std::string &key);
+    void erase(iterator pos);
+    iterator begin();
+    const_iterator begin() const;
+    iterator end();
+    const_iterator end() const;
     virtual void write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline = "\n") const;
 };
 

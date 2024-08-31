@@ -1,9 +1,4 @@
 #include "value_array.h"
-#include "value_null.h"
-#include "value_bool.h"
-#include "value_int.h"
-#include "value_float.h"
-#include "value_string.h"
 #include <stdexcept>
 
 using namespace strtb;
@@ -67,6 +62,21 @@ void value_array::set_move(const size_t pos, value* new_val) {
         throw std::runtime_error("nullptr was given in arguments");
     delete _contents.at(pos);
     _contents.at(pos) = new_val;
+}
+
+void value_array::set(iterator pos, val_type type) {
+    value_utils::change_default(&(*pos), type);
+}
+
+void value_array::set(iterator pos, const value_auto &new_val) {
+    value_utils::change_auto(&(*pos), new_val);
+}
+
+void value_array::set_move(iterator pos, value* new_val) {
+    if (!new_val)
+        throw std::runtime_error("nullptr was given in arguments");
+    delete *pos;
+    *pos = new_val;
 }
 
 value& value_array::at_back() {
@@ -142,12 +152,59 @@ void value_array::insert_move(const size_t pos, value* new_val) {
     _contents.insert(_contents.begin()+pos, new_val);
 }
 
+void value_array::insert(const_iterator pos, val_type type) {
+    if (pos < _contents.begin() && _contents.end() < pos)
+        throw std::out_of_range("Out of range");
+    value* new_obj = value_utils::new_default(type);
+    try {
+        _contents.insert(pos, new_obj);
+    } catch (...) {
+        delete new_obj;
+        throw;
+    }
+}
+
+void value_array::insert(const_iterator pos, const value_auto &new_val) {
+    if (pos < _contents.begin() && _contents.end() < pos)
+        throw std::out_of_range("Out of range");
+    value* new_obj = value_utils::new_auto(new_val);
+    try {
+        _contents.insert(pos, new_obj);
+    } catch (...) {
+        delete new_obj;
+        throw;
+    }
+}
+
+void value_array::insert_move(const_iterator pos, value* new_val) {
+    if (pos < _contents.begin() && _contents.end() < pos)
+        throw std::out_of_range("Out of range");
+    if (!new_val)
+        throw std::runtime_error("nullptr was given in arguments");
+    _contents.insert(pos, new_val);
+}
+
 void value_array::erase(const size_t pos) {
     if (pos >= _contents.size())
         throw std::out_of_range("Out of range");
     delete _contents.at(pos);
     _contents.erase(_contents.begin()+pos);
 }
+
+void value_array::erase(const_iterator pos) {
+    if (pos < _contents.begin() && _contents.end() <= pos)
+        throw std::out_of_range("Out of range");
+    delete *pos;
+    _contents.erase(pos);
+}
+
+value_array::iterator value_array::begin() {return _contents.begin();}
+
+value_array::const_iterator value_array::begin() const {return _contents.begin();}
+
+value_array::iterator value_array::end() {return _contents.end();}
+
+value_array::const_iterator value_array::end() const {return _contents.end();}
 
 void value_array::write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline) const {
     stream << '[';

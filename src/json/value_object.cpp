@@ -94,6 +94,22 @@ void value_object::set_move(const std::string &key, value* new_val) {
         itr->second = new_val;
     }
 }
+
+void value_object::set(iterator pos, val_type type) {
+    value_utils::change_default(&pos->second, type);
+}
+
+void value_object::set(iterator pos, const value_auto &new_val) {
+    value_utils::change_auto(&pos->second, new_val);
+}
+
+void value_object::set_move(iterator pos, value* new_val) {
+    if (!new_val)
+        throw std::runtime_error("nullptr was given in arguments");
+    delete pos->second;
+    pos->second = new_val;
+}
+
 void value_object::erase(const std::string &key) {
     auto itr = _contents.find(key);
     if (itr == _contents.end())
@@ -101,6 +117,19 @@ void value_object::erase(const std::string &key) {
     delete itr->second;
     _contents.erase(itr);
 }
+
+void value_object::erase(iterator pos) {
+    delete pos->second;
+    _contents.erase(pos);
+}
+
+value_object::iterator value_object::begin() {return _contents.begin();}
+
+value_object::const_iterator value_object::begin() const {return _contents.begin();}
+
+value_object::iterator value_object::end() {return _contents.end();}
+
+value_object::const_iterator value_object::end() const {return _contents.end();}
 
 void value_object::write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline) const {
     stream << '{';
