@@ -157,6 +157,7 @@ void system::load_category(const std::string &category_name) {
                 // Config file doesn't exist, or previous cases failed (inavlid json and failed backup), create new file.
                 {
                     // Make sure we can actually create the file
+                    std::filesystem::create_directories(_config_dir);
                     std::ofstream test_out(instance.path);
                     test_out.exceptions(std::ostream::failbit | std::ostream::badbit);
                     test_out << "{}" << std::endl;
@@ -197,6 +198,7 @@ void system::save_category(const std::string &category_name, bool force) {
             }
         }
         try {
+            std::filesystem::create_directories(_config_dir);
             cat.root->write_to_file(cat.path.c_str(), 4);
         } catch (std::exception &e) {
             log.put(logging::ERROR, {"Failed to save category ", common::string_escape(category_name), ": ", e.what()});

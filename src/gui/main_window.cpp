@@ -61,7 +61,13 @@ main_window::main_window(plugins::list *plugin_list, chat::interface *chat_if, c
 
 main_window::~main_window() {
     delete ui;
-    config_if->close_category(conf_cat);
+    if (is_config_loaded) {
+        try {
+            config_if->close_category(conf_cat);
+        } catch (std::exception &e) {
+            log.put(logging::WARNING, {"Failed to save window config: ", e.what()});
+        }
+    }
 }
 
 void main_window::resizeEvent(QResizeEvent *event) {
