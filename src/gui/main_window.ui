@@ -13,6 +13,10 @@
   <property name="windowTitle">
    <string>Streaming Toolbox</string>
   </property>
+  <property name="windowIcon">
+   <iconset theme="streaming-toolbox">
+    <normaloff>../../resources/icon/32/streaming-toolbox.png</normaloff>../../resources/icon/32/streaming-toolbox.png</iconset>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2">
     <item>

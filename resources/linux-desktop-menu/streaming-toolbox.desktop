@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Streaming Toolbox
+GenericName=Streaming Tools and Utilities
+Comment=Various tools for live streaming, all under one GUI
+Exec=streaming-toolbox
+Icon=streaming-toolbox
+Type=Application
+Categories=Utility;Qt
+Keywords=stream;streaming;streamer;tools;toolbox;live;live-stream;livestream;overlay;overlays
+StartupWMClass=streaming-toolbox
