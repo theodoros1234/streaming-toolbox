@@ -20,7 +20,7 @@ private:
     std::filesystem::path _path;
     struct {
         common::version (*get_libstrtb_version)();
-        plugins::plugin_info (*exchange_info)(const plugin_interface_map &interface_map);
+        plugins::plugin_info (*exchange_info)();
         bool (*activate)();
         void (*deactivate)();
     } functions;

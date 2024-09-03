@@ -12,7 +12,6 @@ using namespace strtb;
 
 namespace strtb::plugins {
 
-static plugin_interface_map interface_map;
 static logging::source log("Plugin Loader");
 
 plugin::plugin(fs::path path) {
@@ -54,12 +53,12 @@ plugin::plugin(fs::path path) {
         throw std::runtime_error("Missing functions");
     }
 
-    this->functions.exchange_info = reinterpret_cast<strtb::plugins::plugin_info (*)(const plugin_interface_map&)>(ptr_exchange_info);
+    this->functions.exchange_info = reinterpret_cast<strtb::plugins::plugin_info (*)()>(ptr_exchange_info);
     this->functions.activate = reinterpret_cast<bool (*)()>(ptr_activate);
     this->functions.deactivate = reinterpret_cast<void (*)()>(ptr_deactivate);
 
     // Exchange basic info with plugin
-    this->_info = this->functions.exchange_info(interface_map);
+    this->_info = this->functions.exchange_info();
     log.put(logging::DEBUG, {"Loaded ", common::string_escape(this->_info.name)});
     this->activate();
 }
