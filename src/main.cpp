@@ -66,7 +66,8 @@ int main(int argc, char *argv[]) {
 
     // Init other things
     chat::system chat_system;
-    plugins::plugin::set_interfaces(&chat_system, &config_system);
+    chat::main = &chat_system;
+    plugins::plugin::set_interfaces(&config_system);
     plugins::loader plugin_loader;
 
     // Load user plugins
@@ -74,7 +75,7 @@ int main(int argc, char *argv[]) {
         plugin_loader.load_plugins(std::string(home_path) + "/.local/share/streaming-toolbox/plugins");
 
     // Start GUI
-    gui::main_window w(&plugin_loader, &chat_system, &config_system);
+    gui::main_window w(&plugin_loader, &config_system);
     w.show();
     return a.exec();
 }

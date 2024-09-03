@@ -1,5 +1,6 @@
 #include "plugin.h"
 #include "link.h"
+#include "../logging/logging.h"
 #include "../common/strescape.h"
 
 #include <filesystem>
@@ -131,8 +132,7 @@ plugin_basic_info plugin::info() {
     };
 }
 
-void plugin::set_interfaces(chat::interface *chat_if, config::interface *config_if) {
-    interface_map[INTERFACE_CHAT] = chat_if;
+void plugin::set_interfaces(config::interface *config_if) {
     interface_map[INTERFACE_CONFIG] = config_if;
 }
 

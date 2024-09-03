@@ -1,12 +1,13 @@
 #include "chat_tab.h"
 #include "ui_chat_tab.h"
+#include "../chat/system.h"
 
 #include <QScrollBar>
 
 using namespace strtb;
 using namespace strtb::gui;
 
-chat_tab::chat_tab(chat::interface *chat_if, QWidget *parent)
+chat_tab::chat_tab(QWidget *parent)
     : QWidget(parent), log("GUI: Chat tab"), ui(new Ui::chat_tab) {
     // Set up UI and objects
     ui->setupUi(this);
@@ -19,7 +20,7 @@ chat_tab::chat_tab(chat::interface *chat_if, QWidget *parent)
 
     // Try subscribing to chat and creating thread that listens to it
     try {
-        this->chat_sub = chat_if->subscribe("", "");
+        this->chat_sub = chat::main->subscribe("", "");
         this->chat_sub_thread = new chat_subscription_thread(&this->log, this->chat_sub);
         QObject::connect(this->chat_sub_thread, &chat_subscription_thread::messages_received, this, &chat_tab::message_received, Qt::QueuedConnection);
         this->chat_sub_thread->start();

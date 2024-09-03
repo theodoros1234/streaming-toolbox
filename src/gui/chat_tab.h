@@ -1,7 +1,6 @@
 #ifndef STRTB_GUI_CHAT_TAB_H
 #define STRTB_GUI_CHAT_TAB_H
 
-#include "../chat/interface.h"
 #include "../chat/subscription.h"
 #include "../logging/logging.h"
 #include "chat_subscription_thread.h"
@@ -19,7 +18,7 @@ class chat_tab : public QWidget {
     Q_OBJECT
 
 public:
-    explicit chat_tab(chat::interface *chat_if, QWidget *parent = nullptr);
+    explicit chat_tab(QWidget *parent = nullptr);
     ~chat_tab();
 private:
     logging::source log;

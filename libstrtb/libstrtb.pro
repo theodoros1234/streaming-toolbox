@@ -33,15 +33,16 @@ SOURCES += \
     ../src/chat/provider.cpp \
     ../src/chat/queue.cpp \
     ../src/chat/subscription.cpp \
+    ../src/chat/system.cpp \
     ../src/unicode/unicode.cpp
 
 HEADERS += \
     ../src/chat/channel.h \
-    ../src/chat/interface.h \
     ../src/chat/message.h \
     ../src/chat/provider.h \
     ../src/chat/queue.h \
     ../src/chat/subscription.h \
+    ../src/chat/system.h \
     ../src/common/deregistration_interface.h \
     ../src/common/strescape.h \
     ../src/common/version.h \

@@ -1,7 +1,6 @@
 #ifndef STRTB_CHAT_SYSTEM_H
 #define STRTB_CHAT_SYSTEM_H
 
-#include "interface.h"
 #include "queue.h"
 #include "provider.h"
 #include "subscription.h"
@@ -12,7 +11,13 @@
 
 namespace strtb::chat {
 
-class system : public interface, common::deregistration_interface<provider*>, common::deregistration_interface<subscription*> {
+struct system_channel_info {
+    int provider_count;
+    int channel_count;
+    std::vector<provider_info> providers;
+};
+
+class system : common::deregistration_interface<provider*>, common::deregistration_interface<subscription*> {
 private:
     // Types for subscription map
     typedef std::map<subscription*, queue*> sub_map_sublist;
@@ -31,13 +36,15 @@ private:
     sub_map_providers subscriptions;
 public:
     system();
-    ~system();
-    interface_channel_info get_channel_info();
+    virtual ~system();
+    system_channel_info get_channel_info();
     provider* register_provider(std::string id, std::string name);
     subscription* subscribe(std::string provider_id, std::string channel_id);
     void deregister(provider* object);
     void deregister(subscription* object);
 };
+
+extern system *main;
 
 }
 

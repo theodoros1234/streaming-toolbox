@@ -19,11 +19,11 @@ using namespace strtb::gui;
 
 static const std::string conf_cat = "gui_main_window";
 
-main_window::main_window(plugins::list *plugin_list, chat::interface *chat_if, config::interface *config_if, QWidget *parent)
+main_window::main_window(plugins::list *plugin_list, config::interface *config_if, QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , plugin_tab(plugin_list)
-    , chat_tab(chat_if)
+    , chat_tab()
     , config_if(config_if)
     , log("GUI: Main Window") {
 

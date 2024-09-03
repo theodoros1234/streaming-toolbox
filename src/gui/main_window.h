@@ -2,7 +2,6 @@
 #define STRTB_GUI_MAIN_WINDOW_H
 
 #include "../plugins/list.h"
-#include "../chat/interface.h"
 #include "../config/interface.h"
 #include "../logging/logging.h"
 #include "chat_tab.h"
@@ -24,7 +23,7 @@ class main_window : public QMainWindow {
     Q_OBJECT
 
 public:
-    main_window(plugins::list *plugin_list, chat::interface *chat_if, config::interface *config_if, QWidget *parent = nullptr);
+    main_window(plugins::list *plugin_list, config::interface *config_if, QWidget *parent = nullptr);
     ~main_window();
 
 protected:

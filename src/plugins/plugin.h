@@ -2,7 +2,6 @@
 #define STRTB_PLUGINS_PLUGIN_H
 
 #include "link.h"
-#include "../chat/interface.h"
 #include "../common/version.h"
 #include "../config/interface.h"
 #include <filesystem>
@@ -28,7 +27,7 @@ private:
     } functions;
 
 public:
-    static void set_interfaces(chat::interface *chat_if, config::interface *config_if);
+    static void set_interfaces(config::interface *config_if);
     plugin(std::filesystem::path path);
     ~plugin();
     void activate();

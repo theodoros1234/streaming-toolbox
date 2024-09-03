@@ -22,11 +22,9 @@ SOURCES += \
     ../src/main.cpp \
     ../src/plugins/plugin.cpp \
     ../src/plugins/loader.cpp \
-    ../src/chat/system.cpp \
 
 HEADERS += \
     ../src/chat/channel.h \
-    ../src/chat/interface.h \
     ../src/chat/message.h \
     ../src/chat/provider.h \
     ../src/chat/queue.h \

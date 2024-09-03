@@ -5,6 +5,8 @@
 using namespace strtb;
 using namespace strtb::chat;
 
+chat::system *chat::main = nullptr;
+
 system::system() : log("Chat System") {
     // Start incoming message thread
     this->incoming = new queue();
@@ -111,8 +113,8 @@ system::~system() {
     }
 }
 
-interface_channel_info system::get_channel_info() {
-    interface_channel_info info;
+system_channel_info system::get_channel_info() {
+    system_channel_info info;
     info.provider_count = this->providers.size();
     info.channel_count = 0;
     // Get info from all providers
