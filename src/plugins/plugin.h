@@ -3,7 +3,6 @@
 
 #include "link.h"
 #include "../common/version.h"
-#include "../config/interface.h"
 #include <filesystem>
 #include <QWidget>
 
@@ -27,7 +26,6 @@ private:
     } functions;
 
 public:
-    static void set_interfaces(config::interface *config_if);
     plugin(std::filesystem::path path);
     ~plugin();
     void activate();

@@ -16,8 +16,8 @@ include( ../version.pri )
 SOURCES += \
     ../src/common/strescape.cpp \
     ../src/common/version.cpp \
+    ../src/config/system.cpp \
     ../src/config/id_type.cpp \
-    ../src/config/interface.cpp \
     ../src/json/parser.cpp \
     ../src/json/value.cpp \
     ../src/json/value_array.cpp \
@@ -47,7 +47,7 @@ HEADERS += \
     ../src/common/strescape.h \
     ../src/common/version.h \
     ../src/config/id_type.h \
-    ../src/config/interface.h \
+    ../src/config/system.h \
     ../src/json/all_value_types.h \
     ../src/json/parser.h \
     ../src/json/value.h \

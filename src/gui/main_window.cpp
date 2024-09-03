@@ -2,6 +2,8 @@
 #include "ui_main_window.h"
 #include "../plugins/list.h"
 #include "../common/version.h"
+#include "../config/system.h"
+#include "../json/all_value_types.h"
 
 #include <QObject>
 #include <QListWidget>
@@ -19,12 +21,11 @@ using namespace strtb::gui;
 
 static const std::string conf_cat = "gui_main_window";
 
-main_window::main_window(plugins::list *plugin_list, config::interface *config_if, QWidget *parent)
+main_window::main_window(plugins::list *plugin_list, QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , plugin_tab(plugin_list)
     , chat_tab()
-    , config_if(config_if)
     , log("GUI: Main Window") {
 
     // Set up window and tabs
@@ -35,20 +36,20 @@ main_window::main_window(plugins::list *plugin_list, config::interface *config_i
 
     // Load window config
     try {
-        config_if->load_category(conf_cat);
-        if (config_if->get_category_root_type(conf_cat) != json::VAL_OBJECT)
-            config_if->set_category_root(conf_cat, json::VAL_OBJECT);
-        if (config_if->get_type(conf_cat, {"window_width"}) == json::VAL_INT &&
-            config_if->get_type(conf_cat, {"window_height"}) == json::VAL_INT) {
+        config::main->load_category(conf_cat);
+        if (config::main->get_category_root_type(conf_cat) != json::VAL_OBJECT)
+            config::main->set_category_root(conf_cat, json::VAL_OBJECT);
+        if (config::main->get_type(conf_cat, {"window_width"}) == json::VAL_INT &&
+            config::main->get_type(conf_cat, {"window_height"}) == json::VAL_INT) {
             json::value *width, *height;
-            width = config_if->get_value(conf_cat, {"window_width"});
-            height = config_if->get_value(conf_cat, {"window_height"});
+            width = config::main->get_value(conf_cat, {"window_width"});
+            height = config::main->get_value(conf_cat, {"window_height"});
             this->resize(((json::value_int*) width)->value(), ((json::value_int*) height)->value());
             delete width;
             delete height;
         }
-        if (config_if->get_type(conf_cat, {"window_is_maximized"}) == json::VAL_BOOL) {
-            json::value *maximized = config_if->get_value(conf_cat, {"window_is_maximized"});
+        if (config::main->get_type(conf_cat, {"window_is_maximized"}) == json::VAL_BOOL) {
+            json::value *maximized = config::main->get_value(conf_cat, {"window_is_maximized"});
             if (((json::value_bool*) maximized)->value())
                 this->setWindowState(Qt::WindowMaximized);
             delete maximized;
@@ -63,7 +64,7 @@ main_window::~main_window() {
     delete ui;
     if (is_config_loaded) {
         try {
-            config_if->close_category(conf_cat);
+            config::main->close_category(conf_cat);
         } catch (std::exception &e) {
             log.put(logging::WARNING, {"Failed to save window config: ", e.what()});
         }
@@ -75,11 +76,11 @@ void main_window::resizeEvent(QResizeEvent *event) {
         return;
     try {
         if (this->isMaximized()) {
-            config_if->set_value(conf_cat, {"window_is_maximized"}, true);
+            config::main->set_value(conf_cat, {"window_is_maximized"}, true);
         } else {
-            config_if->set_value(conf_cat, {"window_is_maximized"}, false);
-            config_if->set_value(conf_cat, {"window_width"}, event->size().width());
-            config_if->set_value(conf_cat, {"window_height"}, event->size().height());
+            config::main->set_value(conf_cat, {"window_is_maximized"}, false);
+            config::main->set_value(conf_cat, {"window_width"}, event->size().width());
+            config::main->set_value(conf_cat, {"window_height"}, event->size().height());
         }
     } catch (std::exception &e) {
         log.put(logging::DEBUG, {"Failed to save window size and state: ", e.what()});

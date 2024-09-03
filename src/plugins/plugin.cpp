@@ -132,8 +132,4 @@ plugin_basic_info plugin::info() {
     };
 }
 
-void plugin::set_interfaces(config::interface *config_if) {
-    interface_map[INTERFACE_CONFIG] = config_if;
-}
-
 }
