@@ -39,6 +39,7 @@ HEADERS += \
     ../src/gui/main_window.h \
     ../src/gui/plugin_tab.h \
     ../src/json/all_value_types.h \
+    ../src/json/cast.h \
     ../src/json/parser.h \
     ../src/json/value.h \
     ../src/json/value_array.h \

@@ -5,6 +5,28 @@
 using namespace strtb;
 using namespace strtb::json;
 
+std::string strtb::json::val_type_str(val_type type) {
+    switch (type) {
+    case VAL_NULL:
+        return "strtb::json::value_null";
+    case VAL_BOOL:
+        return "strtb::json::value_bool";
+    case VAL_INT:
+        return "strtb::json::value_int";
+    case VAL_FLOAT:
+        return "strtb::json::value_float";
+    case VAL_STRING:
+        return "strtb::json::value_string";
+    case VAL_ARRAY:
+        return "strtb::json::value_array";
+    case VAL_OBJECT:
+        return "strtb::json::value_object";
+    case VAL_UNDEFINED:
+    default:
+        return "(unknown json type)";
+    }
+}
+
 const char* invalid_type::what() const noexcept {return "invalid or unwanted json value type";}
 
 value::value(val_type type) : _type(type) {}
