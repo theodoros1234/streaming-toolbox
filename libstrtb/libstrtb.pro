@@ -35,6 +35,7 @@ SOURCES += \
     ../src/chat/queue.cpp \
     ../src/chat/subscription.cpp \
     ../src/chat/system.cpp \
+    ../src/networking/tcp_client.cpp \
     ../src/unicode/unicode.cpp
 
 HEADERS += \
@@ -62,6 +63,7 @@ HEADERS += \
     ../src/json/value_string.h \
     ../src/json/value_utils.h \
     ../src/logging/logging.h \
+    ../src/networking/tcp_client.h \
     ../src/plugins/link.h \
     ../src/unicode/unicode.h
 
