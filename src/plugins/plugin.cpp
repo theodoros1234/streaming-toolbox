@@ -22,7 +22,9 @@ plugin::plugin(fs::path path) {
     this->library = dlopen(path.c_str(), RTLD_NOW);
     if (this->library == NULL) {
         // Plugin wasn't loaded
-        throw std::runtime_error(dlerror());
+        const char* error = dlerror();
+        log.put(logging::ERROR, {"Failed loading ", path.filename(), ": ", error});
+        throw std::runtime_error(error);
     }
 
     // Check plugins libstrtb version
