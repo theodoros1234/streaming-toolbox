@@ -77,7 +77,7 @@ DISTFILES +=
 # Header files for plugin development
 HEADER_INCLUDE_DIR = /usr/include/$${TARGET}
 for(header, HEADERS) {
-    header_r = $$replace(header, "../src/", ""))
+    header_r = $$replace(header, "../src/", "")
     header_r_dir = $$dirname(header_r)
     eval(header_include_dir_$${header_r_dir}.path = $${HEADER_INCLUDE_DIR}/$${header_r_dir}))
     eval(header_include_dir_$${header_r_dir}.files += $$header))

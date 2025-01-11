@@ -1,4 +1,5 @@
 #include "tcp_client.h"
+#include <stdexcept>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -9,6 +10,7 @@
 using namespace strtb::networking;
 
 internal_error::internal_error(const char* what, int what_errno) : _what(what), _errno(what_errno) {}
+internal_error::internal_error(int what_errno) : _what(strerror(what_errno)), _errno(what_errno) {}
 const char* internal_error::what() const noexcept {return _what.c_str();}
 int internal_error::what_errno() const noexcept {return _errno;}
 
@@ -17,14 +19,32 @@ const char* address_resolution_error::what() const noexcept {return _what.c_str(
 int address_resolution_error::what_errno() const noexcept {return _errno;}
 
 connection_error::connection_error(const char* what, int what_errno) : _what(what), _errno(what_errno) {}
+connection_error::connection_error(int what_errno) : _what(strerror(what_errno)), _errno(what_errno) {}
 const char* connection_error::what() const noexcept {return _what.c_str();}
 int connection_error::what_errno() const noexcept {return _errno;}
+
+connection_closed::connection_closed(const char* what, int what_errno) : _what(what), _errno(what_errno) {}
+connection_closed::connection_closed(int what_errno) : _what(strerror(what_errno)), _errno(what_errno) {}
+const char* connection_closed::what() const noexcept {return _what.c_str();}
+int connection_closed::what_errno() const noexcept {return _errno;}
 
 struct strtb::networking::tcp_client_platform_specific {
     int sock = -1;
 };
 
-tcp_client::tcp_client(const char* address, uint16_t port) : _pl(new tcp_client_platform_specific) {
+tcp_client::tcp_client() : _pl(new tcp_client_platform_specific), _line_leftovers(0) {}
+
+void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
+    std::lock_guard<std::mutex> guard(_lock);
+    if (_pl->sock != -1) {  // Socket is already open (and possibly connected)
+        if (reconnect) {
+            ::shutdown(_pl->sock, SHUT_RDWR);
+            ::close(_pl->sock);
+        } else {
+            throw connection_closed("socket already open", 0);
+        }
+    }
+
     // Get target host info
     struct addrinfo gai_hints = {
         .ai_flags = 0,
@@ -47,10 +67,8 @@ tcp_client::tcp_client(const char* address, uint16_t port) : _pl(new tcp_client_
     case EAI_FAIL:
     case EAI_NODATA:
     case EAI_NONAME:
-        delete _pl;
         throw address_resolution_error(gai_strerror(gai_err), gai_err);
     default:
-        delete _pl;
         throw internal_error(gai_strerror(gai_err), gai_err);
     }
 
@@ -61,8 +79,8 @@ tcp_client::tcp_client(const char* address, uint16_t port) : _pl(new tcp_client_
         // Try to connect to a socket through any of the returned results
         _pl->sock = socket(item->ai_family, item->ai_socktype, item->ai_protocol);
         if (_pl->sock != -1) {  // Socket creation successful
-            if (connect(_pl->sock, item->ai_addr, item->ai_addrlen) == -1) {    // Connection failed
-                close(_pl->sock);
+            if (::connect(_pl->sock, item->ai_addr, item->ai_addrlen) == -1) {    // Connection failed
+                ::close(_pl->sock);
                 _pl->sock = -1;
 
                 // Determine what went wrong
@@ -122,15 +140,152 @@ tcp_client::tcp_client(const char* address, uint16_t port) : _pl(new tcp_client_
 
     freeaddrinfo(gai_result);
 
-    if (_pl->sock == -1) {  // Failed to connect
-        delete _pl;
-        throw connection_error(strerror(connect_error), connect_error);
+    if (_pl->sock == -1)    // Failed to connect
+        throw connection_error(connect_error);
+}
+
+void tcp_client::connect(const std::string& address, uint16_t port, bool reconnect) {
+    connect(address.c_str(), port, reconnect);
+}
+
+tcp_client::~tcp_client() {
+    std::lock_guard<std::mutex> guard(_lock);
+    if (_pl->sock != -1) {
+        ::shutdown(_pl->sock, SHUT_RDWR);
+        ::close(_pl->sock);
+    }
+    delete _pl;
+}
+
+ssize_t tcp_client::recv() {
+    ssize_t result = ::recv(_pl->sock, _buffer + _line_leftovers, STRTB_NETWORKING_RECV_BUFFER_SIZE - _line_leftovers, 0);
+    if (result == -1) switch (errno) {      // Error
+    case ECONNREFUSED:
+        throw connection_error(errno);
+    default:
+        throw internal_error(errno);
+    } else {                                // Success, or connection closed normally
+        ssize_t r = result + _line_leftovers;
+        _line_leftovers = 0;
+        return r;
     }
 }
 
-tcp_client::tcp_client(const std::string& address, uint16_t port) : tcp_client(address.c_str(), port) {};
+ssize_t tcp_client::send(const char* buf, size_t len) {
+    int sock;
+    {
+        // Check that the socket has been opened before sending through it.
+        // However, it is still NOT safe to close an open socket when there are still other threads
+        // that could send to it. If you need to close an open socket for reconnecting,
+        // while other threads might want to send data, call connect(..., reconnect=true).
+        // NOTE: Closing is different than shutting down, shutdown is safe.
+        std::lock_guard<std::mutex> guard(_lock);
+        sock = _pl->sock;
+        if (sock == -1)
+            throw connection_closed("socket closed or hasn't been opened yet", 0);
+    }
 
-tcp_client::~tcp_client() {
-    close(_pl->sock);
-    delete _pl;
+    ssize_t result = ::send(sock, buf, len, MSG_NOSIGNAL);
+    if (result == -1) switch (errno) {      // Error
+    case ECONNRESET:
+        throw connection_error(errno);
+    case EPIPE:
+    case ENOTCONN:
+        throw connection_closed(errno);
+    default:
+        throw internal_error(errno);
+    } else return result;
+}
+
+ssize_t tcp_client::send(const std::string& buf) {
+    return send(buf.data(), buf.size());
+}
+
+std::lock_guard<std::mutex> tcp_client::acquire_send_lock() {
+    return std::lock_guard<std::mutex>(_send_lock);
+}
+
+static int shutdown_convert[2][2] = {{-1, SHUT_WR}, {SHUT_RD, SHUT_RDWR}};
+
+void tcp_client::shutdown(bool receive, bool send) {
+    if (shutdown_convert[receive][send] == -1) {
+        throw std::invalid_argument("nothing to shut down, receive and send arguments are both false");
+    } else {
+        std::lock_guard<std::mutex> guard(_lock);
+        if (_pl->sock == -1)
+            throw connection_closed("socket closed or hasn't been opened yet", 0);
+        else
+            ::shutdown(_pl->sock, shutdown_convert[receive][send]);
+    }
+}
+
+void tcp_client::close() {
+    std::lock_guard<std::mutex> guard(_lock);
+    if (_pl->sock == -1)
+        throw connection_closed("socket already closed or hasn't been opened yet", 0);
+    else
+        ::close(_pl->sock);
+}
+
+std::string tcp_client::recv_line(const std::string& endline, size_t max_len) {
+    // Up to 2 characters allowed for endline argument
+    if (endline.size() > 2)
+        throw std::invalid_argument("recv_line: endline must have at most 2 characters");
+    // endline cannot be empty
+    if (endline.empty())
+        throw std::invalid_argument("recv_line: endline cannot be empty");
+    // max_len must at least be as long as the endline
+    if (max_len < endline.size())
+        throw std::invalid_argument("recv_line: max_len must be at least as long as the endline");
+
+    std::string line;
+    ssize_t received, i;
+    bool more = true;
+    do {
+        if (_line_leftovers) {
+            // Read any previous leftovers first
+            received = _line_leftovers;
+            _line_leftovers = 0;
+        } else {
+            // Keep receiving more data while the line has not ended yet
+            received = recv();
+        }
+        // Stop if no data was received (socket is closed)
+        if (received == 0)
+            return line;
+        // Examine each block of received data separately
+        for (i=0; i<received; i++) {
+            line.push_back(_buffer[i]);
+
+            // Check for maximum length
+            if (line.size() >= max_len) {
+                more = false;
+                break;
+            }
+
+            // Check for endline
+            if (_buffer[i] == endline.back()) {
+                // Also handle 2 character endlines
+                if (endline.size() == 2) {
+                    if (line.size() >= 2 && line[line.size() - 2] == endline.front()) {
+                        more = false;
+                        break;
+                    }
+                } else {
+                    more = false;
+                    break;
+                }
+            }
+        }
+    } while (more);
+    i++;    // fixes following math
+
+    // Move back any excess bytes left in the receive buffer
+    if (i < received) {
+        _line_leftovers = received - i;
+        memmove(_buffer, _buffer + i, _line_leftovers);
+    } else {
+        _line_leftovers = 0;
+    }
+    return line;
 }
