@@ -5,28 +5,9 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <arpa/inet.h>
-#include <string.h>
+#include <cstring>
 
 using namespace strtb::networking;
-
-internal_error::internal_error(const char* what, int what_errno) : _what(what), _errno(what_errno) {}
-internal_error::internal_error(int what_errno) : _what(strerror(what_errno)), _errno(what_errno) {}
-const char* internal_error::what() const noexcept {return _what.c_str();}
-int internal_error::what_errno() const noexcept {return _errno;}
-
-address_resolution_error::address_resolution_error(const char* what, int what_errno) : _what(what), _errno(what_errno) {}
-const char* address_resolution_error::what() const noexcept {return _what.c_str();}
-int address_resolution_error::what_errno() const noexcept {return _errno;}
-
-connection_error::connection_error(const char* what, int what_errno) : _what(what), _errno(what_errno) {}
-connection_error::connection_error(int what_errno) : _what(strerror(what_errno)), _errno(what_errno) {}
-const char* connection_error::what() const noexcept {return _what.c_str();}
-int connection_error::what_errno() const noexcept {return _errno;}
-
-connection_closed::connection_closed(const char* what, int what_errno) : _what(what), _errno(what_errno) {}
-connection_closed::connection_closed(int what_errno) : _what(strerror(what_errno)), _errno(what_errno) {}
-const char* connection_closed::what() const noexcept {return _what.c_str();}
-int connection_closed::what_errno() const noexcept {return _errno;}
 
 struct strtb::networking::tcp_client_platform_specific {
     int sock = -1;
@@ -47,10 +28,10 @@ void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
 
     // Get target host info
     struct addrinfo gai_hints = {
-        .ai_flags = 0,
+        .ai_flags = AI_NUMERICSERV,
         .ai_family = AF_UNSPEC,
         .ai_socktype = SOCK_STREAM,
-        .ai_protocol = 0,
+        .ai_protocol = IPPROTO_TCP,
         .ai_addrlen = 0,
         .ai_addr = NULL,
         .ai_canonname = NULL,
@@ -207,24 +188,24 @@ std::lock_guard<std::mutex> tcp_client::acquire_send_lock() {
 
 static int shutdown_convert[2][2] = {{-1, SHUT_WR}, {SHUT_RD, SHUT_RDWR}};
 
-void tcp_client::shutdown(bool receive, bool send) {
+bool tcp_client::shutdown(bool receive, bool send) {
     if (shutdown_convert[receive][send] == -1) {
         throw std::invalid_argument("nothing to shut down, receive and send arguments are both false");
-    } else {
-        std::lock_guard<std::mutex> guard(_lock);
-        if (_pl->sock == -1)
-            throw connection_closed("socket closed or hasn't been opened yet", 0);
-        else
-            ::shutdown(_pl->sock, shutdown_convert[receive][send]);
     }
-}
 
-void tcp_client::close() {
     std::lock_guard<std::mutex> guard(_lock);
     if (_pl->sock == -1)
-        throw connection_closed("socket already closed or hasn't been opened yet", 0);
-    else
-        ::close(_pl->sock);
+        return false;
+    ::shutdown(_pl->sock, shutdown_convert[receive][send]);
+    return true;
+}
+
+bool tcp_client::close() {
+    std::lock_guard<std::mutex> guard(_lock);
+    if (_pl->sock == -1)
+        return false;
+    ::close(_pl->sock);
+    return true;
 }
 
 std::string tcp_client::recv_line(const std::string& endline, size_t max_len) {

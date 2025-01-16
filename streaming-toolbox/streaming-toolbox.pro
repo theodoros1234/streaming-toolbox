@@ -51,7 +51,9 @@ HEADERS += \
     ../src/json/value_string.h \
     ../src/json/value_utils.h \
     ../src/logging/logging.h \
+    ../src/networking/exceptions.h \
     ../src/networking/tcp_client.h \
+    ../src/networking/tcp_server.h \
     ../src/plugins/plugin.h \
     ../src/plugins/link.h \
     ../src/plugins/list.h \
