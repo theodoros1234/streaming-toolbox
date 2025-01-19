@@ -22,7 +22,7 @@ void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
             ::shutdown(_pl->sock, SHUT_RDWR);
             ::close(_pl->sock);
         } else {
-            throw connection_closed("socket already open", 0);
+            throw connection_error("socket already open", 0);
         }
     }
 
