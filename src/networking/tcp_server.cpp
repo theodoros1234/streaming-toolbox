@@ -17,7 +17,7 @@ struct strtb::networking::tcp_server_platform_specific {
     bool shutdown_sent = true, shutdown_received = true;
 };
 
-tcp_server::tcp_server() : _pl(new tcp_server_platform_specific) {
+tcp_server::tcp_server() : _pl(new tcp_server_platform_specific), _ip_family(0), _port(0), _backlog(0), _max_active(0) {
     // Create new eventfd (used for shutting down server from another thread)
     _pl->event = eventfd(0, 0);
     if (_pl->event == -1)
@@ -76,8 +76,14 @@ void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int 
     _pl->sock = socket(_pl->af, SOCK_STREAM, 0);
     if (_pl->sock == -1) switch (errno) {
     case EACCES:
+        _ip = "";
+        _ip_family = 0;
+        _port = 0;
         throw connection_error(errno);
     default:
+        _ip = "";
+        _ip_family = 0;
+        _port = 0;
         throw internal_error(errno);
     }
 
@@ -96,6 +102,9 @@ void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int 
                 connection_error e(errno);
                 ::close(_pl->sock);
                 _pl->sock = -1;
+                _ip = "";
+                _ip_family = 0;
+                _port = 0;
                 throw e;
             }
         }
@@ -115,12 +124,18 @@ void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int 
                 connection_error e(errno);
                 ::close(_pl->sock);
                 _pl->sock = -1;
+                _ip = "";
+                _ip_family = 0;
+                _port = 0;
                 throw e;
             }
         }
         break;
 
     default:
+        _ip = "";
+        _ip_family = 0;
+        _port = 0;
         throw internal_error("Unreachable code was reached, this is either a weird bug in Streaming Toolbox, or your CPU is unstable.", 0);
     }
 
@@ -129,6 +144,9 @@ void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int 
         connection_error e(errno);
         ::close(_pl->sock);
         _pl->sock = -1;
+        _ip = "";
+        _ip_family = 0;
+        _port = 0;
         throw e;
     }
 }
@@ -238,5 +256,8 @@ bool tcp_server::close() {
         return false;
     ::close(_pl->sock);
     // TODO: Also wait for all connected clients to close
+    _ip = "";
+    _ip_family = 0;
+    _port = 0;
     return true;
 }

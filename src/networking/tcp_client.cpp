@@ -1,5 +1,4 @@
 #include "tcp_client.h"
-#include <stdexcept>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -9,11 +8,7 @@
 
 using namespace strtb::networking;
 
-struct strtb::networking::tcp_client_platform_specific {
-    int sock = -1;
-};
-
-tcp_client::tcp_client() : _pl(new tcp_client_platform_specific), _line_leftovers(0) {}
+tcp_client::tcp_client() : tcp_socket() {}
 
 void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
     std::lock_guard<std::mutex> guard(_lock);
@@ -56,7 +51,8 @@ void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
     int connect_error = 0;
     int connect_error_priority = 0;
 
-    for (struct addrinfo* item = gai_result; item != NULL; item = item->ai_next) {
+    struct addrinfo* item = NULL;
+    for (item = gai_result; item != NULL; item = item->ai_next) {
         // Try to connect to a socket through any of the returned results
         _pl->sock = socket(item->ai_family, item->ai_socktype, item->ai_protocol);
         if (_pl->sock != -1) {  // Socket creation successful
@@ -119,6 +115,31 @@ void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
         }
     }
 
+    // Store remote host's IP and port
+    if (_pl->sock != -1) {
+        char remote_ip_char[INET6_ADDRSTRLEN] = {0};
+        switch (item->ai_family) {
+        case AF_INET:
+            if (inet_ntop(AF_INET, &((sockaddr_in*) item->ai_addr)->sin_addr, remote_ip_char, INET6_ADDRSTRLEN) == NULL)
+                _remote_ip = "unknown";
+            else
+                _remote_ip = remote_ip_char;
+            _remote_port = ntohs(((sockaddr_in*) item->ai_addr)->sin_port);
+            break;
+
+        case AF_INET6:
+            if (inet_ntop(AF_INET6, &((sockaddr_in6*) item->ai_addr)->sin6_addr, remote_ip_char, INET6_ADDRSTRLEN) == NULL)
+                _remote_ip = "unknown";
+            else
+                _remote_ip = remote_ip_char;
+            _remote_port = ntohs(((sockaddr_in6*) item->ai_addr)->sin6_port);
+            break;
+
+        default:
+            _remote_ip = "unknown";
+        }
+    }
+
     freeaddrinfo(gai_result);
 
     if (_pl->sock == -1)    // Failed to connect
@@ -129,144 +150,21 @@ void tcp_client::connect(const std::string& address, uint16_t port, bool reconne
     connect(address.c_str(), port, reconnect);
 }
 
-tcp_client::~tcp_client() {
-    std::lock_guard<std::mutex> guard(_lock);
-    if (_pl->sock != -1) {
-        ::shutdown(_pl->sock, SHUT_RDWR);
-        ::close(_pl->sock);
-    }
-    delete _pl;
-}
-
-ssize_t tcp_client::recv() {
-    ssize_t result = ::recv(_pl->sock, _buffer + _line_leftovers, STRTB_NETWORKING_RECV_BUFFER_SIZE - _line_leftovers, 0);
-    if (result == -1) switch (errno) {      // Error
-    case ECONNREFUSED:
-        throw connection_error(errno);
-    default:
-        throw internal_error(errno);
-    } else {                                // Success, or connection closed normally
-        ssize_t r = result + _line_leftovers;
-        _line_leftovers = 0;
-        return r;
-    }
-}
-
-ssize_t tcp_client::send(const char* buf, size_t len) {
-    int sock;
-    {
-        // Check that the socket has been opened before sending through it.
-        // However, it is still NOT safe to close an open socket when there are still other threads
-        // that could send to it. If you need to close an open socket for reconnecting,
-        // while other threads might want to send data, call connect(..., reconnect=true).
-        // NOTE: Closing is different than shutting down, shutdown is safe.
-        std::lock_guard<std::mutex> guard(_lock);
-        sock = _pl->sock;
-        if (sock == -1)
-            throw connection_closed("socket closed or hasn't been opened yet", 0);
-    }
-
-    ssize_t result = ::send(sock, buf, len, MSG_NOSIGNAL);
-    if (result == -1) switch (errno) {      // Error
-    case ECONNRESET:
-        throw connection_error(errno);
-    case EPIPE:
-    case ENOTCONN:
-        throw connection_closed(errno);
-    default:
-        throw internal_error(errno);
-    } else return result;
-}
-
-ssize_t tcp_client::send(const std::string& buf) {
-    return send(buf.data(), buf.size());
-}
-
-std::lock_guard<std::mutex> tcp_client::acquire_send_lock() {
-    return std::lock_guard<std::mutex>(_send_lock);
-}
-
-static int shutdown_convert[2][2] = {{-1, SHUT_WR}, {SHUT_RD, SHUT_RDWR}};
-
-bool tcp_client::shutdown(bool receive, bool send) {
-    if (shutdown_convert[receive][send] == -1) {
-        throw std::invalid_argument("nothing to shut down, receive and send arguments are both false");
-    }
-
-    std::lock_guard<std::mutex> guard(_lock);
-    if (_pl->sock == -1)
-        return false;
-    ::shutdown(_pl->sock, shutdown_convert[receive][send]);
-    return true;
-}
-
 bool tcp_client::close() {
-    std::lock_guard<std::mutex> guard(_lock);
-    if (_pl->sock == -1)
-        return false;
-    ::close(_pl->sock);
-    return true;
+    {
+        std::lock_guard<std::mutex> guard(_lock);
+        _remote_ip = "";
+        _remote_port = 0;
+    }
+    return tcp_socket::close();
 }
 
-std::string tcp_client::recv_line(const std::string& endline, size_t max_len) {
-    // Up to 2 characters allowed for endline argument
-    if (endline.size() > 2)
-        throw std::invalid_argument("recv_line: endline must have at most 2 characters");
-    // endline cannot be empty
-    if (endline.empty())
-        throw std::invalid_argument("recv_line: endline cannot be empty");
-    // max_len must at least be as long as the endline
-    if (max_len < endline.size())
-        throw std::invalid_argument("recv_line: max_len must be at least as long as the endline");
+std::string tcp_client::remote_ip() {
+    std::lock_guard<std::mutex> guard(_lock);
+    return _remote_ip;
+}
 
-    std::string line;
-    ssize_t received, i;
-    bool more = true;
-    do {
-        if (_line_leftovers) {
-            // Read any previous leftovers first
-            received = _line_leftovers;
-            _line_leftovers = 0;
-        } else {
-            // Keep receiving more data while the line has not ended yet
-            received = recv();
-        }
-        // Stop if no data was received (socket is closed)
-        if (received == 0)
-            return line;
-        // Examine each block of received data separately
-        for (i=0; i<received; i++) {
-            line.push_back(_buffer[i]);
-
-            // Check for maximum length
-            if (line.size() >= max_len) {
-                more = false;
-                break;
-            }
-
-            // Check for endline
-            if (_buffer[i] == endline.back()) {
-                // Also handle 2 character endlines
-                if (endline.size() == 2) {
-                    if (line.size() >= 2 && line[line.size() - 2] == endline.front()) {
-                        more = false;
-                        break;
-                    }
-                } else {
-                    more = false;
-                    break;
-                }
-            }
-        }
-    } while (more);
-    i++;    // fixes following math
-
-    // Move back any excess bytes left in the receive buffer
-    if (i < received) {
-        _line_leftovers = received - i;
-        memmove(_buffer, _buffer + i, _line_leftovers);
-    } else {
-        _line_leftovers = 0;
-    }
-    return line;
+int tcp_client::remote_port() {
+    std::lock_guard<std::mutex> guard(_lock);
+    return _remote_port;
 }

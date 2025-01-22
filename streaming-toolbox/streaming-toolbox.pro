@@ -54,6 +54,7 @@ HEADERS += \
     ../src/networking/exceptions.h \
     ../src/networking/tcp_client.h \
     ../src/networking/tcp_server.h \
+    ../src/networking/tcp_socket.h \
     ../src/plugins/plugin.h \
     ../src/plugins/link.h \
     ../src/plugins/list.h \
