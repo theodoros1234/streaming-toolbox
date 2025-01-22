@@ -1,4 +1,5 @@
 #include "tcp_socket.h"
+#include "../logging/logging.h"
 #include <stdexcept>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -7,13 +8,16 @@
 #include <arpa/inet.h>
 #include <cstring>
 
+using namespace strtb;
 using namespace strtb::networking;
+
+static logging::source log("TCP Socket");
 
 tcp_socket::tcp_socket() : _pl(new tcp_socket::platform_specific) {}
 
 tcp_socket::~tcp_socket() {
-    std::lock_guard<std::mutex> guard(_lock);
     if (_pl->sock != -1) {
+        log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket after all threads that use it have been stopped."});
         ::shutdown(_pl->sock, SHUT_RDWR);
         ::close(_pl->sock);
     }
@@ -83,11 +87,16 @@ bool tcp_socket::shutdown(bool receive, bool send) {
 }
 
 bool tcp_socket::close() {
-    std::lock_guard<std::mutex> guard(_lock);
     if (_pl->sock == -1)
         return false;
     ::close(_pl->sock);
+    _pl->sock = -1;
     return true;
+}
+
+bool tcp_socket::is_open() {
+    std::lock_guard<std::mutex> guard(_lock);
+    return _pl->sock != -1;
 }
 
 std::string tcp_socket::recv_line(const std::string& endline, size_t max_len) {

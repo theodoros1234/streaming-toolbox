@@ -32,6 +32,7 @@ public:
     std::string recv_line(const std::string& endline = "\r\n", size_t max_len = 8192);
     bool shutdown(bool receive = true, bool send = true);
     bool close();
+    bool is_open();
 };
 
 }

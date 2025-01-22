@@ -151,11 +151,8 @@ void tcp_client::connect(const std::string& address, uint16_t port, bool reconne
 }
 
 bool tcp_client::close() {
-    {
-        std::lock_guard<std::mutex> guard(_lock);
-        _remote_ip = "";
-        _remote_port = 0;
-    }
+    _remote_ip = "";
+    _remote_port = 0;
     return tcp_socket::close();
 }
 

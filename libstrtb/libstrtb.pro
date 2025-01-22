@@ -38,6 +38,7 @@ SOURCES += \
     ../src/networking/exceptions.cpp \
     ../src/networking/tcp_client.cpp \
     ../src/networking/tcp_server.cpp \
+    ../src/networking/tcp_server_connection.cpp \
     ../src/networking/tcp_socket.cpp \
     ../src/unicode/unicode.cpp
 
@@ -69,6 +70,7 @@ HEADERS += \
     ../src/networking/exceptions.h \
     ../src/networking/tcp_client.h \
     ../src/networking/tcp_server.h \
+    ../src/networking/tcp_server_connection.h \
     ../src/networking/tcp_socket.h \
     ../src/plugins/link.h \
     ../src/unicode/unicode.h
