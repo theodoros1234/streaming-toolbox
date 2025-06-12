@@ -8,51 +8,42 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+
+// Platform-specific
+#ifdef __linux__
 #include <sys/eventfd.h>
 #include <poll.h>
+#endif
 
 using namespace strtb::networking;
 using namespace strtb;
 
 static logging::source log("TCP Server");
 
-struct strtb::networking::tcp_server_platform_specific {
-    int sock = -1, event, af;
-    bool shutdown_sent = true, shutdown_received = true;
-};
-
-tcp_server::tcp_server() : _pl(new tcp_server_platform_specific), _ip_family(0), _server_port(0), _backlog(0), _max_active(0) {
+tcp_server::tcp_server() : _ip_family(0), _server_port(0), _backlog(0), _max_active(0) {
     // Create new eventfd (used for shutting down server from another thread)
-    _pl->event = eventfd(0, 0);
-    if (_pl->event == -1)
+    _event = eventfd(0, 0);
+    if (_event == -1)
         throw internal_error("failed to setup internal synchronization mechanism: " + std::string(strerror(errno)), errno);
 }
 
 tcp_server::~tcp_server() {
     close();
-    ::close(_pl->event);
-    delete _pl;
+    ::close(_event);
 }
 
-void tcp_server::listen(const std::string& address, uint16_t port, bool reconnect, int backlog, size_t max_active) {
-    listen(address.c_str(), port, reconnect, backlog, max_active);
+void tcp_server::listen(const std::string& address, uint16_t port, bool reuseaddr, int backlog, size_t max_active) {
+    listen(address.c_str(), port, reuseaddr, backlog, max_active);
 }
 
-void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int backlog, size_t max_active) {
+void tcp_server::listen(const char* address, uint16_t port, bool reuseaddr, int backlog, size_t max_active) {
     std::lock_guard<std::mutex> guard(_lock);
 
-    if (_pl->sock != -1) {
-        // Socket is already open
-        if (reconnect) {
-            ::close(_pl->sock);
-            // TODO: Also disconnect all connected clients
-        } else {
-            throw connection_error("socket already open", 0);
-        }
-    }
+    if (_sock != -1)
+        throw connection_error("socket already open", 0);
 
-    _pl->shutdown_sent = false;
-    _pl->shutdown_received = false;
+    _shutdown_sent = false;
+    _shutdown_received = false;
     _backlog = backlog;
     _max_active = max_active;
 
@@ -66,19 +57,19 @@ void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int 
         _ip_family = 4;
         _server_ip = address_str_clean;
         _server_port = port;
-        _pl->af = AF_INET;
+        _af = AF_INET;
     } else if (inet_pton(AF_INET6, address, address_struct) == 1) {     // IPv6 address
         if (inet_ntop(AF_INET6, address_struct, address_str_clean, INET6_ADDRSTRLEN) == NULL)
             throw internal_error("internal error while handling IP address: " + std::string(strerror(errno)), errno);
         _ip_family = 6;
         _server_ip = address_str_clean;
         _server_port = port;
-        _pl->af = AF_INET6;
+        _af = AF_INET6;
     } else throw address_resolution_error("given address is not a valid IPv4 or IPv6 IP address", 0);
 
     // Open socket
-    _pl->sock = socket(_pl->af, SOCK_STREAM, 0);
-    if (_pl->sock == -1) switch (errno) {
+    _sock = socket(_af, SOCK_STREAM, 0);
+    if (_sock == -1) switch (errno) {
     case EACCES:
         _server_ip = "";
         _ip_family = 0;
@@ -91,8 +82,15 @@ void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int 
         throw internal_error(errno);
     }
 
+    // Set reuseaddr if needed
+    if (reuseaddr) {
+        int value = 1;
+        if (setsockopt(_sock, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value)))
+            throw internal_error(errno);
+    }
+
     // Bind to socket
-    switch (_pl->af) {
+    switch (_af) {
     case AF_INET: {
             struct sockaddr_in saddr = {
                 .sin_family = AF_INET,
@@ -101,11 +99,11 @@ void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int 
                 .sin_zero = {0}
             };
 
-            if (bind(_pl->sock, (struct sockaddr*) &saddr, sizeof(saddr)) == -1) {
+            if (bind(_sock, (struct sockaddr*) &saddr, sizeof(saddr)) == -1) {
                 // Error binding
                 connection_error e(errno);
-                ::close(_pl->sock);
-                _pl->sock = -1;
+                ::close(_sock);
+                _sock = -1;
                 _server_ip = "";
                 _ip_family = 0;
                 _server_port = 0;
@@ -123,11 +121,11 @@ void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int 
                 .sin6_scope_id = 0
             };
 
-            if (bind(_pl->sock, (struct sockaddr*) &saddr, sizeof(saddr)) == -1) {
+            if (bind(_sock, (struct sockaddr*) &saddr, sizeof(saddr)) == -1) {
                 // Error binding
                 connection_error e(errno);
-                ::close(_pl->sock);
-                _pl->sock = -1;
+                ::close(_sock);
+                _sock = -1;
                 _server_ip = "";
                 _ip_family = 0;
                 _server_port = 0;
@@ -143,11 +141,11 @@ void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int 
         throw internal_error("Unreachable code was reached, this is either a weird bug in Streaming Toolbox, or your CPU is unstable.", 0);
     }
 
-    if (::listen(_pl->sock, backlog) == -1) {
+    if (::listen(_sock, backlog) == -1) {
         // Error listening
         connection_error e(errno);
-        ::close(_pl->sock);
-        _pl->sock = -1;
+        ::close(_sock);
+        _sock = -1;
         _server_ip = "";
         _ip_family = 0;
         _server_port = 0;
@@ -156,20 +154,20 @@ void tcp_server::listen(const char* address, uint16_t port, bool reconnect, int 
 }
 
 tcp_server_connection* tcp_server::accept() {
-    if (_pl->sock == -1)
+    if (_sock == -1)
         throw connection_closed("socket closed or hasn't been opened yet", 0);
-    if (_pl->shutdown_received)
+    if (_shutdown_received)
         return nullptr;
 
     // Loop until there's a new connection, a shutdown or an error
     while (true) {
         struct pollfd p[] = {
             {
-                .fd = _pl->sock,
+                .fd = _sock,
                 .events = POLLIN,
                 .revents = 0
             }, {
-                .fd = _pl->event,
+                .fd = _event,
                 .events = POLLIN,
                 .revents = 0
             }
@@ -182,10 +180,10 @@ tcp_server_connection* tcp_server::accept() {
         // Check for shutdown event
         if (p[1].revents & (POLLIN | POLLERR)) {
             uint64_t buffer;
-            if (read(_pl->event, &buffer, 8) != 8)
+            if (read(_event, &buffer, 8) != 8)
                 throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(errno)), errno);
             std::lock_guard<std::mutex> guard(_lock);
-            _pl->shutdown_received = true;
+            _shutdown_received = true;
             return nullptr;
         }
 
@@ -194,7 +192,7 @@ tcp_server_connection* tcp_server::accept() {
             // Get incoming connection's address
             char addr[sizeof(struct sockaddr_in6)];
             socklen_t addrlen = sizeof(struct sockaddr_in6);
-            int new_sock = ::accept(_pl->sock, (sockaddr*)&addr, &addrlen);
+            int new_sock = ::accept(_sock, (sockaddr*)&addr, &addrlen);
 
             // Check for errors
             if (new_sock == -1) switch (errno) {
@@ -218,7 +216,7 @@ tcp_server_connection* tcp_server::accept() {
 
             char addr_str[INET6_ADDRSTRLEN];
             int port;
-            switch (_pl->af) {
+            switch (_af) {
             case AF_INET:
                 if (addrlen != sizeof(struct sockaddr_in))
                     throw internal_error("unexpected socket address struct length", 0);
@@ -237,11 +235,11 @@ tcp_server_connection* tcp_server::accept() {
 
             std::unique_lock<std::mutex> guard(_lock);
             // Wait until we're under the max active connection limit, or until shutdown
-            while (_active_connections.size() >= _max_active && !_pl->shutdown_sent)
+            while (_active_connections.size() >= _max_active && !_shutdown_sent)
                 _connections_cv.wait(guard);
 
             // If shutdown was sent, abort this connection attempt
-            if (_pl->shutdown_sent) {
+            if (_shutdown_sent) {
                 ::close(new_sock);
                 return nullptr;
             }
@@ -258,16 +256,16 @@ tcp_server_connection* tcp_server::accept() {
 bool tcp_server::shutdown() {
     std::lock_guard<std::mutex> guard(_lock);
     // Make sure the socket is still open
-    if (_pl->sock == -1)
+    if (_sock == -1)
         return false;
-    if (_pl->shutdown_sent)
+    if (_shutdown_sent)
         return true;
 
     // Send shutdown event
     uint64_t buf = 1;
-    if (write(_pl->event, &buf, 8) != 8)
+    if (write(_event, &buf, 8) != 8)
         throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(errno)), errno);
-    _pl->shutdown_sent = true;
+    _shutdown_sent = true;
     _connections_cv.notify_all();
 
     // Shutdown all connected clients
@@ -280,22 +278,23 @@ bool tcp_server::shutdown() {
 bool tcp_server::close() {
     std::unique_lock<std::mutex> guard(_lock);
     // Make sure the socket is still open
-    if (_pl->sock == -1)
+    if (_sock == -1)
         return false;
 
     // Make sure the socket was shut down
-    if (!_pl->shutdown_sent) {
+    if (!_shutdown_sent) {
         log.put(logging::WARNING, {"close() called without shutting down. Shutting down the server, but this may lead to a crash. If you're a plugin developer, make sure you call shutdown() on the server and wait for the accepting thread to finish, before closing."});
         shutdown();
-    } else if (!_pl->shutdown_received) {
+    } else if (!_shutdown_received) {
         log.put(logging::WARNING, {"close() called before the accepting thread received the shutdown request. This may lead to instability or weird behaviour. If you're a plugin developer, make sure that you wait for the accepting thread to finish after calling shutdown(), before closing. The accepting thread should detect a shutdown when its last call to accept() returns nullptr."});
     }
 
     // Close socket
-    ::close(_pl->sock);
+    ::close(_sock);
     _server_ip = "";
     _ip_family = 0;
     _server_port = 0;
+    _sock = -1;
 
     // Wait for all connected clients to close
     while (!_active_connections.empty())

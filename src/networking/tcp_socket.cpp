@@ -13,19 +13,21 @@ using namespace strtb::networking;
 
 static logging::source log("TCP Socket");
 
-tcp_socket::tcp_socket() : _pl(new tcp_socket::platform_specific) {}
+tcp_socket::tcp_socket() {}
 
 tcp_socket::~tcp_socket() {
-    if (_pl->sock != -1) {
+    if (_sock != -1) {
         log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket after all threads that use it have been stopped."});
-        ::shutdown(_pl->sock, SHUT_RDWR);
-        ::close(_pl->sock);
+        ::shutdown(_sock, SHUT_RDWR);
+        ::close(_sock);
     }
-    delete _pl;
 }
 
 ssize_t tcp_socket::recv() {
-    ssize_t result = ::recv(_pl->sock, _buffer + _line_leftovers, STRTB_NETWORKING_RECV_BUFFER_SIZE - _line_leftovers, 0);
+    if (_sock == -1)
+        throw connection_closed("socket closed or hasn't been opened yet", 0);
+
+    ssize_t result = ::recv(_sock, _buffer + _line_leftovers, STRTB_NETWORKING_RECV_BUFFER_SIZE - _line_leftovers, 0);
     if (result == -1) switch (errno) {      // Error
     case ECONNREFUSED:
         throw connection_error(errno);
@@ -39,20 +41,10 @@ ssize_t tcp_socket::recv() {
 }
 
 ssize_t tcp_socket::send(const char* buf, size_t len) {
-    int sock;
-    {
-        // Check that the socket has been opened before sending through it.
-        // However, it is still NOT safe to close an open socket when there are still other threads
-        // that could send to it. If you need to close an open socket for reconnecting,
-        // while other threads might want to send data, call connect(..., reconnect=true).
-        // NOTE: Closing is different than shutting down, shutdown is safe.
-        std::lock_guard<std::mutex> guard(_lock);
-        sock = _pl->sock;
-        if (sock == -1)
-            throw connection_closed("socket closed or hasn't been opened yet", 0);
-    }
+    if (_sock == -1)
+        throw connection_closed("socket closed or hasn't been opened yet", 0);
 
-    ssize_t result = ::send(sock, buf, len, MSG_NOSIGNAL);
+    ssize_t result = ::send(_sock, buf, len, MSG_NOSIGNAL);
     if (result == -1) switch (errno) {      // Error
     case ECONNRESET:
         throw connection_error(errno);
@@ -68,35 +60,29 @@ ssize_t tcp_socket::send(const std::string& buf) {
     return send(buf.data(), buf.size());
 }
 
-std::lock_guard<std::mutex> tcp_socket::acquire_send_lock() {
-    return std::lock_guard<std::mutex>(_send_lock);
-}
-
 static int shutdown_convert[2][2] = {{-1, SHUT_WR}, {SHUT_RD, SHUT_RDWR}};
 
-bool tcp_socket::shutdown(bool receive, bool send) {
+void tcp_socket::shutdown(bool receive, bool send) {
     if (shutdown_convert[receive][send] == -1) {
         throw std::invalid_argument("nothing to shut down, receive and send arguments are both false");
     }
 
-    std::lock_guard<std::mutex> guard(_lock);
-    if (_pl->sock == -1)
-        return false;
-    ::shutdown(_pl->sock, shutdown_convert[receive][send]);
-    return true;
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    if (_sock != -1)
+        ::shutdown(_sock, shutdown_convert[receive][send]);
 }
 
 bool tcp_socket::close() {
-    if (_pl->sock == -1)
+    if (_sock == -1)
         return false;
-    ::close(_pl->sock);
-    _pl->sock = -1;
+    ::close(_sock);
+    _sock = -1;
     return true;
 }
 
 bool tcp_socket::is_open() {
-    std::lock_guard<std::mutex> guard(_lock);
-    return _pl->sock != -1;
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    return _sock != -1;
 }
 
 std::string tcp_socket::recv_line(const std::string& endline, size_t max_len) {

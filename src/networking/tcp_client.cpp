@@ -6,19 +6,36 @@
 #include <arpa/inet.h>
 #include <cstring>
 
+// Platform-specific
+#ifdef __linux__
+#include <sys/eventfd.h>
+#include <poll.h>
+#include <fcntl.h>
+#endif
+
 using namespace strtb::networking;
 
-tcp_client::tcp_client() : tcp_socket() {}
+tcp_client::tcp_client() : tcp_socket() {
+    // Create new eventfd (used for shutting down server from another thread)
+    _event = eventfd(0, 0);
+    if (_event == -1)
+        throw internal_error("failed to setup internal synchronization mechanism: " + std::string(strerror(errno)), errno);
+}
 
-void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
-    std::lock_guard<std::mutex> guard(_lock);
-    if (_pl->sock != -1) {  // Socket is already open (and possibly connected)
-        if (reconnect) {
-            ::shutdown(_pl->sock, SHUT_RDWR);
-            ::close(_pl->sock);
-        } else {
-            throw connection_error("socket already open", 0);
-        }
+tcp_client::~tcp_client() {
+    ::close(_event);
+}
+
+void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
+    int sock_tmp = -1;
+    {
+        std::lock_guard<std::recursive_mutex> guard(_lock);
+        if (_sock != -1)
+            throw connection_error("socket already connected", EISCONN);
+        else if (_connecting)
+            throw connection_error("connect was called by another thread", EALREADY);
+        _connecting = true;
+        _cancel_sent = false;
     }
 
     // Get target host info
@@ -34,52 +51,140 @@ void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
     };
 
     struct addrinfo* gai_result;
-    int gai_err;
-    switch (gai_err = getaddrinfo(address, std::to_string(port).c_str(), &gai_hints, &gai_result)) {
-    case 0: // Success
-        break;
-    case EAI_ADDRFAMILY:
-    case EAI_AGAIN:
-    case EAI_FAIL:
-    case EAI_NODATA:
-    case EAI_NONAME:
-        throw address_resolution_error(gai_strerror(gai_err), gai_err);
-    default:
-        throw internal_error(gai_strerror(gai_err), gai_err);
+    int gai_err = getaddrinfo(address, std::to_string(port).c_str(), &gai_hints, &gai_result);
+    if (gai_err != 0) {
+        std::lock_guard<std::recursive_mutex> guard(_lock);
+        _connecting = false;
+
+        switch (gai_err) {
+        case EAI_ADDRFAMILY:
+        case EAI_AGAIN:
+        case EAI_FAIL:
+        case EAI_NODATA:
+        case EAI_NONAME:
+            throw address_resolution_error(gai_strerror(gai_err), gai_err);
+        default:
+            throw internal_error(gai_strerror(gai_err), gai_err);
+        }
     }
 
-    int connect_error = 0;
+    connection_error connect_error = 0;
     int connect_error_priority = 0;
 
     struct addrinfo* item = NULL;
     for (item = gai_result; item != NULL; item = item->ai_next) {
         // Try to connect to a socket through any of the returned results
-        _pl->sock = socket(item->ai_family, item->ai_socktype, item->ai_protocol);
-        if (_pl->sock != -1) {  // Socket creation successful
-            if (::connect(_pl->sock, item->ai_addr, item->ai_addrlen) == -1) {    // Connection failed
-                ::close(_pl->sock);
-                _pl->sock = -1;
+        sock_tmp = socket(item->ai_family, item->ai_socktype, item->ai_protocol);
+        if (sock_tmp != -1) {  // Socket creation successful
+            try {
+                // Set timeout
+                struct timeval timeout_st = {
+                    .tv_sec = timeout,
+                    .tv_usec = 0
+                };
+                if (setsockopt(sock_tmp, SOL_SOCKET, SO_SNDTIMEO, &timeout_st, sizeof(timeout_st)))
+                    throw internal_error(errno);
+
+                // Asynchronously start connection
+                int flags = fcntl(sock_tmp, F_GETFL);
+                if (flags == -1)
+                    throw internal_error(errno);
+                flags |= O_NONBLOCK;
+                if (fcntl(sock_tmp, F_SETFL, flags))
+                    throw internal_error(errno);
+
+                if (::connect(sock_tmp, item->ai_addr, item->ai_addrlen) == 0)      // Connection was instantly successful
+                    break;
+                else if (errno != EINPROGRESS)                                      // Connection instantly failed
+                    throw connection_error(errno);
+
+                // Wait for a cancellation signal or for the connection process to finish
+                struct pollfd p[] = {
+                    {
+                        .fd = sock_tmp,
+                        .events = POLLOUT,
+                        .revents = 0
+                    }, {
+                        .fd = _event,
+                        .events = POLLIN,
+                        .revents = 0
+                    }
+                };
+
+                flags &= ~O_NONBLOCK;
+                if (fcntl(sock_tmp, F_SETFL, flags) && errno != EINPROGRESS)
+                    throw internal_error(errno);
+
+                if (poll(p, 2, -1) == -1)
+                    throw internal_error(errno);
+
+                if (p[1].revents) {     // Check cancellation
+                    uint64_t buffer;
+                    ::close(sock_tmp);
+                    sock_tmp = -1;
+                    freeaddrinfo(gai_result);
+
+                    {
+                        std::lock_guard<std::recursive_mutex> guard(_lock);
+                        _connecting = false;
+                    }
+
+                    if (read(_event, &buffer, 8) != 8) {
+                        int event_errno = errno;
+                        sock_tmp = -1;
+                        throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(event_errno)), event_errno);
+                    } else throw connection_closed("Connection cancelled", 0);
+                }
+
+                int sock_err;
+                if (p[0].revents) {     // Check connection
+                    socklen_t sock_err_len = sizeof(int);
+                    if (getsockopt(sock_tmp, SOL_SOCKET, SO_ERROR, &sock_err, &sock_err_len)) {
+                        int gso_errno = errno;
+                        ::close(sock_tmp);
+                        sock_tmp = -1;
+                        throw internal_error("getsockopt: " + std::string(strerror(errno)), gso_errno);
+                    }
+
+                    if (sock_err)       // Connection error
+                        throw connection_error(sock_err);
+                    else                // Connection successful
+                        break;
+                }
+
+                // Unreachable code, poll returned without anything happening
+                ::close(sock_tmp);
+                sock_tmp = -1;
+                {
+                    std::lock_guard<std::recursive_mutex> guard(_lock);
+                    _connecting = false;
+                }
+                throw internal_error("unreachable code reached: poll returned when nothing happened", 0);
+
+            } catch (connection_error &e) {
+                ::close(sock_tmp);
+                sock_tmp = -1;
 
                 // Determine what went wrong
                 // Out of all address connections, only the most "important" error will be given back (if all fail).
-                switch (errno) {
+                switch (e.what_errno()) {
                 case ENETUNREACH:
                     if (connect_error_priority < 1) {
-                        connect_error = errno;
+                        connect_error = e;
                         connect_error_priority = 1;
                     }
                     break;
 
                 case ETIMEDOUT:
                     if (connect_error_priority < 2) {
-                        connect_error = errno;
+                        connect_error = e;
                         connect_error_priority = 2;
                     }
                     break;
 
                 case ECONNREFUSED:
                     if (connect_error_priority < 3) {
-                        connect_error = errno;
+                        connect_error = e;
                         connect_error_priority = 3;
                     }
                     break;
@@ -87,18 +192,33 @@ void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
                 case EACCES:
                 case EPERM:
                     if (connect_error_priority < 4) {
-                        connect_error = errno;
+                        connect_error = e;
                         connect_error_priority = 4;
                     }
                     break;
 
                 default:
                     if (connect_error_priority < 5) {
-                        connect_error = errno;
+                        connect_error = e;
                         connect_error_priority = 5;
                     }
                 }
-            } else break;       // Connect successful
+
+            } catch (internal_error &e) {
+                /*
+                 * These kinds of errors are considered critical and should never happen,
+                 * unless the code has bugs or the application or OS reached an unstable state,
+                 * so we just close the socket and give up when this happens.
+                 */
+                ::close(sock_tmp);
+                sock_tmp = -1;
+                freeaddrinfo(gai_result);
+                {
+                    std::lock_guard<std::recursive_mutex> guard(_lock);
+                    _connecting = false;
+                }
+                throw e;
+            }
         } else switch (errno) { // Socket creation failed, determine what went wrong
         case EACCES:
             if (connect_error_priority < 4) {
@@ -115,8 +235,12 @@ void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
         }
     }
 
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    _connecting = false;
+    _sock = sock_tmp;
+
     // Store remote host's IP and port
-    if (_pl->sock != -1) {
+    if (sock_tmp != -1) {
         char remote_ip_char[INET6_ADDRSTRLEN] = {0};
         switch (item->ai_family) {
         case AF_INET:
@@ -142,26 +266,43 @@ void tcp_client::connect(const char* address, uint16_t port, bool reconnect) {
 
     freeaddrinfo(gai_result);
 
-    if (_pl->sock == -1)    // Failed to connect
+    if (sock_tmp == -1)    // Failed to connect
         throw connection_error(connect_error);
 }
 
-void tcp_client::connect(const std::string& address, uint16_t port, bool reconnect) {
-    connect(address.c_str(), port, reconnect);
+void tcp_client::connect(const std::string& address, uint16_t port, time_t timeout) {
+    connect(address.c_str(), port, timeout);
+}
+
+void tcp_client::cancel_connect() {
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    if (_connecting && !_cancel_sent) {
+        uint64_t buf = 1;
+        if (write(_event, &buf, 8) != 8)
+            throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(errno)), errno);
+        _cancel_sent = true;
+    }
 }
 
 bool tcp_client::close() {
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    cancel_connect();
     _remote_ip = "";
     _remote_port = 0;
     return tcp_socket::close();
 }
 
 std::string tcp_client::remote_ip() {
-    std::lock_guard<std::mutex> guard(_lock);
+    std::lock_guard<std::recursive_mutex> guard(_lock);
     return _remote_ip;
 }
 
 int tcp_client::remote_port() {
-    std::lock_guard<std::mutex> guard(_lock);
+    std::lock_guard<std::recursive_mutex> guard(_lock);
     return _remote_port;
+}
+
+bool tcp_client::is_connecting() {
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    return _connecting;
 }

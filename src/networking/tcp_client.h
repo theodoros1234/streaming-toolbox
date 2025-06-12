@@ -1,6 +1,8 @@
 #ifndef STRTB_NETWORKING_TCP_CLIENT_H
 #define STRTB_NETWORKING_TCP_CLIENT_H
 
+#include <time.h>
+
 #include "tcp_socket.h"
 
 namespace strtb::networking {
@@ -9,14 +11,23 @@ class tcp_client : public tcp_socket {
 private:
     std::string _remote_ip;
     int _remote_port = 0;
+    bool _connecting = false, _cancel_sent = false;
+
+    // Platform-specific
+#ifdef __linux__
+    int _event;
+#endif
+
 public:
     tcp_client();
-    ~tcp_client() = default;
-    void connect(const char* address, uint16_t port, bool reconnect = false);
-    void connect(const std::string& address, uint16_t port, bool reconnect = false);
+    ~tcp_client();
+    void connect(const char* address, uint16_t port, time_t timeout = 30);
+    void connect(const std::string& address, uint16_t port, time_t timeout = 30);
+    void cancel_connect();
     bool close();
     std::string remote_ip();
     int remote_port();
+    bool is_connecting();
 };
 
 }
