@@ -19,6 +19,7 @@ SOURCES += \
     ../src/config/system.cpp \
     ../src/config/id_type.cpp \
     ../src/json/cast.cpp \
+    ../src/json/holder.cpp \
     ../src/json/parser.cpp \
     ../src/json/value.cpp \
     ../src/json/value_array.cpp \
@@ -56,6 +57,7 @@ HEADERS += \
     ../src/config/system.h \
     ../src/json/all_value_types.h \
     ../src/json/cast.h \
+    ../src/json/holder.h \
     ../src/json/parser.h \
     ../src/json/value.h \
     ../src/json/value_array.h \

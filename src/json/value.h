@@ -15,6 +15,11 @@ public:
     const char* what() const noexcept;
 };
 
+class undefined_exception : public std::exception {
+public:
+    const char* what() const noexcept;
+};
+
 class value {
 private:
     val_type _type;

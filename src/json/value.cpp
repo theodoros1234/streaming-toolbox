@@ -29,6 +29,8 @@ std::string strtb::json::val_type_str(val_type type) {
 
 const char* invalid_type::what() const noexcept {return "invalid or unwanted json value type";}
 
+const char* undefined_exception::what() const noexcept {return "tried to access an undefined value";}
+
 value::value(val_type type) : _type(type) {}
 
 val_type value::type() const {return this->_type;}
