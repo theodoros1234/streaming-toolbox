@@ -217,7 +217,7 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
                     std::lock_guard<std::recursive_mutex> guard(_lock);
                     _connecting = false;
                 }
-                throw e;
+                throw;
             }
         } else switch (errno) { // Socket creation failed, determine what went wrong
         case EACCES:

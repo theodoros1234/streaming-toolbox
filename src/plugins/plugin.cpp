@@ -60,7 +60,16 @@ plugin::plugin(fs::path path) {
     this->functions.deactivate = reinterpret_cast<void (*)()>(ptr_deactivate);
 
     // Exchange basic info with plugin
-    this->_info = this->functions.exchange_info();
+    try {
+        this->_info = this->functions.exchange_info();
+    } catch (std::exception &e) {
+        log.put(logging::ERROR, {"Unhandled exception while exchanging info with ", path.filename(), ": ", e.what()});
+        throw;
+    } catch (...) {
+        log.put(logging::ERROR, {"Unhandled exception while exchanging info with ", path.filename()});
+        throw;
+    }
+
     log.put(logging::DEBUG, {"Loaded ", common::string_escape(this->_info.name)});
     this->activate();
 }
@@ -68,14 +77,28 @@ plugin::plugin(fs::path path) {
 plugin::~plugin() {
     // Unload plugin
     log.put(logging::DEBUG, {"Deactivating and unloading ", common::string_escape(this->_info.name)});
-    this->functions.deactivate();
+    try {
+        this->functions.deactivate();
+    } catch (std::exception &e) {
+        log.put(logging::ERROR, {"Unhandled exception while deactivating ", common::string_escape(this->_info.name), ": ", e.what()});
+    } catch (...) {
+        log.put(logging::ERROR, {"Unhandled exception while deactivating ", common::string_escape(this->_info.name)});
+    }
     dlclose(this->library);
 }
 
 void plugin::activate() {
-    if (!this->functions.activate()) {
-        log.put(logging::ERROR, {"Couldn't activate ", common::string_escape(this->_info.name)});
-        throw std::runtime_error("Couldn't activate " + common::string_escape(this->_info.name));
+    try {
+        if (!this->functions.activate()) {
+            log.put(logging::ERROR, {"Couldn't activate ", common::string_escape(this->_info.name)});
+            throw std::runtime_error("Couldn't activate " + common::string_escape(this->_info.name));
+        }
+    } catch (std::exception &e) {
+        log.put(logging::ERROR, {"Unhandled exception while activating ", common::string_escape(this->_info.name), ": ", e.what()});
+        throw;
+    } catch (...) {
+        log.put(logging::ERROR, {"Unhandled exception while activating ", common::string_escape(this->_info.name)});
+        throw;
     }
 }
 
