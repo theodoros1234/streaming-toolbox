@@ -2,13 +2,32 @@
 
 using namespace strtb::json;
 
+
 holder::holder() : _v(nullptr) {}
 
-holder::holder(class value* v) : _v(v) {}
+holder::holder(strtb::json::value* v) : _v(v) {}
 
 holder::~holder() {
     if (_v)
         delete _v;
+}
+
+holder& holder::operator=(const holder& other) {
+    if (_v)
+        delete _v;
+
+    if (other.type() == VAL_UNDEFINED)
+        _v = nullptr;
+    else
+        _v = other.value(true)->copy();
+
+    return *this;
+}
+
+void holder::set(json::value* v) {
+    if (_v)
+        delete _v;
+    _v = v;
 }
 
 val_type holder::type() const {

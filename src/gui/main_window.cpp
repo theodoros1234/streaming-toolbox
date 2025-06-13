@@ -3,7 +3,7 @@
 #include "../plugins/list.h"
 #include "../common/version.h"
 #include "../config/system.h"
-#include "../json/all_value_types.h"
+#include "../json/holder.h"
 
 #include <QObject>
 #include <QListWidget>
@@ -41,18 +41,14 @@ main_window::main_window(plugins::list *plugin_list, QWidget *parent)
             config::main->set_category_root(conf_cat, json::VAL_OBJECT);
         if (config::main->get_type(conf_cat, {"window_width"}) == json::VAL_INT &&
             config::main->get_type(conf_cat, {"window_height"}) == json::VAL_INT) {
-            json::value *width, *height;
-            width = config::main->get_value(conf_cat, {"window_width"});
-            height = config::main->get_value(conf_cat, {"window_height"});
-            this->resize(((json::value_int*) width)->value(), ((json::value_int*) height)->value());
-            delete width;
-            delete height;
+            json::holder width = config::main->get_value(conf_cat, {"window_width"});
+            json::holder height = config::main->get_value(conf_cat, {"window_height"});
+            this->resize(width.as_int().value(), height.as_int().value());
         }
         if (config::main->get_type(conf_cat, {"window_is_maximized"}) == json::VAL_BOOL) {
-            json::value *maximized = config::main->get_value(conf_cat, {"window_is_maximized"});
-            if (((json::value_bool*) maximized)->value())
+            json::holder maximized = config::main->get_value(conf_cat, {"window_is_maximized"});
+            if (maximized.as_bool().value())
                 this->setWindowState(Qt::WindowMaximized);
-            delete maximized;
         }
         is_config_loaded = true;
     } catch (std::exception &e) {
