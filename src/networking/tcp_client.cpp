@@ -34,6 +34,8 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
             throw connection_error("socket already connected", EISCONN);
         else if (_connecting)
             throw connection_error("connect was called by another thread", EALREADY);
+        else if (_connect_restrict)
+            throw connection_closed("Connection cancelled", 0);
         _connecting = true;
         _cancel_sent = false;
     }
@@ -269,8 +271,14 @@ void tcp_client::connect(const std::string& address, uint16_t port, time_t timeo
     connect(address.c_str(), port, timeout);
 }
 
+void tcp_client::reset() {
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    _connect_restrict = false;
+}
+
 void tcp_client::cancel_connect() {
     std::lock_guard<std::recursive_mutex> guard(_lock);
+    _connect_restrict = true;
     if (_connecting && !_cancel_sent) {
         uint64_t buf = 1;
         if (write(_event, &buf, 8) != 8)

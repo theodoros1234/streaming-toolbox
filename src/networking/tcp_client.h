@@ -11,7 +11,7 @@ class tcp_client : public tcp_socket {
 private:
     std::string _remote_ip;
     int _remote_port = 0;
-    bool _connecting = false, _cancel_sent = false;
+    bool _connecting = false, _cancel_sent = false, _connect_restrict = false;
 
     // Platform-specific
 #ifdef __linux__
@@ -24,6 +24,7 @@ public:
     void connect(const char* address, uint16_t port, time_t timeout = 30);
     void connect(const std::string& address, uint16_t port, time_t timeout = 30);
     void cancel_connect();
+    void reset();
     bool close();
     std::string remote_ip();
     int remote_port();
