@@ -12,15 +12,11 @@ holder::~holder() {
         delete _v;
 }
 
-holder& holder::operator=(const holder& other) {
-    if (_v)
-        delete _v;
+holder& holder::operator=(json::value* other) {
+    if (_v == other)
+        return *this;
 
-    if (other.type() == VAL_UNDEFINED)
-        _v = nullptr;
-    else
-        _v = other.value(true)->copy();
-
+    set(other);
     return *this;
 }
 

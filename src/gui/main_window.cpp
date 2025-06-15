@@ -41,8 +41,9 @@ main_window::main_window(plugins::list *plugin_list, QWidget *parent)
             config::main->set_category_root(conf_cat, json::VAL_OBJECT);
         if (config::main->get_type(conf_cat, {"window_width"}) == json::VAL_INT &&
             config::main->get_type(conf_cat, {"window_height"}) == json::VAL_INT) {
-            json::holder width = config::main->get_value(conf_cat, {"window_width"});
-            json::holder height = config::main->get_value(conf_cat, {"window_height"});
+            json::holder width, height;
+            width = config::main->get_value(conf_cat, {"window_width"});
+            height = config::main->get_value(conf_cat, {"window_height"});
             this->resize(width.as_int().value(), height.as_int().value());
         }
         if (config::main->get_type(conf_cat, {"window_is_maximized"}) == json::VAL_BOOL) {
