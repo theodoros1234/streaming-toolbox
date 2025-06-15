@@ -77,14 +77,6 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
         sock_tmp = socket(item->ai_family, item->ai_socktype, item->ai_protocol);
         if (sock_tmp != -1) {  // Socket creation successful
             try {
-                // Set timeout
-                struct timeval timeout_st = {
-                    .tv_sec = timeout,
-                    .tv_usec = 0
-                };
-                if (setsockopt(sock_tmp, SOL_SOCKET, SO_SNDTIMEO, &timeout_st, sizeof(timeout_st)))
-                    throw internal_error(errno);
-
                 // Asynchronously start connection
                 int flags = fcntl(sock_tmp, F_GETFL);
                 if (flags == -1)
@@ -115,8 +107,11 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
                 if (fcntl(sock_tmp, F_SETFL, flags) && errno != EINPROGRESS)
                     throw internal_error(errno);
 
-                if (poll(p, 2, -1) == -1)
+                int poll_return = poll(p, 2, timeout * 1000);
+                if (poll_return == -1)
                     throw internal_error(errno);
+                else if (poll_return == 0)
+                    throw connection_error(ETIMEDOUT);
 
                 if (p[1].revents) {     // Check cancellation
                     uint64_t buffer;
