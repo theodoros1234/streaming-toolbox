@@ -17,7 +17,7 @@ tcp_socket::tcp_socket() {}
 
 tcp_socket::~tcp_socket() {
     if (_sock != -1) {
-        log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket after all threads that use it have been stopped."});
+        log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
         ::shutdown(_sock, SHUT_RDWR);
         ::close(_sock);
     }

@@ -1,4 +1,5 @@
 #include "tcp_client.h"
+#include "../logging/logging.h"
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -15,6 +16,8 @@
 
 using namespace strtb::networking;
 
+static strtb::logging::source log("TCP Client");
+
 tcp_client::tcp_client() : tcp_socket() {
     // Create new eventfd (used for shutting down server from another thread)
     _event = eventfd(0, 0);
@@ -23,6 +26,8 @@ tcp_client::tcp_client() : tcp_socket() {
 }
 
 tcp_client::~tcp_client() {
+    if (_sock != -1)
+        log.put(logging::WARNING, {"Destructor called when client connection to ", _remote_ip, ":", _remote_port, " was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
     ::close(_event);
 }
 

@@ -28,7 +28,10 @@ tcp_server::tcp_server() : _ip_family(0), _server_port(0), _backlog(0), _max_act
 }
 
 tcp_server::~tcp_server() {
-    close();
+    if (_sock != -1 || !_active_connections.empty()) {
+        log.put(logging::WARNING, {"Destructor called when server on ", _server_ip, ":", _server_port, " was still open. Closing the server, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the server."});
+        close();
+    }
     ::close(_event);
 }
 
