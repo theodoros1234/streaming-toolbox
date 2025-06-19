@@ -61,7 +61,25 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
     int gai_err = getaddrinfo(address, std::to_string(port).c_str(), &gai_hints, &gai_result);
     if (gai_err != 0) {
         std::lock_guard<std::recursive_mutex> guard(_lock);
+
+        // Consume any cancellation signal that might've been sent
         _connecting = false;
+        struct pollfd p = {
+            .fd = _event,
+            .events = POLLIN,
+            .revents = 0
+        };
+
+        if (poll(&p, 1, 0) == -1)
+            throw internal_error(errno);
+
+        if (p.revents) {     // Check cancellation
+            uint64_t buffer;
+            if (read(_event, &buffer, 8) != 8) {
+                int event_errno = errno;
+                throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(event_errno)), event_errno);
+            } else throw connection_closed("Connection cancelled", 0);
+        }
 
         switch (gai_err) {
         case EAI_ADDRFAMILY:
@@ -120,47 +138,74 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
                 else if (poll_return == 0)
                     throw connection_error(ETIMEDOUT);
 
-                if (p[1].revents) {     // Check cancellation
-                    uint64_t buffer;
-                    ::close(sock_tmp);
-                    sock_tmp = -1;
-                    freeaddrinfo(gai_result);
+                {
+                    std::lock_guard<std::recursive_mutex> guard(_lock);
+                    _connecting = false;
 
-                    {
-                        std::lock_guard<std::recursive_mutex> guard(_lock);
-                        _connecting = false;
-                    }
+                    // Re-check cancellation event with lock to prevent a race condition
+                    if (poll(&p[1], 1, 0) == -1)
+                        throw internal_error(errno);
 
-                    if (read(_event, &buffer, 8) != 8) {
-                        int event_errno = errno;
-                        sock_tmp = -1;
-                        throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(event_errno)), event_errno);
-                    } else throw connection_closed("Connection cancelled", 0);
-                }
-
-                int sock_err;
-                if (p[0].revents) {     // Check connection
-                    socklen_t sock_err_len = sizeof(int);
-                    if (getsockopt(sock_tmp, SOL_SOCKET, SO_ERROR, &sock_err, &sock_err_len)) {
-                        int gso_errno = errno;
+                    if (p[1].revents) {     // Check cancellation
+                        uint64_t buffer;
                         ::close(sock_tmp);
                         sock_tmp = -1;
-                        throw internal_error("getsockopt: " + std::string(strerror(errno)), gso_errno);
+                        freeaddrinfo(gai_result);
+
+                        if (read(_event, &buffer, 8) != 8) {
+                            int event_errno = errno;
+                            sock_tmp = -1;
+                            throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(event_errno)), event_errno);
+                        } else throw connection_closed("Connection cancelled", 0);
                     }
 
-                    if (sock_err)       // Connection error
-                        throw connection_error(sock_err);
-                    else                // Connection successful
-                        break;
+                    int sock_err;
+                    if (p[0].revents) {     // Check connection
+                        socklen_t sock_err_len = sizeof(int);
+                        if (getsockopt(sock_tmp, SOL_SOCKET, SO_ERROR, &sock_err, &sock_err_len)) {
+                            int gso_errno = errno;
+                            ::close(sock_tmp);
+                            sock_tmp = -1;
+                            throw internal_error("getsockopt: " + std::string(strerror(errno)), gso_errno);
+                        }
+
+                        if (sock_err) {     // Connection error
+                            throw connection_error(sock_err);
+                        } else {            // Connection successful
+                            _sock = sock_tmp;
+
+                            // Store remote host's IP and port
+                            if (sock_tmp != -1) {
+                                char remote_ip_char[INET6_ADDRSTRLEN] = {0};
+                                switch (item->ai_family) {
+                                case AF_INET:
+                                    if (inet_ntop(AF_INET, &((sockaddr_in*) item->ai_addr)->sin_addr, remote_ip_char, INET6_ADDRSTRLEN) == NULL)
+                                        _remote_ip = "unknown";
+                                    else
+                                        _remote_ip = remote_ip_char;
+                                    _remote_port = ntohs(((sockaddr_in*) item->ai_addr)->sin_port);
+                                    break;
+
+                                case AF_INET6:
+                                    if (inet_ntop(AF_INET6, &((sockaddr_in6*) item->ai_addr)->sin6_addr, remote_ip_char, INET6_ADDRSTRLEN) == NULL)
+                                        _remote_ip = "unknown";
+                                    else
+                                        _remote_ip = remote_ip_char;
+                                    _remote_port = ntohs(((sockaddr_in6*) item->ai_addr)->sin6_port);
+                                    break;
+
+                                default:
+                                    _remote_ip = "unknown";
+                                }
+                            }
+                            break;
+                        }
+                    }
                 }
 
                 // Unreachable code, poll returned without anything happening
                 ::close(sock_tmp);
                 sock_tmp = -1;
-                {
-                    std::lock_guard<std::recursive_mutex> guard(_lock);
-                    _connecting = false;
-                }
                 throw internal_error("unreachable code reached: poll returned when nothing happened", 0);
 
             } catch (connection_error &e) {
@@ -218,6 +263,22 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
                 {
                     std::lock_guard<std::recursive_mutex> guard(_lock);
                     _connecting = false;
+                    struct pollfd p = {
+                        .fd = _event,
+                        .events = POLLIN,
+                        .revents = 0
+                    };
+
+                    if (poll(&p, 1, 0) == -1)
+                        throw internal_error(errno);
+
+                    if (p.revents) {     // Check cancellation
+                        uint64_t buffer;
+                        if (read(_event, &buffer, 8) != 8) {
+                            int event_errno = errno;
+                            throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(event_errno)), event_errno);
+                        } else throw connection_closed("Connection cancelled", 0);
+                    }
                 }
                 throw;
             }
@@ -237,36 +298,30 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
         }
     }
 
+    freeaddrinfo(gai_result);
+
+    // Check if a cancellation signal was sent after we finished checking addresses
+    // This prevents a race condition when all addresses fail to connect
     std::lock_guard<std::recursive_mutex> guard(_lock);
-    _connecting = false;
-    _sock = sock_tmp;
+    if (_connecting) {
+        _connecting = false;
+        struct pollfd p = {
+            .fd = _event,
+            .events = POLLIN,
+            .revents = 0
+        };
 
-    // Store remote host's IP and port
-    if (sock_tmp != -1) {
-        char remote_ip_char[INET6_ADDRSTRLEN] = {0};
-        switch (item->ai_family) {
-        case AF_INET:
-            if (inet_ntop(AF_INET, &((sockaddr_in*) item->ai_addr)->sin_addr, remote_ip_char, INET6_ADDRSTRLEN) == NULL)
-                _remote_ip = "unknown";
-            else
-                _remote_ip = remote_ip_char;
-            _remote_port = ntohs(((sockaddr_in*) item->ai_addr)->sin_port);
-            break;
+        if (poll(&p, 1, 0) == -1)
+            throw internal_error(errno);
 
-        case AF_INET6:
-            if (inet_ntop(AF_INET6, &((sockaddr_in6*) item->ai_addr)->sin6_addr, remote_ip_char, INET6_ADDRSTRLEN) == NULL)
-                _remote_ip = "unknown";
-            else
-                _remote_ip = remote_ip_char;
-            _remote_port = ntohs(((sockaddr_in6*) item->ai_addr)->sin6_port);
-            break;
-
-        default:
-            _remote_ip = "unknown";
+        if (p.revents) {     // Check cancellation
+            uint64_t buffer;
+            if (read(_event, &buffer, 8) != 8) {
+                int event_errno = errno;
+                throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(event_errno)), event_errno);
+            } else throw connection_closed("Connection cancelled", 0);
         }
     }
-
-    freeaddrinfo(gai_result);
 
     if (sock_tmp == -1)    // Failed to connect
         throw connection_error(connect_error);

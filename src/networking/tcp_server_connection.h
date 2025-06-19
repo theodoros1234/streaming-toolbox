@@ -19,7 +19,8 @@ protected:
     void connect(int fd, std::string server_ip, int server_port, std::string remote_ip, int remote_port);
 public:
     tcp_server_connection(strtb::common::deregistration_interface<class tcp_server_connection*> *parent);
-    bool close();
+    ~tcp_server_connection();
+    void close();
     std::string server_ip();
     std::string remote_ip();
     int server_port();

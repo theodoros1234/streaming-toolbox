@@ -4,6 +4,11 @@ using namespace strtb::networking;
 
 tcp_server_connection::tcp_server_connection(strtb::common::deregistration_interface<class tcp_server_connection*> *parent) : _parent(parent) {}
 
+tcp_server_connection::~tcp_server_connection() {
+    if (_sock != -1 && _parent)
+        _parent->deregister(this);
+}
+
 void tcp_server_connection::connect(int fd, std::string server_ip, int server_port, std::string remote_ip, int remote_port) {
     std::lock_guard<std::recursive_mutex> guard(_lock);
     _sock = fd;
@@ -13,11 +18,10 @@ void tcp_server_connection::connect(int fd, std::string server_ip, int server_po
     _remote_port = remote_port;
 }
 
-bool tcp_server_connection::close() {
-    bool result = tcp_socket::close();
+void tcp_server_connection::close() {
+    tcp_socket::close();
     if (_parent)
         _parent->deregister(this);
-    return result;
 }
 
 std::string tcp_server_connection::server_ip() {
