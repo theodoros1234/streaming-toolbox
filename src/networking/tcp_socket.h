@@ -26,13 +26,13 @@ public:
     tcp_socket();
     virtual ~tcp_socket();
     ssize_t recv();
-    ssize_t recv(size_t max_len);
-    ssize_t send(const char* buf, size_t len);
+    virtual ssize_t recv(size_t max_len);
+    virtual ssize_t send(const char* buf, size_t len);
     ssize_t send(const std::string& buf);
     std::string recv_line(const std::string& endline = "\r\n", size_t max_len = 8192);
     void recv_line(std::string& line, const std::string& endline = "\r\n", size_t max_len = 8192);
     void shutdown(bool receive = true, bool send = true);
-    bool close();
+    virtual void close();
     bool is_open();
 };
 

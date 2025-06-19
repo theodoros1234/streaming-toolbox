@@ -6,6 +6,7 @@ CONFIG += c++17
 CONFIG += object_parallel_to_source
 TEMPLATE = lib
 TARGET = strtb
+LIBS = -lssl
 
 include( ../version.pri )
 
@@ -38,9 +39,11 @@ SOURCES += \
     ../src/chat/system.cpp \
     ../src/networking/exceptions.cpp \
     ../src/networking/tcp_client.cpp \
+    ../src/networking/tcp_client_ssl.cpp \
     ../src/networking/tcp_server.cpp \
     ../src/networking/tcp_server_connection.cpp \
     ../src/networking/tcp_socket.cpp \
+    ../src/networking/tcp_socket_ssl.cpp \
     ../src/unicode/unicode.cpp
 
 HEADERS += \
@@ -71,9 +74,11 @@ HEADERS += \
     ../src/logging/logging.h \
     ../src/networking/exceptions.h \
     ../src/networking/tcp_client.h \
+    ../src/networking/tcp_client_ssl.h \
     ../src/networking/tcp_server.h \
     ../src/networking/tcp_server_connection.h \
     ../src/networking/tcp_socket.h \
+    ../src/networking/tcp_socket_ssl.h \
     ../src/plugins/link.h \
     ../src/unicode/unicode.h
 

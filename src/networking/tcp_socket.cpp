@@ -95,13 +95,15 @@ void tcp_socket::shutdown(bool receive, bool send) {
         ::shutdown(_sock, shutdown_convert[receive][send]);
 }
 
-bool tcp_socket::close() {
+void tcp_socket::close() {
     std::lock_guard<std::recursive_mutex> guard(_lock);
     if (_sock == -1)
-        return false;
-    ::close(_sock);
+        throw connection_closed("socket already closed or never opened", 0);
+    shutdown(true, true);
+    int close_ret = ::close(_sock);
     _sock = -1;
-    return true;
+    if (close_ret)
+        throw internal_error(errno);
 }
 
 bool tcp_socket::is_open() {

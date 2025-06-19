@@ -292,12 +292,12 @@ void tcp_client::cancel_connect() {
     }
 }
 
-bool tcp_client::close() {
+void tcp_client::close() {
     std::lock_guard<std::recursive_mutex> guard(_lock);
     cancel_connect();
     _remote_ip = "";
     _remote_port = 0;
-    return tcp_socket::close();
+    tcp_socket::close();
 }
 
 std::string tcp_client::remote_ip() {

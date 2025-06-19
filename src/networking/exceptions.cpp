@@ -26,3 +26,10 @@ connection_closed::connection_closed(int what_errno) : _what(strerror(what_errno
 const char* connection_closed::what() const noexcept {return _what.c_str();}
 int connection_closed::what_errno() const noexcept {return _errno;}
 
+connection_error_ssl::connection_error_ssl(const char* what, int what_errno) : connection_error(what, what_errno) {}
+connection_error_ssl::connection_error_ssl(const std::string& what, int what_errno) : connection_error(what, what_errno) {}
+connection_error_ssl::connection_error_ssl(int what_errno) : connection_error(what_errno) {}
+
+internal_error_ssl::internal_error_ssl(const char* what, int what_errno) : internal_error(what, what_errno) {}
+internal_error_ssl::internal_error_ssl(const std::string& what, int what_errno) : internal_error(what, what_errno) {}
+internal_error_ssl::internal_error_ssl(int what_errno) : internal_error(what_errno) {}

@@ -55,6 +55,20 @@ private:
     int _errno;
 };
 
+class connection_error_ssl : public connection_error {
+public:
+    connection_error_ssl(const char* what, int what_errno);
+    connection_error_ssl(const std::string& what, int what_errno);
+    connection_error_ssl(int what_errno);
+};
+
+class internal_error_ssl : public internal_error {
+public:
+    internal_error_ssl(const char* what, int what_errno);
+    internal_error_ssl(const std::string& what, int what_errno);
+    internal_error_ssl(int what_errno);
+};
+
 }
 
 #endif // STRTB_NETWORKING_EXCEPTIONS_H

@@ -25,7 +25,7 @@ public:
     void connect(const std::string& address, uint16_t port, time_t timeout = 30);
     void cancel_connect();
     void reset();
-    bool close();
+    void close();
     std::string remote_ip();
     int remote_port();
     bool is_connecting();
