@@ -17,8 +17,8 @@ private:
 protected:
     friend tcp_server;
     void connect(int fd, std::string server_ip, int server_port, std::string remote_ip, int remote_port);
+    tcp_server_connection(strtb::common::deregistration_interface<class tcp_server_connection*> *parent, size_t recv_buffer_size);
 public:
-    tcp_server_connection(strtb::common::deregistration_interface<class tcp_server_connection*> *parent);
     ~tcp_server_connection();
     void close();
     std::string server_ip();

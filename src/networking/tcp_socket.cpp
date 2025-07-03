@@ -7,24 +7,38 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <cstring>
+#include <cstdlib>
 
 using namespace strtb;
 using namespace strtb::networking;
 
 static logging::source log("TCP Socket");
 
-tcp_socket::tcp_socket() {}
+tcp_socket::tcp_socket() : tcp_socket(STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT) {}
+
+tcp_socket::tcp_socket(size_t recv_buffer_size) {
+    _buffer_size = recv_buffer_size;
+    if (recv_buffer_size < STRTB_NETWORKING_RECV_BUFFER_SIZE_MIN)
+        throw std::invalid_argument("tcp_socket recv_buffer_size must be at least 256 bytes");
+    _buffer = (char*) std::malloc(recv_buffer_size);
+    if (!_buffer)
+        throw internal_error("Failed to allocate memory for TCP socket recv buffer: " + std::string(std::strerror(errno)), errno);
+    buffer = _buffer;
+    buffer_clear();
+}
 
 tcp_socket::~tcp_socket() {
     if (_sock != -1) {
         log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
         ::shutdown(_sock, SHUT_RDWR);
         ::close(_sock);
+        buffer_clear();
     }
+    free(_buffer);
 }
 
 ssize_t tcp_socket::recv() {
-    return recv(STRTB_NETWORKING_RECV_BUFFER_SIZE);
+    return recv(_buffer_size);
 }
 
 ssize_t tcp_socket::recv(size_t max_len) {
@@ -34,8 +48,8 @@ ssize_t tcp_socket::recv(size_t max_len) {
     if (max_len == 0)
         throw std::invalid_argument("max_len cannot be 0");
 
-    if (max_len > STRTB_NETWORKING_RECV_BUFFER_SIZE)
-        max_len = STRTB_NETWORKING_RECV_BUFFER_SIZE;
+    if (max_len > _buffer_size)
+        max_len = _buffer_size;
 
     // Return from recv_line's leftovers if there are enough to cover the request
     if (max_len <= _line_leftovers) {   // TODO: I haven't properly tested this part, but it should be working
@@ -102,6 +116,7 @@ void tcp_socket::close() {
     shutdown(true, true);
     int close_ret = ::close(_sock);
     _sock = -1;
+    buffer_clear();
     if (close_ret)
         throw internal_error(errno);
 }
@@ -176,4 +191,10 @@ void tcp_socket::recv_line(std::string& line, const std::string& endline, size_t
     } else {
         _line_leftovers = 0;
     }
+}
+
+size_t tcp_socket::buffer_size() {return _buffer_size;}
+
+void tcp_socket::buffer_clear() {
+    std::memset(_buffer, 0, _buffer_size);
 }

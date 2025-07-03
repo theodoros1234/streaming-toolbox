@@ -13,6 +13,7 @@ protected:
     tcp_socket_ssl_thread _thread;
 public:
     tcp_client_ssl();
+    tcp_client_ssl(size_t recv_buffer_size);
     ~tcp_client_ssl();
     void connect(const char* address, uint16_t port, time_t timeout = 30);
     void connect(const char* address, uint16_t port, bool allow_abrupt_shutdown = false, bool verify_certificate = true, SSL_CTX* ssl_context = nullptr, time_t timeout = 30);

@@ -20,6 +20,7 @@ protected:
 
 public:
     tcp_client();
+    tcp_client(size_t recv_buffer_size);
     ~tcp_client();
     void connect(const char* address, uint16_t port, time_t timeout = 30);
     void connect(const std::string& address, uint16_t port, time_t timeout = 30);

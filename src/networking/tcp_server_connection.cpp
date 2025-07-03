@@ -2,7 +2,7 @@
 
 using namespace strtb::networking;
 
-tcp_server_connection::tcp_server_connection(strtb::common::deregistration_interface<class tcp_server_connection*> *parent) : _parent(parent) {}
+tcp_server_connection::tcp_server_connection(strtb::common::deregistration_interface<class tcp_server_connection*> *parent, size_t recv_buffer_size) : tcp_socket(recv_buffer_size), _parent(parent) {}
 
 tcp_server_connection::~tcp_server_connection() {
     if (_sock != -1 && _parent)

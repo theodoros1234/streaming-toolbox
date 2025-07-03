@@ -44,7 +44,9 @@ static struct default_context_container {
     }
 } default_context;
 
-tcp_client_ssl::tcp_client_ssl() {}
+tcp_client_ssl::tcp_client_ssl() : tcp_client(STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT_SSL) {}
+
+tcp_client_ssl::tcp_client_ssl(size_t recv_buffer_size) : tcp_client(recv_buffer_size) {}
 
 tcp_client_ssl::~tcp_client_ssl() {
     if (_ssl) {
@@ -159,8 +161,8 @@ ssize_t tcp_client_ssl::recv(size_t max_len) {
     if (max_len == 0)
         throw std::invalid_argument("max_len cannot be 0");
 
-    if (max_len > STRTB_NETWORKING_RECV_BUFFER_SIZE)
-        max_len = STRTB_NETWORKING_RECV_BUFFER_SIZE;
+    if (max_len > _buffer_size)
+        max_len = _buffer_size;
 
     // Return from recv_line's leftovers if there are enough to cover the request
     if (max_len <= _line_leftovers) {   // TODO: I haven't properly tested this part, but it should be working
@@ -190,6 +192,7 @@ ssize_t tcp_client_ssl::send(const char* buf, size_t len) {
 
 void tcp_client_ssl::shutdown_gracefully() {
     // Returns true if the server has also sent a close_notify back or false if it hasn't yet
+    // NOTE: Only call this from the sender thread. For unexpectedly cancelling the connection, use shutdown()
     assert((_sock == -1) == (_ssl == nullptr));
 
     if (_ssl == nullptr)
@@ -213,4 +216,5 @@ void tcp_client_ssl::close() {
     _thread.stop();
     SSL_free(_ssl);
     _ssl = nullptr;
+    buffer_clear();
 }

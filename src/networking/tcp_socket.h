@@ -5,13 +5,16 @@
 #include <mutex>
 #include "exceptions.h"     // IWYU pragma: export
 
-#define STRTB_NETWORKING_RECV_BUFFER_SIZE 4096
+#define STRTB_NETWORKING_RECV_BUFFER_SIZE_MIN 256
+#define STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT 4096
+#define STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT_SSL 16384
 
 namespace strtb::networking {
 
 class tcp_socket {
 protected:
-    char _buffer[STRTB_NETWORKING_RECV_BUFFER_SIZE];
+    char* _buffer;
+    size_t _buffer_size;
     const char padding = 0;   // used just in case some plugin uses old null-terminated C functions on the buffer
     size_t _line_leftovers_pos = 0, _line_leftovers = 0;
     std::recursive_mutex _lock;
@@ -22,8 +25,9 @@ protected:
 #endif
 
 public:
-    const char* buffer = _buffer;
+    const char* buffer;
     tcp_socket();
+    tcp_socket(size_t recv_buffer_size);
     virtual ~tcp_socket();
     ssize_t recv();
     virtual ssize_t recv(size_t max_len);
@@ -34,6 +38,8 @@ public:
     void shutdown(bool receive = true, bool send = true);
     virtual void close();
     bool is_open();
+    size_t buffer_size();
+    void buffer_clear();
 };
 
 }

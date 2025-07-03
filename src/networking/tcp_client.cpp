@@ -18,7 +18,9 @@ using namespace strtb::networking;
 
 static strtb::logging::source log("TCP Client");
 
-tcp_client::tcp_client() : tcp_socket() {
+tcp_client::tcp_client() : tcp_client(STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT) {}
+
+tcp_client::tcp_client(size_t recv_buffer_size) : tcp_socket(recv_buffer_size) {
     // Create new eventfd (used for shutting down server from another thread)
     _event = eventfd(0, 0);
     if (_event == -1)

@@ -17,7 +17,7 @@ private:
     std::condition_variable _connections_cv;
     std::string _server_ip;
     int _ip_family, _server_port, _backlog;
-    size_t _max_active;
+    size_t _max_active, _recv_buffer_size;
     std::set<tcp_server_connection*> _active_connections;
 
     // Platform-specific
@@ -28,6 +28,7 @@ private:
 
 public:
     tcp_server();
+    tcp_server(size_t recv_buffer_size);
     ~tcp_server();
     void listen(const char* address, uint16_t port, bool reuseaddr = true, int backlog = 64, size_t max_active = 64);
     void listen(const std::string& address, uint16_t port, bool reuseaddr = true, int backlog = 64, size_t max_active = 64);
@@ -37,6 +38,7 @@ public:
     std::string server_ip();
     int server_port();
     int ip_family();
+    size_t recv_buffer_size();
     void deregister(tcp_server_connection* target);
 };
 

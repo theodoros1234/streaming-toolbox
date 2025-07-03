@@ -20,7 +20,10 @@ using namespace strtb;
 
 static logging::source log("TCP Server");
 
-tcp_server::tcp_server() : _ip_family(0), _server_port(0), _backlog(0), _max_active(0) {
+tcp_server::tcp_server() : tcp_server(STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT) {}
+
+tcp_server::tcp_server(size_t recv_buffer_size) : _ip_family(0), _server_port(0), _backlog(0), _max_active(0) {
+    _recv_buffer_size = recv_buffer_size;
     // Create new eventfd (used for shutting down server from another thread)
     _event = eventfd(0, 0);
     if (_event == -1)
@@ -248,7 +251,7 @@ tcp_server_connection* tcp_server::accept() {
             }
 
             // Wrap new connection socket into the appropriate object
-            tcp_server_connection* new_conn = new tcp_server_connection(this);
+            tcp_server_connection* new_conn = new tcp_server_connection(this, _recv_buffer_size);
             new_conn->connect(new_sock, _server_ip, _server_port, addr_str, port);
             _active_connections.insert(new_conn);
             return new_conn;
@@ -328,3 +331,5 @@ int tcp_server::ip_family() {
     std::lock_guard<std::mutex> guard(_lock);
     return _ip_family;
 }
+
+size_t tcp_server::recv_buffer_size() {return _recv_buffer_size;}

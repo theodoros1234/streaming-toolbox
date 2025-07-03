@@ -6,7 +6,7 @@ CONFIG += c++17
 CONFIG += object_parallel_to_source
 TEMPLATE = lib
 TARGET = strtb
-LIBS = -lssl -lpthread
+LIBS = -lssl -lcrypto -lpthread
 
 include( ../version.pri )
 
