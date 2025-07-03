@@ -69,6 +69,26 @@ public:
     internal_error_ssl(int what_errno);
 };
 
+class ssl_verification_error : public network_error {
+public:
+    ssl_verification_error(const char* what, int what_errno);
+    ssl_verification_error(const std::string& what, int what_errno);
+    const char* what() const noexcept;
+    int what_errno() const noexcept;
+private:
+    std::string _what;
+    int _errno;
+};
+
+class bad_threading : public network_error {
+public:
+    bad_threading(const char* what);
+    bad_threading(const std::string& what);
+    const char* what() const noexcept;
+private:
+    std::string _what;
+};
+
 }
 
 #endif // STRTB_NETWORKING_EXCEPTIONS_H

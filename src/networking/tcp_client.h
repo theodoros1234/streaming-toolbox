@@ -8,7 +8,7 @@
 namespace strtb::networking {
 
 class tcp_client : public tcp_socket {
-private:
+protected:
     std::string _remote_ip;
     int _remote_port = 0;
     bool _connecting = false, _cancel_sent = false, _connect_restrict = false;

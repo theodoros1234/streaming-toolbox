@@ -75,7 +75,7 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
 
         if (p.revents) {     // Check cancellation
             uint64_t buffer;
-            if (read(_event, &buffer, 8) != 8) {
+            if (read(_event, &buffer, 8) != 8) {    // NOLINT
                 int event_errno = errno;
                 throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(event_errno)), event_errno);
             } else throw connection_closed("Connection cancelled", 0);
@@ -152,7 +152,7 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
                         sock_tmp = -1;
                         freeaddrinfo(gai_result);
 
-                        if (read(_event, &buffer, 8) != 8) {
+                        if (read(_event, &buffer, 8) != 8) {    // NOLINT
                             int event_errno = errno;
                             sock_tmp = -1;
                             throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(event_errno)), event_errno);
@@ -316,7 +316,7 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
 
         if (p.revents) {     // Check cancellation
             uint64_t buffer;
-            if (read(_event, &buffer, 8) != 8) {
+            if (read(_event, &buffer, 8) != 8) {    // NOLINT
                 int event_errno = errno;
                 throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(event_errno)), event_errno);
             } else throw connection_closed("Connection cancelled", 0);

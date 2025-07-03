@@ -6,7 +6,7 @@ CONFIG += c++17
 CONFIG += object_parallel_to_source
 TEMPLATE = lib
 TARGET = strtb
-LIBS = -lssl
+LIBS = -lssl -lpthread
 
 include( ../version.pri )
 
@@ -38,12 +38,13 @@ SOURCES += \
     ../src/chat/subscription.cpp \
     ../src/chat/system.cpp \
     ../src/networking/exceptions.cpp \
+    ../src/networking/sigpipe_suppressor.cpp \
     ../src/networking/tcp_client.cpp \
     ../src/networking/tcp_client_ssl.cpp \
     ../src/networking/tcp_server.cpp \
     ../src/networking/tcp_server_connection.cpp \
     ../src/networking/tcp_socket.cpp \
-    ../src/networking/tcp_socket_ssl.cpp \
+    ../src/networking/tcp_socket_ssl_thread.cpp \
     ../src/unicode/unicode.cpp
 
 HEADERS += \
@@ -73,12 +74,13 @@ HEADERS += \
     ../src/json/value_utils.h \
     ../src/logging/logging.h \
     ../src/networking/exceptions.h \
+    ../src/networking/sigpipe_suppressor.h \
     ../src/networking/tcp_client.h \
     ../src/networking/tcp_client_ssl.h \
     ../src/networking/tcp_server.h \
     ../src/networking/tcp_server_connection.h \
     ../src/networking/tcp_socket.h \
-    ../src/networking/tcp_socket_ssl.h \
+    ../src/networking/tcp_socket_ssl_thread.h \
     ../src/plugins/link.h \
     ../src/unicode/unicode.h
 
