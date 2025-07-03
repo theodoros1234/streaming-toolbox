@@ -15,8 +15,8 @@ public:
     tcp_client_ssl();
     ~tcp_client_ssl();
     void connect(const char* address, uint16_t port, time_t timeout = 30);
-    void connect(const char* address, uint16_t port, bool verify_certificate = true, SSL_CTX* ssl_context = nullptr, time_t timeout = 30);
-    void connect(const std::string& address, uint16_t port, bool verify_certificate = true, SSL_CTX* ssl_context = nullptr, time_t timeout = 30);
+    void connect(const char* address, uint16_t port, bool allow_abrupt_shutdown = false, bool verify_certificate = true, SSL_CTX* ssl_context = nullptr, time_t timeout = 30);
+    void connect(const std::string& address, uint16_t port, bool allow_abrupt_shutdown = false, bool verify_certificate = true, SSL_CTX* ssl_context = nullptr, time_t timeout = 30);
     ssize_t recv(size_t max_len);
     ssize_t send(const char* buf, size_t len);
     void shutdown_gracefully();

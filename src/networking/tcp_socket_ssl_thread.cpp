@@ -291,6 +291,7 @@ void tcp_socket_ssl_thread::thread_loop() {
 
                     case SSL_ERROR_ZERO_RETURN:
                         _length_read = 0;
+                        _successful_read = true;
                         _requested_read = false;
                         _cv_read.notify_one();
                         break;
@@ -338,6 +339,6 @@ void tcp_socket_ssl_thread::_decide_exception() {
             throw internal_error(errno);
         }
     default:
-        throw internal_error_ssl("SSL/TLS internal error", _errno_ssl);
+        throw internal_error_ssl("SSL/TLS internal error (error code " + std::to_string(_errno_ssl) + ")", _errno_ssl);
     }
 }

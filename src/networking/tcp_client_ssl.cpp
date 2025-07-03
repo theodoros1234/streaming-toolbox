@@ -58,14 +58,14 @@ tcp_client_ssl::~tcp_client_ssl() {
 }
 
 void tcp_client_ssl::connect(const char* address, uint16_t port, time_t timeout) {
-    connect(address, port, true, nullptr, timeout);
+    connect(address, port, false, true, nullptr, timeout);
 }
 
-void tcp_client_ssl::connect(const std::string& address, uint16_t port, bool verify_certificate, SSL_CTX* ssl_context, time_t timeout) {
-    connect(address.c_str(), port, verify_certificate, ssl_context, timeout);
+void tcp_client_ssl::connect(const std::string& address, uint16_t port, bool allow_abrupt_shutdown, bool verify_certificate, SSL_CTX* ssl_context, time_t timeout) {
+    connect(address.c_str(), port, allow_abrupt_shutdown, verify_certificate, ssl_context, timeout);
 }
 
-void tcp_client_ssl::connect(const char* address, uint16_t port, bool verify_certificate, SSL_CTX* ssl_context, time_t timeout) {
+void tcp_client_ssl::connect(const char* address, uint16_t port, bool allow_abrupt_shutdown, bool verify_certificate, SSL_CTX* ssl_context, time_t timeout) {
     // TODO: think about locking the socket _lock cause it will prevent shutdown from being run, but also think about setting _sock to -1
 
     tcp_client::connect(address, port, timeout);
@@ -83,6 +83,9 @@ void tcp_client_ssl::connect(const char* address, uint16_t port, bool verify_cer
         SSL_set_verify(_ssl, SSL_VERIFY_PEER, NULL);
     else
         SSL_set_verify(_ssl, SSL_VERIFY_NONE, NULL);
+
+    if (allow_abrupt_shutdown)
+        SSL_set_options(_ssl, SSL_OP_IGNORE_UNEXPECTED_EOF);
 
     sigpipe_suppressor sp;
     BIO* bio = BIO_new(BIO_s_socket());
