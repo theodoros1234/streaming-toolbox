@@ -27,9 +27,8 @@ public:
     void cancel_connect();
     void reset();
     void close();
-    std::string remote_ip();
-    int remote_port();
-    bool is_connecting();
+    const std::string& remote_ip() const;
+    int remote_port() const;
 };
 
 }

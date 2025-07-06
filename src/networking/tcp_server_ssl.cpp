@@ -35,7 +35,9 @@ tcp_server_connection* tcp_server_ssl::_new_connection(int sock, std::string rem
     return new tcp_server_connection_ssl(this, _recv_buffer_size, sock, _server_ip, _server_port, remote_ip, remote_port, _ctx);
 }
 
-SSL_CTX* tcp_server_ssl::ssl_ctx() const {return _ctx;}
+SSL_CTX* tcp_server_ssl::ssl_ctx() const {
+    return _ctx;
+}
 
 tcp_server_connection_ssl* tcp_server_ssl::accept() {
     return (tcp_server_connection_ssl*) tcp_server::accept();

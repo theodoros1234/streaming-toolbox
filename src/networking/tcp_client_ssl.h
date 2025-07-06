@@ -22,6 +22,7 @@ public:
     ssize_t send(const char* buf, size_t len);
     void shutdown_gracefully();
     void close();
+    SSL* ssl() const;
 };
 
 }

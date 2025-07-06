@@ -329,19 +329,22 @@ void tcp_server::deregister(tcp_server_connection* target) {
     _connections_cv.notify_all();
 }
 
-std::string tcp_server::server_ip() {
-    std::lock_guard<std::mutex> guard(_lock);
+const std::string& tcp_server::server_ip() const {
     return _server_ip;
 }
 
-int tcp_server::server_port() {
-    std::lock_guard<std::mutex> guard(_lock);
+int tcp_server::server_port() const {
     return _server_port;
 }
 
-int tcp_server::ip_family() {
-    std::lock_guard<std::mutex> guard(_lock);
+int tcp_server::ip_family() const {
     return _ip_family;
 }
 
-size_t tcp_server::recv_buffer_size() {return _recv_buffer_size;}
+size_t tcp_server::recv_buffer_size() const {
+    return _recv_buffer_size;
+}
+
+int tcp_server::fd() const {
+    return _sock;
+}

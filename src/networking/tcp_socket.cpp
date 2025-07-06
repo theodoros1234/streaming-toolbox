@@ -16,8 +16,7 @@ static logging::source log("TCP Socket");
 
 tcp_socket::tcp_socket() : tcp_socket(STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT) {}
 
-tcp_socket::tcp_socket(size_t recv_buffer_size) {
-    _buffer_size = recv_buffer_size;
+tcp_socket::tcp_socket(size_t recv_buffer_size) : _buffer_size(recv_buffer_size) {
     if (recv_buffer_size < STRTB_NETWORKING_RECV_BUFFER_SIZE_MIN)
         throw std::invalid_argument("tcp_socket recv_buffer_size must be at least 256 bytes");
     _buffer = (char*) std::malloc(recv_buffer_size);
@@ -121,8 +120,7 @@ void tcp_socket::close() {
         throw internal_error(errno);
 }
 
-bool tcp_socket::is_open() {
-    std::lock_guard<std::recursive_mutex> guard(_lock);
+bool tcp_socket::is_open() const {
     return _sock != -1;
 }
 
@@ -193,8 +191,14 @@ void tcp_socket::recv_line(std::string& line, const std::string& endline, size_t
     }
 }
 
-size_t tcp_socket::buffer_size() {return _buffer_size;}
+size_t tcp_socket::buffer_size() const {
+    return _buffer_size;
+}
 
 void tcp_socket::buffer_clear() {
     std::memset(_buffer, 0, _buffer_size);
 }
+
+#ifdef __linux__
+int tcp_socket::fd() const {return _sock;}
+#endif

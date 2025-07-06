@@ -31,6 +31,7 @@ public:
     ssize_t recv(size_t max_len);
     ssize_t send(const char* buf, size_t len);
     void shutdown_gracefully();
+    SSL* ssl() const;
 };
 
 }

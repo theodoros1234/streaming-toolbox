@@ -161,3 +161,7 @@ void tcp_server_connection_ssl::shutdown_gracefully() {
 
     _thread.shutdown_gracefully();
 }
+
+SSL* tcp_server_connection_ssl::ssl() const {
+    return _ssl;
+}

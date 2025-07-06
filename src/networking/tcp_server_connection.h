@@ -12,8 +12,8 @@ class tcp_server;
 class tcp_server_connection : public tcp_socket {
 protected:
     strtb::common::deregistration_interface<class tcp_server_connection*> *_parent = nullptr;
-    std::string _server_ip, _remote_ip;
-    int _server_port = 0, _remote_port = 0;
+    const std::string _server_ip, _remote_ip;
+    const int _server_port = 0, _remote_port = 0;
     friend tcp_server;
     tcp_server_connection(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
                           size_t recv_buffer_size,
@@ -25,10 +25,10 @@ protected:
 public:
     virtual ~tcp_server_connection();
     void close();
-    std::string server_ip();
-    std::string remote_ip();
-    int server_port();
-    int remote_port();
+    const std::string& server_ip() const;
+    const std::string& remote_ip() const;
+    int server_port() const;
+    int remote_port() const;
 };
 
 }

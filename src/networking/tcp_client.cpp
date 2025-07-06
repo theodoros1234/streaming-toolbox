@@ -357,17 +357,10 @@ void tcp_client::close() {
     tcp_socket::close();
 }
 
-std::string tcp_client::remote_ip() {
-    std::lock_guard<std::recursive_mutex> guard(_lock);
+const std::string& tcp_client::remote_ip() const {
     return _remote_ip;
 }
 
-int tcp_client::remote_port() {
-    std::lock_guard<std::recursive_mutex> guard(_lock);
+int tcp_client::remote_port() const {
     return _remote_port;
-}
-
-bool tcp_client::is_connecting() {
-    std::lock_guard<std::recursive_mutex> guard(_lock);
-    return _connecting;
 }

@@ -14,8 +14,7 @@ namespace strtb::networking {
 class tcp_socket {
 protected:
     char* _buffer;
-    size_t _buffer_size;
-    const char padding = 0;   // used just in case some plugin uses old null-terminated C functions on the buffer
+    const size_t _buffer_size;
     size_t _line_leftovers_pos = 0, _line_leftovers = 0;
     std::recursive_mutex _lock;
 
@@ -37,9 +36,12 @@ public:
     void recv_line(std::string& line, const std::string& endline = "\r\n", size_t max_len = 8192);
     void shutdown(bool receive = true, bool send = true);
     virtual void close();
-    bool is_open();
-    size_t buffer_size();
+    bool is_open() const;
+    size_t buffer_size() const;
     void buffer_clear();
+#ifdef __linux__
+    int fd() const;
+#endif
 };
 
 }

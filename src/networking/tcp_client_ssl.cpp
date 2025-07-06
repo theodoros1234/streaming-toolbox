@@ -220,3 +220,7 @@ void tcp_client_ssl::close() {
     _ssl = nullptr;
     buffer_clear();
 }
+
+SSL* tcp_client_ssl::ssl() const {
+    return _ssl;
+}

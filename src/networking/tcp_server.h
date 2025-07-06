@@ -37,11 +37,14 @@ public:
     tcp_server_connection* accept();
     bool shutdown();
     bool close();
-    std::string server_ip();
-    int server_port();
-    int ip_family();
-    size_t recv_buffer_size();
+    const std::string& server_ip() const;
+    int server_port() const;
+    int ip_family() const;
+    size_t recv_buffer_size() const;
     void deregister(tcp_server_connection* target);
+#ifdef __linux__
+    int fd() const;
+#endif
 };
 
 }

@@ -29,22 +29,18 @@ void tcp_server_connection::close() {
         _parent->deregister(this);
 }
 
-std::string tcp_server_connection::server_ip() {
-    std::lock_guard<std::recursive_mutex> guard(_lock);
+const std::string& tcp_server_connection::server_ip() const {
     return _server_ip;
 }
 
-std::string tcp_server_connection::remote_ip() {
-    std::lock_guard<std::recursive_mutex> guard(_lock);
+const std::string& tcp_server_connection::remote_ip() const {
     return _remote_ip;
 }
 
-int tcp_server_connection::server_port() {
-    std::lock_guard<std::recursive_mutex> guard(_lock);
+int tcp_server_connection::server_port() const {
     return _server_port;
 }
 
-int tcp_server_connection::remote_port() {
-    std::lock_guard<std::recursive_mutex> guard(_lock);
+int tcp_server_connection::remote_port() const {
     return _remote_port;
 }
