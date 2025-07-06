@@ -31,8 +31,8 @@ tcp_server_ssl::~tcp_server_ssl() {
     }
 }
 
-tcp_server_connection* tcp_server_ssl::_new_connection(int sock, std::string remote_ip, int remote_port) {
-    return new tcp_server_connection_ssl(this, _recv_buffer_size, sock, _server_ip, _server_port, remote_ip, remote_port, _ctx);
+tcp_server_connection* tcp_server_ssl::_new_connection(const bound_port& server, int sock, std::string remote_ip, int remote_port) {
+    return new tcp_server_connection_ssl(this, _recv_buffer_size, sock, server.server_ip, server.server_port, remote_ip, remote_port, _ctx);
 }
 
 SSL_CTX* tcp_server_ssl::ssl_ctx() const {

@@ -13,7 +13,7 @@ private:
     bool _ctx_caller_provided = false;
 
 protected:
-    tcp_server_connection* _new_connection(int sock, std::string remote_ip, int remote_port);
+    tcp_server_connection* _new_connection(const bound_port& server, int sock, std::string remote_ip, int remote_port);
 
 public:
     tcp_server_ssl(SSL_CTX* ctx = nullptr);
