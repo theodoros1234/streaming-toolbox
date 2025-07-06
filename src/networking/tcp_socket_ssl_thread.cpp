@@ -109,7 +109,8 @@ size_t tcp_socket_ssl_thread::recv(char* buffer, size_t length) {
     // Wakeup SSL thread
     _requested_read = true;
     uint64_t u = 1;
-    write(_eventfd, &u, sizeof(uint64_t));
+    if (write(_eventfd, &u, sizeof(uint64_t)) != sizeof(uint64_t))
+        throw internal_error("error in internal synchronization mechanism: " + std::string(std::strerror(errno)), errno);
 
     // Wait to receive data
     _successful_read = false;
@@ -142,7 +143,8 @@ size_t tcp_socket_ssl_thread::send(const char* buffer, size_t length) {
     // Wakeup SSL thread
     _requested_write = true;
     uint64_t u = 1;
-    write(_eventfd, &u, sizeof(uint64_t));
+    if (write(_eventfd, &u, sizeof(uint64_t)) != sizeof(uint64_t))
+        throw internal_error("error in internal synchronization mechanism: " + std::string(std::strerror(errno)), errno);
 
     // Wait to send data
     _successful_write = false;
@@ -167,7 +169,8 @@ void tcp_socket_ssl_thread::shutdown_gracefully() {
     _requested_write = true;
     _requested_shutdown = true;
     uint64_t u = 1;
-    write(_eventfd, &u, sizeof(uint64_t));
+    if (write(_eventfd, &u, sizeof(uint64_t)) != sizeof(uint64_t))
+        throw internal_error("error in internal synchronization mechanism: " + std::string(std::strerror(errno)), errno);
 
     // Wait to send shutdown
     _cv_write.wait(guard);
@@ -202,7 +205,13 @@ void tcp_socket_ssl_thread::thread_loop() {
 
         if (p[1].revents & POLLIN) {
             uint64_t u;
-            read(_eventfd, &u, sizeof(uint64_t));
+            if (read(_eventfd, &u, sizeof(uint64_t)) != sizeof(uint64_t)) {
+                _errno_syscall = errno;
+                close(_eventfd);
+                _eventfd = -1;
+                _thread_active = false;
+                break;
+            }
         } else if (p[1].revents & POLLHUP) {
             // Can't continue if eventfd fails in some way
             close(_eventfd);
@@ -318,7 +327,7 @@ void tcp_socket_ssl_thread::thread_loop() {
 
 void tcp_socket_ssl_thread::_decide_exception() {
     if (_eventfd == -1)
-        throw internal_error("error in internal synchronization mechanism", 0);
+        throw internal_error("error in internal synchronization mechanism", _errno_syscall);
 
     if (_errno_ssl == 0 && !_thread_active)
         throw connection_closed("Connection closed", 0);
