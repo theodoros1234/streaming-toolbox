@@ -10,12 +10,15 @@
 namespace strtb::networking {
 
 class sigpipe_suppressor {
+    // Only do this for non-windows systems
+#ifndef _WIN32
 private:
     bool needs_block;
     sigset_t sigpipe_set;
 public:
     sigpipe_suppressor();
     ~sigpipe_suppressor();
+#endif
 };
 
 }

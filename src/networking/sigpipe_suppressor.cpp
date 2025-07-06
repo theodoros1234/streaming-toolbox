@@ -6,6 +6,9 @@
 
 using namespace strtb::networking;
 
+// Only do this for non-windows systems
+#ifndef _WIN32
+
 sigpipe_suppressor::sigpipe_suppressor() {
     // Check if SIGPIPE is already blocked, which means we don't need to change it
     sigset_t blocked;
@@ -37,3 +40,5 @@ sigpipe_suppressor::~sigpipe_suppressor() {
         pthread_sigmask(SIG_UNBLOCK, &sigpipe_set, NULL);
     }
 }
+
+#endif
