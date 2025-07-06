@@ -43,6 +43,8 @@ SOURCES += \
     ../src/networking/tcp_client_ssl.cpp \
     ../src/networking/tcp_server.cpp \
     ../src/networking/tcp_server_connection.cpp \
+    ../src/networking/tcp_server_connection_ssl.cpp \
+    ../src/networking/tcp_server_ssl.cpp \
     ../src/networking/tcp_socket.cpp \
     ../src/networking/tcp_socket_ssl_thread.cpp \
     ../src/unicode/unicode.cpp
@@ -79,6 +81,8 @@ HEADERS += \
     ../src/networking/tcp_client_ssl.h \
     ../src/networking/tcp_server.h \
     ../src/networking/tcp_server_connection.h \
+    ../src/networking/tcp_server_connection_ssl.h \
+    ../src/networking/tcp_server_ssl.h \
     ../src/networking/tcp_socket.h \
     ../src/networking/tcp_socket_ssl_thread.h \
     ../src/plugins/link.h \

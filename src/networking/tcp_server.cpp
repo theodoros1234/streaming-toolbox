@@ -250,13 +250,25 @@ tcp_server_connection* tcp_server::accept() {
                 return nullptr;
             }
 
-            // Wrap new connection socket into the appropriate object
-            tcp_server_connection* new_conn = new tcp_server_connection(this, _recv_buffer_size);
-            new_conn->connect(new_sock, _server_ip, _server_port, addr_str, port);
-            _active_connections.insert(new_conn);
+            // Wrap new connection socket into the appropriate object (could be a subclass for SSL)
+            tcp_server_connection* new_conn = nullptr;
+            try {
+                new_conn = _new_connection(new_sock, addr_str, port);
+                _active_connections.insert(new_conn);
+            } catch (...) {
+                if (new_conn)
+                    delete new_conn;
+                throw;
+            }
+
             return new_conn;
         }
     }
+}
+
+tcp_server_connection* tcp_server::_new_connection(int sock, std::string remote_ip, int remote_port) {
+    // This is a separate function because it can be overriden by tcp_server_ssl
+    return new tcp_server_connection(this, _recv_buffer_size, sock, _server_ip, _server_port, remote_ip, remote_port);
 }
 
 bool tcp_server::shutdown() {

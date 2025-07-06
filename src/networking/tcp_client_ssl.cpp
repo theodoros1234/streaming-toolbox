@@ -72,8 +72,11 @@ void tcp_client_ssl::connect(const char* address, uint16_t port, bool allow_abru
 
     tcp_client::connect(address, port, timeout);
 
-    if (!ssl_context)
+    if (!ssl_context) {
+        if (!default_context.ctx)
+            throw internal_error_ssl("Failed to get the default SSL context", 0);
         ssl_context = default_context.ctx;
+    }
 
     _ssl = SSL_new(ssl_context);
     if (!_ssl) {
@@ -191,7 +194,6 @@ ssize_t tcp_client_ssl::send(const char* buf, size_t len) {
 }
 
 void tcp_client_ssl::shutdown_gracefully() {
-    // Returns true if the server has also sent a close_notify back or false if it hasn't yet
     // NOTE: Only call this from the sender thread. For unexpectedly cancelling the connection, use shutdown()
     assert((_sock == -1) == (_ssl == nullptr));
 
