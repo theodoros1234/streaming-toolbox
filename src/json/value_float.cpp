@@ -26,7 +26,7 @@ void value_float::deinf() {
         _value = std::numeric_limits<double>::min();
 }
 
-void value_float::write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline) const {
+void value_float::write_to_stream(std::ostream &stream, int, int, const char*) const {
     // JSON requires using '.' as a decimal point, which might be different
     // from our locale's decimal point, so we need to work around this
     // by creating a fake (string) stream, giving it the standard C locale

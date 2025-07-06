@@ -51,7 +51,7 @@ void chat_tab::view_scrolled(int value) {
     }
 }
 
-void chat_tab::view_scroll_height_changed(int min, int max) {
+void chat_tab::view_scroll_height_changed(int, int max) {
     // Scroll to bottom if previously scrolled to bottom
     if (this->scrolled_to_bottom)
         this->chat_view_scrollbar->setValue(max);

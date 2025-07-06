@@ -18,6 +18,6 @@ void value_string::set_value(const std::string &value) {_value = value;}
 
 value* value_string::copy() const {return new value_string(_value.c_str());}
 
-void value_string::write_to_stream(std::ostream &stream, int pretty_print, int pretty_print_level, const char* newline) const {
+void value_string::write_to_stream(std::ostream &stream, int, int, const char*) const {
     stream << common::string_escape(_value);
 }
