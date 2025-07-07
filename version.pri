@@ -1,5 +1,5 @@
 v_major = 0
-v_minor = 4
+v_minor = 5
 v_patch = 0
 v_phase = \"\\\"alpha\\\"\"
 
