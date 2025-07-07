@@ -68,7 +68,7 @@ main_window::~main_window() {
     }
 }
 
-void main_window::resizeEvent(QResizeEvent *event) {
+void main_window::closeEvent(QCloseEvent*) {
     if (!is_config_loaded)
         return;
     try {
@@ -76,8 +76,8 @@ void main_window::resizeEvent(QResizeEvent *event) {
             config::main->set_value(conf_cat, {"window_is_maximized"}, true);
         } else {
             config::main->set_value(conf_cat, {"window_is_maximized"}, false);
-            config::main->set_value(conf_cat, {"window_width"}, event->size().width());
-            config::main->set_value(conf_cat, {"window_height"}, event->size().height());
+            config::main->set_value(conf_cat, {"window_width"}, size().width());
+            config::main->set_value(conf_cat, {"window_height"}, size().height());
         }
     } catch (std::exception &e) {
         log.put(logging::DEBUG, {"Failed to save window size and state: ", e.what()});
