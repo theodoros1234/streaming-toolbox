@@ -8,7 +8,7 @@
 
 namespace strtb::json::parser {
 
-class invalid_json : public std::exception {
+class invalid_json : public json_error {
 private:
     std::string _what;
 public:

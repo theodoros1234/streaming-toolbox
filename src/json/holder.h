@@ -5,8 +5,7 @@
 
 namespace strtb::json {
 
-class holder
-{
+class holder {
 private:
     json::value* _v;
 public:

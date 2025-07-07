@@ -14,7 +14,9 @@ namespace strtb::config {
 
 typedef std::vector<id_type> path_type;
 
-class invalid_category_name : public std::exception {
+class config_error : public std::exception {};
+
+class invalid_category_name : public config_error {
 private:
     std::string _what;
 public:
@@ -23,7 +25,7 @@ public:
     const char* what() const noexcept;
 };
 
-class category_not_found : public std::exception {
+class category_not_found : public config_error {
 private:
     std::string _what;
 public:
@@ -31,7 +33,7 @@ public:
     const char* what() const noexcept;
 };
 
-class category_filesystem_error : public std::exception {
+class category_filesystem_error : public config_error {
 private:
     std::string _what;
 public:
@@ -39,7 +41,7 @@ public:
     const char* what() const noexcept;
 };
 
-class broken_path : public std::exception {
+class broken_path : public config_error {
 private:
     std::string _what;
     std::string _category_name;
@@ -52,7 +54,7 @@ public:
     const path_type& path_until_break() const;
 };
 
-class invalid_target : public std::exception {
+class invalid_target : public config_error {
 private:
     std::string _what;
 public:
