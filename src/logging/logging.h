@@ -28,11 +28,11 @@ private:
         uint64_t uint64;
         float fl;
         double db;
-        void *ptr;
+        const void *ptr;
     } v;
     enum {STR, C_STR, CHAR, INT32, UINT32, INT64, UINT64, FLOAT, DOUBLE, PTR, PATH} type;
 public:
-    message_part(std::string value);
+    message_part(const std::string& value);
     message_part(const char *value);
     message_part(char value);
     message_part(int32_t value);
@@ -41,7 +41,7 @@ public:
     message_part(uint64_t value);
     message_part(float value);
     message_part(double value);
-    message_part(void *value);
+    message_part(const void *value);
     message_part(std::filesystem::path value);
 protected:
     friend class source;

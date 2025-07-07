@@ -1,0 +1,41 @@
+#ifndef STRTB_NETWORKING_TCP_SOCKET_SSL_THREAD_H
+#define STRTB_NETWORKING_TCP_SOCKET_SSL_THREAD_H
+
+#include <thread>
+#include <openssl/ssl.h>
+#include <mutex>
+#include <condition_variable>
+
+namespace strtb::networking {
+
+class tcp_socket_ssl_thread {
+private:
+    std::mutex _lock;
+    std::condition_variable _cv_read, _cv_write;
+    std::thread* _t = nullptr;
+    bool _thread_active = false;
+    int _sock, _eventfd;
+    SSL* _ssl;
+    char* _buffer_read;
+    const char* _buffer_write;
+    size_t _length_read, _length_write;
+    bool _successful_read, _successful_write;
+    bool _requested_read, _requested_write, _requested_shutdown, _requested_close, _shutdown_sent;
+    int _errno_ssl, _errno_syscall;
+    void _decide_exception();
+protected:
+    void thread_loop();
+    friend std::thread;
+public:
+    tcp_socket_ssl_thread();
+    ~tcp_socket_ssl_thread();
+    void start(int sock, SSL* ssl);
+    void stop();
+    size_t recv(char* buffer, size_t length);
+    size_t send(const char* buffer, size_t length);
+    void shutdown_gracefully();
+};
+
+}
+
+#endif // STRTB_NETWORKING_TCP_SOCKET_SSL_THREAD_H

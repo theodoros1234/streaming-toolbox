@@ -23,38 +23,15 @@ SOURCES += \
     ../src/plugins/loader.cpp \
 
 HEADERS += \
-    ../src/chat/channel.h \
-    ../src/chat/message.h \
-    ../src/chat/provider.h \
-    ../src/chat/queue.h \
-    ../src/chat/subscription.h \
-    ../src/chat/system.h \
-    ../src/common/deregistration_interface.h \
-    ../src/common/strescape.h \
     ../src/common/version.h \
-    ../src/config/id_type.h \
-    ../src/config/system.h \
     ../src/gui/chat_subscription_thread.h \
     ../src/gui/chat_tab.h \
     ../src/gui/main_window.h \
     ../src/gui/plugin_tab.h \
-    ../src/json/all_value_types.h \
-    ../src/json/parser.h \
-    ../src/json/value.h \
-    ../src/json/value_array.h \
-    ../src/json/value_bool.h \
-    ../src/json/value_float.h \
-    ../src/json/value_int.h \
-    ../src/json/value_null.h \
-    ../src/json/value_object.h \
-    ../src/json/value_string.h \
-    ../src/json/value_utils.h \
-    ../src/logging/logging.h \
     ../src/plugins/plugin.h \
     ../src/plugins/link.h \
     ../src/plugins/list.h \
-    ../src/plugins/loader.h \
-    ../src/unicode/unicode.h
+    ../src/plugins/loader.h
 
 FORMS += \
     ../src/gui/chat_tab.ui \

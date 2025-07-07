@@ -49,7 +49,7 @@ void add_output_file(std::string path, level log_level, endline_type endline_typ
     add_output_stream(stream, log_level, endline_type, force_flush, formatting);
 }
 
-message_part::message_part(std::string value) {
+message_part::message_part(const std::string& value) {
     v_str = value;
     type = STR;
 }
@@ -94,7 +94,7 @@ message_part::message_part(double value) {
     type = DOUBLE;
 }
 
-message_part::message_part(void *value) {
+message_part::message_part(const void *value) {
     v.ptr = value;
     type = PTR;
 }

@@ -6,6 +6,7 @@ CONFIG += c++17
 CONFIG += object_parallel_to_source
 TEMPLATE = lib
 TARGET = strtb
+LIBS = -lssl -lcrypto -lpthread
 
 include( ../version.pri )
 
@@ -18,6 +19,8 @@ SOURCES += \
     ../src/common/version.cpp \
     ../src/config/system.cpp \
     ../src/config/id_type.cpp \
+    ../src/json/cast.cpp \
+    ../src/json/holder.cpp \
     ../src/json/parser.cpp \
     ../src/json/value.cpp \
     ../src/json/value_array.cpp \
@@ -34,6 +37,16 @@ SOURCES += \
     ../src/chat/queue.cpp \
     ../src/chat/subscription.cpp \
     ../src/chat/system.cpp \
+    ../src/networking/exceptions.cpp \
+    ../src/networking/sigpipe_suppressor.cpp \
+    ../src/networking/tcp_client.cpp \
+    ../src/networking/tcp_client_ssl.cpp \
+    ../src/networking/tcp_server.cpp \
+    ../src/networking/tcp_server_connection.cpp \
+    ../src/networking/tcp_server_connection_ssl.cpp \
+    ../src/networking/tcp_server_ssl.cpp \
+    ../src/networking/tcp_socket.cpp \
+    ../src/networking/tcp_socket_ssl_thread.cpp \
     ../src/unicode/unicode.cpp
 
 HEADERS += \
@@ -49,6 +62,8 @@ HEADERS += \
     ../src/config/id_type.h \
     ../src/config/system.h \
     ../src/json/all_value_types.h \
+    ../src/json/cast.h \
+    ../src/json/holder.h \
     ../src/json/parser.h \
     ../src/json/value.h \
     ../src/json/value_array.h \
@@ -60,6 +75,16 @@ HEADERS += \
     ../src/json/value_string.h \
     ../src/json/value_utils.h \
     ../src/logging/logging.h \
+    ../src/networking/exceptions.h \
+    ../src/networking/sigpipe_suppressor.h \
+    ../src/networking/tcp_client.h \
+    ../src/networking/tcp_client_ssl.h \
+    ../src/networking/tcp_server.h \
+    ../src/networking/tcp_server_connection.h \
+    ../src/networking/tcp_server_connection_ssl.h \
+    ../src/networking/tcp_server_ssl.h \
+    ../src/networking/tcp_socket.h \
+    ../src/networking/tcp_socket_ssl_thread.h \
     ../src/plugins/link.h \
     ../src/unicode/unicode.h
 
@@ -73,7 +98,7 @@ DISTFILES +=
 # Header files for plugin development
 HEADER_INCLUDE_DIR = /usr/include/$${TARGET}
 for(header, HEADERS) {
-    header_r = $$replace(header, "../src/", ""))
+    header_r = $$replace(header, "../src/", "")
     header_r_dir = $$dirname(header_r)
     eval(header_include_dir_$${header_r_dir}.path = $${HEADER_INCLUDE_DIR}/$${header_r_dir}))
     eval(header_include_dir_$${header_r_dir}.files += $$header))

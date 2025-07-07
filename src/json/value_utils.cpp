@@ -7,8 +7,6 @@
 #include "value_array.h"
 #include "value_object.h"
 
-#include <stdexcept>
-
 using namespace strtb;
 using namespace strtb::json;
 using namespace strtb::json::value_utils;
@@ -69,7 +67,7 @@ value* value_utils::new_default(val_type type) {
 value* value_utils::new_auto(const value_auto &val) {
     if (val.is_ptr()) {
         if (!val.value_as_ptr())
-            throw std::runtime_error("nullptr was given in arguments");
+            throw undefined_exception();
         return val.value_as_ptr()->copy();
     } else switch (val.type()) {
     case VAL_BOOL:
@@ -81,7 +79,7 @@ value* value_utils::new_auto(const value_auto &val) {
     case VAL_STRING:
         if (val.is_c_str()) {
             if (!val.value_as_c_str())
-                throw std::runtime_error("nullptr was given in arguments");
+                throw undefined_exception();
             return new value_string(val.value_as_c_str());
         } else
             return new value_string(val.value_as_string());
@@ -168,7 +166,7 @@ void value_utils::change_auto(value** old_val, const value_auto &new_val) {
 
     if (new_val.is_ptr()) {
         if (!new_val.value_as_ptr())
-            throw std::runtime_error("nullptr was given in arguments");
+            throw undefined_exception();
         delete *old_val;
         *old_val = new_val.value_as_ptr()->copy();
     } else switch (new_val.type()) {
@@ -203,7 +201,7 @@ void value_utils::change_auto(value** old_val, const value_auto &new_val) {
     case VAL_STRING:
         if (new_val.is_c_str()) {
             if (!new_val.value_as_c_str())
-                throw std::runtime_error("nullptr was given in arguments");
+                throw undefined_exception();
             if (old_type == VAL_STRING)
                 ((value_string*)*old_val)->set_value(new_val.value_as_c_str());
             else {

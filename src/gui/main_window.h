@@ -26,7 +26,7 @@ public:
     ~main_window();
 
 protected:
-    virtual void resizeEvent(QResizeEvent *event);
+    virtual void closeEvent(QCloseEvent *event);
 
 private:
     Ui::MainWindow *ui;
