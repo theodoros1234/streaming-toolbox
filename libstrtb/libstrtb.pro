@@ -19,6 +19,9 @@ SOURCES += \
     ../src/common/version.cpp \
     ../src/config/system.cpp \
     ../src/config/id_type.cpp \
+    ../src/event/item.cpp \
+    ../src/event/provider.cpp \
+    ../src/event/system.cpp \
     ../src/json/cast.cpp \
     ../src/json/holder.cpp \
     ../src/json/parser.cpp \
@@ -61,6 +64,9 @@ HEADERS += \
     ../src/common/version.h \
     ../src/config/id_type.h \
     ../src/config/system.h \
+    ../src/event/item.h \
+    ../src/event/provider.h \
+    ../src/event/system.h \
     ../src/json/all_value_types.h \
     ../src/json/cast.h \
     ../src/json/holder.h \

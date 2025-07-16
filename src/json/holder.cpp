@@ -5,6 +5,14 @@ using namespace strtb::json;
 
 holder::holder() : _v(nullptr) {}
 
+holder::holder(const holder& o) {
+    _v = o.value()->copy();
+}
+
+holder::holder(holder&& o) {
+    _v = o.detach(true);
+}
+
 holder::holder(strtb::json::value* v) : _v(v) {}
 
 holder::~holder() {

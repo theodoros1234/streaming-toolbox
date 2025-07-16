@@ -10,6 +10,8 @@ private:
     json::value* _v;
 public:
     holder();
+    holder(const holder& o);
+    holder(holder&& o);
     holder(json::value* v);
     ~holder();
     holder& operator=(json::value* other);
