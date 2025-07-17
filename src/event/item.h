@@ -9,7 +9,7 @@
 namespace strtb::event {
 
 struct param_definition {
-    std::string name, display_name;
+    std::string name;
     json::val_type type = json::VAL_UNDEFINED;
     bool required = false;
     param_definition* array_definition = nullptr;

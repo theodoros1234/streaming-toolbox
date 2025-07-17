@@ -12,7 +12,7 @@ provider::~provider() {
 }
 
 void provider::_setup_check() {
-    if (!_id)
+    if (_id == 0)
         throw std::logic_error("event provider not set up");
 }
 
@@ -26,7 +26,7 @@ void provider::setup(const std::string& name, const std::string& display_name, c
     pcat.description = description;
     _name = name;
 
-    system_ptr->provider_item_add(0, STRTB_EVENT_ROOT, name, pcat);
+    _id = system_ptr->provider_item_add(0, STRTB_EVENT_ROOT, name, pcat);
 }
 
 bool provider::setup_finished() {
@@ -46,6 +46,8 @@ uint64_t provider::id() {
 
 uint64_t provider::item_add(uint64_t target_location, const std::string &name, const item_info &item) {
     _setup_check();
+    if (target_location == 0)
+        target_location = _id;
     return system_ptr->provider_item_add(_id, target_location, name, item);
 }
 
@@ -56,6 +58,8 @@ uint64_t provider::item_add(const item_path& target_location, const std::string 
 
 void provider::item_remove(uint64_t target_location, const std::string &name) {
     _setup_check();
+    if (target_location == 0)
+        target_location = _id;
     system_ptr->provider_item_remove(_id, target_location, name);
 }
 
@@ -64,12 +68,14 @@ void provider::item_remove(const item_path& target_location, const std::string &
     system_ptr->provider_item_remove(_id, target_location, name);
 }
 
-void provider::category_clear(uint64_t resource_id) {
+void provider::category_clear(uint64_t target_location) {
     _setup_check();
-    system_ptr->provider_category_clear(_id, resource_id);
+    if (target_location == 0)
+        target_location = _id;
+    system_ptr->provider_category_clear(_id, target_location);
 }
 
-void provider::category_clear(const item_path& inner_location) {
+void provider::category_clear(const item_path& target_location) {
     _setup_check();
-    system_ptr->provider_category_clear(_id, inner_location);
+    system_ptr->provider_category_clear(_id, target_location);
 }

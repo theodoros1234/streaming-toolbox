@@ -22,51 +22,8 @@
     <item>
      <widget class="QTabWidget" name="mainTabView">
       <property name="currentIndex">
-       <number>0</number>
+       <number>-1</number>
       </property>
-      <widget class="QWidget" name="tabOverview">
-       <attribute name="title">
-        <string>Overview</string>
-       </attribute>
-      </widget>
-      <widget class="QWidget" name="tabPlugins">
-       <attribute name="title">
-        <string>Plugins</string>
-       </attribute>
-       <layout class="QGridLayout" name="tabPluginsLayout">
-        <property name="leftMargin">
-         <number>0</number>
-        </property>
-        <property name="topMargin">
-         <number>0</number>
-        </property>
-        <property name="rightMargin">
-         <number>0</number>
-        </property>
-        <property name="bottomMargin">
-         <number>0</number>
-        </property>
-       </layout>
-      </widget>
-      <widget class="QWidget" name="tabChat">
-       <attribute name="title">
-        <string>Chat</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_4">
-        <property name="leftMargin">
-         <number>0</number>
-        </property>
-        <property name="topMargin">
-         <number>0</number>
-        </property>
-        <property name="rightMargin">
-         <number>0</number>
-        </property>
-        <property name="bottomMargin">
-         <number>0</number>
-        </property>
-       </layout>
-      </widget>
      </widget>
     </item>
    </layout>

@@ -16,6 +16,7 @@ include( ../version.pri )
 SOURCES += \
     ../src/gui/chat_subscription_thread.cpp \
     ../src/gui/chat_tab.cpp \
+    ../src/gui/event_viewer.cpp \
     ../src/gui/main_window.cpp \
     ../src/gui/plugin_tab.cpp \
     ../src/main.cpp \
@@ -26,6 +27,7 @@ HEADERS += \
     ../src/common/version.h \
     ../src/gui/chat_subscription_thread.h \
     ../src/gui/chat_tab.h \
+    ../src/gui/event_viewer.h \
     ../src/gui/main_window.h \
     ../src/gui/plugin_tab.h \
     ../src/plugins/plugin.h \
@@ -35,6 +37,7 @@ HEADERS += \
 
 FORMS += \
     ../src/gui/chat_tab.ui \
+    ../src/gui/event_viewer.ui \
     ../src/gui/main_window.ui \
     ../src/gui/plugin_tab.ui
 

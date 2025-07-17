@@ -24,15 +24,16 @@ static const std::string conf_cat = "gui_main_window";
 main_window::main_window(plugins::list *plugin_list, QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , plugin_tab(plugin_list)
-    , chat_tab()
+    , _plugin_tab(plugin_list)
+    , _chat_tab()
     , log("GUI: Main Window") {
 
     // Set up window and tabs
     ui->setupUi(this);
     ui->statusbar->showMessage(common::get_libstrtb_version_string());
-    ui->tabChat->layout()->addWidget(&chat_tab);
-    ui->tabPlugins->layout()->addWidget(&plugin_tab);
+    ui->mainTabView->addTab(&_plugin_tab, "Plugins");
+    ui->mainTabView->addTab(&_chat_tab, "Chat");
+    ui->mainTabView->addTab(&_event_viewer, "Event Viewer");
 
     // Load window config
     try {

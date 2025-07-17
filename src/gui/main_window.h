@@ -5,6 +5,7 @@
 #include "../logging/logging.h"
 #include "chat_tab.h"
 #include "plugin_tab.h"
+#include "event_viewer.h"
 
 #include <QMainWindow>
 #include <QStringListModel>
@@ -30,8 +31,9 @@ protected:
 
 private:
     Ui::MainWindow *ui;
-    class plugin_tab plugin_tab;
-    class chat_tab chat_tab;
+    plugin_tab _plugin_tab;
+    chat_tab _chat_tab;
+    event_viewer _event_viewer;
     bool is_config_loaded = false;
     logging::source log;
 };

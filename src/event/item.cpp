@@ -4,7 +4,6 @@ using namespace strtb::event;
 
 param_definition::param_definition(const param_definition& from) {
     name = from.name;
-    display_name = from.display_name;
     type = from.type;
     required = from.required;
 
@@ -20,7 +19,6 @@ param_definition::param_definition(const param_definition& from) {
 
 param_definition::param_definition(param_definition&& from) :
     name(std::move(from.name)),
-    display_name(std::move(from.display_name)),
     type(from.type),
     required(from.required),
     array_definition(from.array_definition),
@@ -47,7 +45,6 @@ param_definition& param_definition::operator=(const param_definition& from) {
 
     // Copy attributes from the other object
     name = from.name;
-    display_name = from.display_name;
     type = from.type;
     required = from.required;
 

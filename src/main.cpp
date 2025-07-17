@@ -4,6 +4,7 @@
 #include "logging/logging.h"
 #include "config/system.h"
 #include "common/version.h"
+#include "event/system.h"
 
 #include <QApplication>
 #include <cstdlib>
@@ -66,6 +67,7 @@ int main(int argc, char *argv[]) {
     config::main = &config_system;
 
     // Init other things
+    event::system event_system;
     chat::system chat_system;
     chat::main = &chat_system;
     plugins::loader plugin_loader;
