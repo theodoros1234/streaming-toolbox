@@ -8,6 +8,39 @@
 
 namespace strtb::event {
 
+class event_exception : public std::exception {
+private:
+    std::string _what;
+public:
+    event_exception(const std::string& what);
+    const char* what() const noexcept;
+};
+
+class internal_error : public event_exception {
+public:
+    internal_error(const std::string& what);
+};
+
+class not_found : public event_exception {
+public:
+    not_found(const std::string& what);
+};
+
+class wrong_type : public event_exception {
+public:
+    wrong_type(const std::string& what);
+};
+
+class out_of_scope : public event_exception {
+public:
+    out_of_scope(const std::string& what);
+};
+
+class already_exists : public event_exception {
+public:
+    already_exists(const std::string& what);
+};
+
 struct param_definition {
     std::string name;
     json::val_type type = json::VAL_UNDEFINED;
@@ -18,9 +51,15 @@ struct param_definition {
     param_definition() = default;
     param_definition(const param_definition& from);
     param_definition(param_definition&& from);
+    param_definition(json::val_type type);
+    param_definition(const std::string& name, json::val_type type, bool required);
     ~param_definition();
     param_definition& operator=(const param_definition& from);
     param_definition& operator=(param_definition&& from);
+    void array_define(json::val_type type);
+    void array_clear_definition();
+    void object_add_definition(const std::string& name, json::val_type type, bool required);
+    void object_clear_definitions();
 };
 
 struct example_definition {
@@ -29,6 +68,9 @@ struct example_definition {
     example_definition() = default;
     example_definition(const example_definition& other);
     example_definition(example_definition&& other);
+    example_definition(const json::value_object* params, const json::value_object* returns);
+    example_definition(const json::value_object& params, const json::value_object& returns);
+    example_definition(json::value_object&& params, json::value_object&& returns);
     example_definition& operator=(const example_definition& other);
     example_definition& operator=(example_definition&& other);
 };
@@ -48,6 +90,9 @@ struct item_info {
     std::string display_name, description;
     std::vector<param_definition> params, returns;
     std::vector<example_definition> examples;
+
+    item_info() = default;
+    item_info(item_type type, const std::string& display_name, const std::string& description);
 };
 
 struct item_listing : public item_info {

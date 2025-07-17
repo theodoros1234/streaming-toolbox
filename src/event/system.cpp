@@ -10,18 +10,6 @@ using namespace strtb::event;
 event::system* strtb::event::system_ptr = nullptr;
 static logging::source log("Event System");
 
-event_exception::event_exception(const std::string& what) : _what(what) {}
-
-const char* event_exception::what() const noexcept {
-    return _what.c_str();
-}
-
-internal_error::internal_error(const std::string& what) : event_exception(what) {}
-not_found::not_found(const std::string& what) : event_exception(what) {}
-wrong_type::wrong_type(const std::string& what) : event_exception(what) {}
-out_of_scope::out_of_scope(const std::string& what) : event_exception(what) {}
-already_exists::already_exists(const std::string& what) : event_exception(what) {}
-
 system::res_cnt::res_cnt(res_item* ptr) : ptr(ptr) {}
 
 void system::res_cnt::make_item(item_type type,

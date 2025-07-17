@@ -8,44 +8,10 @@
 #include <vector>
 #include <mutex>
 #include <string>
-#include <exception>
 
 #define STRTB_EVENT_ROOT 1
 
 namespace strtb::event {
-
-class event_exception : public std::exception {
-private:
-    std::string _what;
-public:
-    event_exception(const std::string& what);
-    const char* what() const noexcept;
-};
-
-class internal_error : public event_exception {
-public:
-    internal_error(const std::string& what);
-};
-
-class not_found : public event_exception {
-public:
-    not_found(const std::string& what);
-};
-
-class wrong_type : public event_exception {
-public:
-    wrong_type(const std::string& what);
-};
-
-class out_of_scope : public event_exception {
-public:
-    out_of_scope(const std::string& what);
-};
-
-class already_exists : public event_exception {
-public:
-    already_exists(const std::string& what);
-};
 
 class system {
 private:
