@@ -106,14 +106,14 @@ system::res_cnt::~res_cnt() {
         delete ptr;
 }
 
-item_type system::res_cnt::type() {
+item_type system::res_cnt::type() const {
     if (ptr)
         return ptr->type;
     else
         return ITEM_UNDEFINED;
 }
 
-system::res_item_category* system::res_cnt::as_category() {
+system::res_item_category* system::res_cnt::as_category() const {
     if (!ptr)
         throw not_found("holding a null pointer");
     if (ptr->type != ITEM_CATEGORY)
@@ -121,7 +121,7 @@ system::res_item_category* system::res_cnt::as_category() {
     return (res_item_category*) ptr;
 }
 
-system::res_item_event_src* system::res_cnt::as_event_src() {
+system::res_item_event_src* system::res_cnt::as_event_src() const {
     if (!ptr)
         throw not_found("holding a null pointer");
     if (ptr->type != ITEM_EVENT_SRC)
@@ -129,7 +129,7 @@ system::res_item_event_src* system::res_cnt::as_event_src() {
     return (res_item_event_src*) ptr;
 }
 
-system::res_item_action_sink* system::res_cnt::as_action_sink() {
+system::res_item_action_sink* system::res_cnt::as_action_sink() const {
     if (!ptr)
         throw not_found("holding a null pointer");
     if (ptr->type != ITEM_ACTION_SINK)

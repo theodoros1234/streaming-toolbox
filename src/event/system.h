@@ -94,10 +94,10 @@ private:
                        const std::vector<param_definition>& params,
                        const std::vector<param_definition>& returns,
                        const std::vector<example_definition>& examples);
-        item_type type();
-        res_item_category* as_category();
-        res_item_event_src* as_event_src();
-        res_item_action_sink* as_action_sink();
+        item_type type() const;
+        res_item_category* as_category() const;
+        res_item_event_src* as_event_src() const;
+        res_item_action_sink* as_action_sink() const;
     };
 
     std::mutex _lock;

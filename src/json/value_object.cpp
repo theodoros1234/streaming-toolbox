@@ -11,12 +11,27 @@ value_object::value_object(const std::map<std::string, value*> &contents) : json
 
 value_object::value_object(const value_object &from) : value_object(from._contents) {}
 
+value_object::value_object(value_object&& from) : json::value(VAL_OBJECT), _contents(std::move(from._contents)) {
+    from._contents.clear();
+}
+
 value_object::~value_object() {
     for (auto item : _contents)
         delete item.second;
 }
 
 value* value_object::copy() const {return new value_object(*this);}
+
+value_object& value_object::operator=(const value_object& other) {
+    set_contents(other._contents);
+    return *this;
+}
+
+value_object& value_object::operator=(value_object&& other) {
+    _contents = std::move(other._contents);
+    other._contents.clear();
+    return *this;
+}
 
 std::map<std::string, value*> value_object::contents() const {
     std::map<std::string, value*> copy;

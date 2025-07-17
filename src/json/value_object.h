@@ -19,8 +19,11 @@ public:
     value_object();
     value_object(const std::map<std::string, value*> &contents);
     value_object(const value_object &from);
+    value_object(value_object&& from);
     virtual ~value_object();
     virtual value* copy() const;
+    value_object& operator=(const value_object& other);
+    value_object& operator=(value_object&& other);
     std::map<std::string, value*> contents() const;
     void set_contents(const std::map<std::string, value*> &contents);
     void clear();

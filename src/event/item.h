@@ -20,10 +20,17 @@ struct param_definition {
     param_definition(param_definition&& from);
     ~param_definition();
     param_definition& operator=(const param_definition& from);
+    param_definition& operator=(param_definition&& from);
 };
 
 struct example_definition {
     json::value_object params, returns;
+
+    example_definition() = default;
+    example_definition(const example_definition& other);
+    example_definition(example_definition&& other);
+    example_definition& operator=(const example_definition& other);
+    example_definition& operator=(example_definition&& other);
 };
 
 enum item_type {ITEM_UNDEFINED, ITEM_CATEGORY, ITEM_EVENT_SRC, ITEM_ACTION_SINK};

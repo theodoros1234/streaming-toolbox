@@ -59,3 +59,49 @@ param_definition& param_definition::operator=(const param_definition& from) {
 
     return *this;
 }
+
+param_definition& param_definition::operator=(param_definition&& from) {
+    // Delete anything we have
+    if (array_definition)
+        delete array_definition;
+    array_definition = nullptr;
+    for (auto i : object_definition)
+        delete i;
+
+    // Copy attributes from the other object
+    name = std::move(from.name);
+    type = from.type;
+    required = from.required;
+
+    if (from.array_definition) {
+        array_definition = from.array_definition;
+        from.array_definition = nullptr;
+    }
+
+    object_definition = std::move(from.object_definition);
+    from.object_definition.clear();
+
+    return *this;
+}
+
+example_definition::example_definition(const example_definition& other) {
+    params = other.params;
+    returns = other.returns;
+}
+
+example_definition::example_definition(example_definition&& other) {
+    params = std::move(other.params);
+    returns = std::move(other.returns);
+}
+
+example_definition& example_definition::operator=(const example_definition& other) {
+    params = other.params;
+    returns = other.returns;
+    return *this;
+}
+
+example_definition& example_definition::operator=(example_definition&& other) {
+    params = std::move(other.params);
+    returns = std::move(other.returns);
+    return *this;
+}
