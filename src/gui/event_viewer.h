@@ -29,7 +29,7 @@ private:
     Ui::event_viewer *ui;
 
 public slots:
-    void populate(bool);
+    void populate();
     void show_info();
 };
 

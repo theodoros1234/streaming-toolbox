@@ -9,14 +9,14 @@ event_viewer::event_viewer(QWidget *parent)
     ui->setupUi(this);
     QObject::connect(ui->button_refresh, &QPushButton::clicked, this, &event_viewer::populate);
     QObject::connect(ui->item_tree, &QTreeWidget::itemSelectionChanged, this, &event_viewer::show_info);
-    populate(true);
+    populate();
 }
 
 event_viewer::~event_viewer() {
     delete ui;
 }
 
-void event_viewer::populate(bool) {
+void event_viewer::populate() {
     ui->item_tree->clear();
     event::item_info info = event::system_ptr->info(STRTB_EVENT_ROOT);
     tree_item* item = new tree_item();
@@ -28,7 +28,7 @@ void event_viewer::populate(bool) {
     item->event_item_info.provider_id = info.provider_id;
     item->setText(0, info.display_name.c_str());
     item->populate();
-    ui->item_tree->expandAll();
+    ui->item_tree->expandItem(item);
 }
 
 void event_viewer::tree_item::populate() {
@@ -158,3 +158,4 @@ void event_viewer::show_info() {
         ui->item_info->clear();
     }
 }
+

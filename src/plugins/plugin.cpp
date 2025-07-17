@@ -71,7 +71,12 @@ plugin::plugin(fs::path path) {
     }
 
     log.put(logging::DEBUG, {"Loaded ", common::string_escape(this->_info.name)});
-    this->activate();
+    try {
+        this->activate();
+    } catch (...) {
+        dlclose(this->library);
+        throw;
+    }
 }
 
 plugin::~plugin() {
@@ -88,17 +93,19 @@ plugin::~plugin() {
 }
 
 void plugin::activate() {
+    bool result;
     try {
-        if (!this->functions.activate()) {
-            log.put(logging::ERROR, {"Couldn't activate ", common::string_escape(this->_info.name)});
-            throw std::runtime_error("Couldn't activate " + common::string_escape(this->_info.name));
-        }
+        result = this->functions.activate();
     } catch (std::exception &e) {
         log.put(logging::ERROR, {"Unhandled exception while activating ", common::string_escape(this->_info.name), ": ", e.what()});
         throw;
     } catch (...) {
         log.put(logging::ERROR, {"Unhandled exception while activating ", common::string_escape(this->_info.name)});
         throw;
+    }
+    if (!result) {
+        log.put(logging::ERROR, {"Couldn't activate ", common::string_escape(this->_info.name)});
+        throw std::runtime_error("Couldn't activate " + common::string_escape(this->_info.name));
     }
 }
 

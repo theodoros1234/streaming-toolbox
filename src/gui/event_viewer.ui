@@ -13,7 +13,7 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QHBoxLayout" name="horizontalLayout">
+  <layout class="QHBoxLayout" name="horizontalLayout_2">
    <item>
     <widget class="QTreeWidget" name="item_tree">
      <attribute name="headerVisible">
@@ -29,11 +29,29 @@
    <item>
     <layout class="QVBoxLayout" name="verticalLayout">
      <item>
-      <widget class="QPushButton" name="button_refresh">
-       <property name="text">
-        <string>Refresh</string>
-       </property>
-      </widget>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QPushButton" name="button_refresh">
+         <property name="text">
+          <string>Refresh</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="button_expand">
+         <property name="text">
+          <string>Expand All</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="button_collapse">
+         <property name="text">
+          <string>Collapse All</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
      <item>
       <widget class="QTextBrowser" name="item_info">
@@ -51,7 +69,7 @@
        </property>
        <property name="baseSize">
         <size>
-         <width>200</width>
+         <width>400</width>
          <height>0</height>
         </size>
        </property>
@@ -72,5 +90,38 @@ li.checked::marker { content: &quot;\2612&quot;; }
   </layout>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>button_expand</sender>
+   <signal>clicked()</signal>
+   <receiver>item_tree</receiver>
+   <slot>expandAll()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>553</x>
+     <y>23</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>160</x>
+     <y>299</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>button_collapse</sender>
+   <signal>clicked()</signal>
+   <receiver>item_tree</receiver>
+   <slot>collapseAll()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>712</x>
+     <y>23</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>160</x>
+     <y>299</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>
