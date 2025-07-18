@@ -41,6 +41,11 @@ public:
     already_exists(const std::string& what);
 };
 
+class parsing_error : public event_exception {
+public:
+    parsing_error(const std::string& what);
+};
+
 struct param_definition {
     std::string name;
     json::val_type type = json::VAL_UNDEFINED;
@@ -53,6 +58,7 @@ struct param_definition {
     param_definition(param_definition&& from);
     param_definition(json::val_type type);
     param_definition(const std::string& name, json::val_type type, bool required);
+    param_definition(const json::value_object* from);
     ~param_definition();
     param_definition& operator=(const param_definition& from);
     param_definition& operator=(param_definition&& from);
@@ -93,6 +99,7 @@ struct item_info {
 
     item_info() = default;
     item_info(item_type type, const std::string& display_name, const std::string& description);
+    item_info(const json::value_object* from);
 };
 
 struct item_listing : public item_info {

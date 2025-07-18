@@ -1,5 +1,6 @@
 #include "event_viewer.h"
 #include "ui_event_viewer.h"
+#include "../json/value_utils.h"
 
 using namespace strtb::gui;
 
@@ -43,50 +44,39 @@ void event_viewer::tree_item::populate() {
     }
 }
 
-static void list_params(QString& text, const std::vector<strtb::event::param_definition>& params) {
-    text.append("<ul>");
-    for (auto& p : params) {
+static void list_param(QString& text, const strtb::event::param_definition& p) {
+
         text.append("<li><b>");
         text.append(p.name);
         text.append(":</b> ");
 
-        switch (p.type) {
-        case strtb::json::VAL_NULL:
-            text.append("null");
-            break;
-        case strtb::json::VAL_BOOL:
-            text.append("boolean");
-            break;
-        case strtb::json::VAL_INT:
-            text.append("integer");
-            break;
-        case strtb::json::VAL_FLOAT:
-            text.append("float");
-            break;
-        case strtb::json::VAL_STRING:
-            text.append("string");
-            break;
-        case strtb::json::VAL_ARRAY:
-            text.append("array");
-            break;
-        case strtb::json::VAL_OBJECT:
-            text.append("object");
-            break;
-        case strtb::json::VAL_UNDEFINED:
-            text.append("undefined");
-            break;
-        default:
-            text.append("invalid");
-            break;
-        }
+        text.append(strtb::json::type_to_string(p.type));
 
         if (p.required)
             text.append(", required");
         else
             text.append(", optional");
 
+        if (!p.object_definition.empty()) {
+            text.append("<br><b>Object definition:</b><ul>");
+            for (auto po : p.object_definition)
+                list_param(text, *po);
+            text.append("</ul>");
+        }
+
+        if (p.array_definition) {
+            text.append("<br><b>Array definition:</b><ul>");
+            list_param(text, *p.array_definition);
+            text.append("</ul>");
+        }
+
         text.append("</li>");
-    }
+}
+
+static void list_params(QString& text, const std::vector<strtb::event::param_definition>& params) {
+    text.append("<ul>");
+    for (auto& p : params)
+        list_param(text, p);
     text.append("</ul>");
 }
 
