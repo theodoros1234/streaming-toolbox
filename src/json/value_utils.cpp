@@ -240,3 +240,45 @@ void value_utils::change_auto(value** old_val, const value_auto &new_val) {
         throw json::invalid_type();
     }
 }
+
+val_type strtb::json::type_from_string(const std::string& str) {
+    if (str == "null")
+        return VAL_NULL;
+    else if (str == "bool")
+        return VAL_BOOL;
+    else if (str == "int")
+        return VAL_INT;
+    else if (str == "float")
+        return VAL_FLOAT;
+    else if (str == "string")
+        return VAL_STRING;
+    else if (str == "array")
+        return VAL_ARRAY;
+    else if (str == "object")
+        return VAL_OBJECT;
+    else
+        return VAL_UNDEFINED;
+}
+
+std::string strtb::json::type_to_string(val_type type) {
+    switch (type) {
+    case VAL_NULL:
+        return "null";
+    case VAL_BOOL:
+        return "bool";
+    case VAL_INT:
+        return "int";
+    case VAL_FLOAT:
+        return "float";
+    case VAL_STRING:
+        return "string";
+    case VAL_ARRAY:
+        return "array";
+    case VAL_OBJECT:
+        return "object";
+    case VAL_UNDEFINED:
+        return "undefined";
+    default:
+        return "invalid";
+    }
+}

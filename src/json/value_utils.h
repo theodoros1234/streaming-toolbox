@@ -60,6 +60,9 @@ void change_auto(value** old_val, const value_auto &new_val);
 
 }
 
+val_type type_from_string(const std::string& str);
+std::string type_to_string(val_type type);
+
 }
 
 #endif // STRTB_JSON_VALUE_UTILS_H
