@@ -46,6 +46,12 @@ public:
     parsing_error(const std::string& what);
 };
 
+class invalid_path : public event_exception {
+public:
+    invalid_path(const std::string& what, ssize_t pos);
+    const ssize_t pos;
+};
+
 struct param_definition {
     std::string name;
     json::val_type type = json::VAL_UNDEFINED;
@@ -84,6 +90,11 @@ struct example_definition {
 enum item_type {ITEM_UNDEFINED, ITEM_CATEGORY, ITEM_EVENT_SRC, ITEM_ACTION_SINK};
 
 typedef std::vector<std::string> item_path;
+
+bool item_path_validate_segment(const std::string& segment);
+ssize_t item_path_validate(const item_path& path);
+std::string item_path_to_string(const item_path& path);
+item_path to_item_path(const std::string& path_str, size_t max_segment_length = 256, size_t max_depth = 64);
 
 struct item_ref {
     uint64_t resource_id = 0;

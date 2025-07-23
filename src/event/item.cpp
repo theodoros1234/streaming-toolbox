@@ -1,5 +1,6 @@
 #include "item.h"
 #include "../json/cast.h"
+#include "../common/strescape.h"
 
 using namespace strtb::event;
 
@@ -15,6 +16,7 @@ wrong_type::wrong_type(const std::string& what) : event_exception(what) {}
 out_of_scope::out_of_scope(const std::string& what) : event_exception(what) {}
 already_exists::already_exists(const std::string& what) : event_exception(what) {}
 parsing_error::parsing_error(const std::string& what) : event_exception(what) {}
+invalid_path::invalid_path(const std::string& what, ssize_t pos) : event_exception(what), pos(pos) {}
 
 param_definition::param_definition(const param_definition& from) {
     name = from.name;
@@ -354,5 +356,87 @@ item_info::item_info(const json::value_object* from) {
             throw parsing_error("\"examples\" must be an array");
         }
     }
-
 }
+
+bool strtb::event::item_path_validate_segment(const std::string& segment) {
+    if (segment.empty())
+        return false;
+    for (char c : segment)
+        if (!(('a' <= c && c <= 'z') ||
+              ('A' <= c && c <= 'Z') ||
+              ('0' <= c && c <= '9') ||
+              (c == '_') || (c == '-')))
+            return false;
+    return true;
+}
+
+ssize_t strtb::event::item_path_validate(const item_path& path) {
+    for (item_path::const_iterator segment = path.begin(); segment < path.end(); segment++)
+        if (!item_path_validate_segment(*segment))
+            return segment - path.begin();  // Returning position of problematic segment
+    return -1;  // Returning -1 means all segments are valid
+}
+
+std::string strtb::event::item_path_to_string(const item_path& path) {
+    std::string str;
+    ssize_t path_validate = item_path_validate(path);
+    if (path_validate != -1)
+        throw invalid_path("path segment " + common::string_escape(path.at(path_validate)) + " is invalid", path_validate);
+
+    size_t length = 0;
+    for (const std::string& segment : path)
+        length += segment.length() + 1;
+    str.reserve(length);
+
+    for (const std::string& segment : path) {
+        str += "/";
+        str += segment;
+    }
+
+    return str;
+}
+
+item_path strtb::event::to_item_path(const std::string& path_str, size_t max_segment_length, size_t max_depth) {
+    item_path path;
+
+    std::string::size_type from = 0, to = 1, segment_length = 0;
+    if (path_str.size() < 1 || path_str.at(0) != '/')
+        throw parsing_error("path must start with /");
+
+    while (path.size() <= max_depth) {
+        if (to >= path_str.size())
+            return path;
+
+        from = to;
+        to = path_str.find('/', from);
+        if (to == path_str.npos) {  // end of string
+            to = path_str.size();
+            segment_length = to - from;
+        } else {                    // found slash, skip it for next iteration
+            segment_length = to - from;
+            to++;
+        }
+
+        if (segment_length == 0)    // skip empty segments
+            continue;
+
+        if (segment_length > max_segment_length)
+            throw parsing_error("segment exceeds maximum segment length");
+
+        std::string segment = path_str.substr(from, segment_length);
+
+        if (!item_path_validate_segment(segment))
+            throw parsing_error("path contains invalid characters");
+
+        if (path.size() >= max_depth)
+            throw parsing_error("path exceeds maximum depth");
+
+        if (item_path_validate_segment(segment))
+            path.push_back(std::move(segment));
+        else
+            throw parsing_error("path segment " + common::string_escape(segment) + " is invalid");
+    }
+
+    throw parsing_error("path exceeds maximum depth");
+}
+

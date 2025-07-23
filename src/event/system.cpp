@@ -148,6 +148,9 @@ system::~system() {
 
 uint64_t system::_follow_path(uint64_t start, const item_path& path) {
     uint64_t current_pos = start;
+    ssize_t path_validate = item_path_validate(path);
+    if (path_validate != -1)
+        throw invalid_path("path segment " + common::string_escape(path.at(path_validate)) + " is invalid", path_validate);
 
     for (const std::string& next_piece : path) {
         try {
@@ -198,6 +201,9 @@ uint64_t system::_provider_item_add(uint64_t provider_id,
                              "or that your system is unstable, as it would normally take "
                              "hundreds of years at minimum for this to happen.");
     }
+
+    if (!item_path_validate_segment(name))
+        throw invalid_path("name " + common::string_escape(name) + " is invalid", -1);
 
     uint64_t& new_entry = location->list[name];
     if (new_entry != 0)
@@ -271,6 +277,9 @@ uint64_t system::provider_item_add(uint64_t provider_id,
 
 void system::_provider_item_remove(res_item_category* location, const std::string& name) {
     uint64_t rid = 0;
+
+    if (!item_path_validate_segment(name))
+        throw invalid_path("name " + common::string_escape(name) + " is invalid", -1);
 
     // Delete entry in category
     auto cat_entry = location->list.find(name);
