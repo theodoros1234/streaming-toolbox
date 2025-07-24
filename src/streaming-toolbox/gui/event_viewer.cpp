@@ -28,7 +28,7 @@ void event_viewer::populate() {
     item->event_item_info.display_name = info.display_name;
     item->event_item_info.description = info.description;
     item->event_item_info.provider_id = info.provider_id;
-    item->setText(0, info.display_name.c_str());
+    item->setText(0, QString::fromStdString(info.display_name));
     item->populate();
     ui->item_tree->expandItem(item);
 }
@@ -39,7 +39,7 @@ void event_viewer::tree_item::populate() {
         tree_item* item = new tree_item();
         this->addChild(item);
         item->event_item_info = i;
-        item->setText(0, i.display_name.c_str());
+        item->setText(0, QString::fromStdString(i.display_name));
         if (i.type == event::ITEM_CATEGORY)
             item->populate();
     }
@@ -48,10 +48,10 @@ void event_viewer::tree_item::populate() {
 static void list_param(QString& text, const strtb::event::param_definition& p) {
 
         text.append("<li><b>");
-        text.append(p.name);
+        text.append(QString::fromStdString(p.name));
         text.append(":</b> ");
 
-        text.append(strtb::json::type_to_string(p.type));
+        text.append(QString::fromStdString(strtb::json::type_to_string(p.type)));
 
         if (p.required)
             text.append(", required");
@@ -96,13 +96,13 @@ void event_viewer::show_info() {
         text.append(QString::number(info.provider_id));
         text.append("</p>");
         text.append("<p><b>Name:</b> ");
-        text.append(info.name);
+        text.append(QString::fromStdString(info.name));
         text.append("</p>");
         text.append("<p><b>Display Name:</b> ");
-        text.append(info.display_name);
+        text.append(QString::fromStdString(info.display_name));
         text.append("</p>");
         text.append("<p><b>Description:</b> ");
-        text.append(info.description);
+        text.append(QString::fromStdString(info.description));
         text.append("</p>");
         text.append("<p><b>Type:</b> ");
         switch (info.type) {

@@ -39,11 +39,11 @@ int main(int argc, char *argv[]) {
         QMessageBox error_message_box;
 
         QString error_message = "Version mismatch between Streaming Toolbox (v";
-        error_message.append(std::to_string(STRTB_SRC_VERSION_MAJOR));
+        error_message.append(QString::number(STRTB_SRC_VERSION_MAJOR));
         error_message.append('.');
-        error_message.append(std::to_string(STRTB_SRC_VERSION_MINOR));
+        error_message.append(QString::number(STRTB_SRC_VERSION_MINOR));
         error_message.append('.');
-        error_message.append(std::to_string(STRTB_SRC_VERSION_PATCH));
+        error_message.append(QString::number(STRTB_SRC_VERSION_PATCH));
         error_message.append('-');
         error_message.append(STRTB_SRC_VERSION_PHASE);
         error_message.append(") and libstrtb (");

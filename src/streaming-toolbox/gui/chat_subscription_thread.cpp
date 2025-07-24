@@ -16,11 +16,11 @@ void chat_subscription_thread::run() {
         for (auto msg : buffer) {
             // Format message into a string
             QString msg_str = QString("<b><font color=\"");
-            msg_str.append(QString(msg.user_color.c_str()).toHtmlEscaped());
+            msg_str.append(QString::fromStdString(msg.user_color).toHtmlEscaped());
             msg_str.append("\">");
-            msg_str.append(QString(msg.user_name.c_str()).toHtmlEscaped());
+            msg_str.append(QString::fromStdString(msg.user_name).toHtmlEscaped());
             msg_str.append("</font></b>: ");
-            msg_str.append(QString(msg.message.c_str()).toHtmlEscaped());
+            msg_str.append(QString::fromStdString(msg.message).toHtmlEscaped());
             messages.push_back(msg_str);
         }
         // Send processed messages upstream through signal

@@ -21,8 +21,8 @@ plugin_tab::plugin_tab(plugins::list *plugin_list, QWidget *parent)
     // Place all plugins into the UI's list
     for (auto plugin : plugin_list->plugins()) {
         QPixmap color_pix(PLUGIN_ACCENT_COLOR_SIZE, PLUGIN_ACCENT_COLOR_SIZE);
-        color_pix.fill(QColor(plugin.accent_color.c_str()));
-        ui->pluginList->addItem(new QListWidgetItem(QIcon(color_pix), plugin.name.c_str(), ui->pluginList));
+        color_pix.fill(QColor(QString::fromStdString((plugin.accent_color))));
+        ui->pluginList->addItem(new QListWidgetItem(QIcon(color_pix), QString::fromStdString(plugin.name), ui->pluginList));
     }
 }
 
@@ -41,7 +41,7 @@ void plugin_tab::select_plugin(int index) {
     QWidget *settings = this->plugin_list->plugin_settings_page(index);
 
     // Update title
-    ui->pluginSettingsLabel->setText(("Settings for " + info.name).c_str());
+    ui->pluginSettingsLabel->setText("Settings for " + QString::fromStdString(info.name));
 
     // Remove previous settings page from other plugn (if it's there)
     if (this->ui->settingsScrollArea->widget())
@@ -56,27 +56,27 @@ void plugin_tab::select_plugin(int index) {
     QString about_text;
     if (!info.name.empty()) {
         about_text.append("<b>Name:</b> ");
-        about_text.append(QString(info.name.c_str()).toHtmlEscaped());
+        about_text.append(QString::fromStdString(info.name).toHtmlEscaped());
         about_text.append("<br><br>");
     }
     if (!info.version.empty()) {
         about_text.append("<b>Version:</b> ");
-        about_text.append(QString(info.version.c_str()).toHtmlEscaped());
+        about_text.append(QString::fromStdString(info.version).toHtmlEscaped());
         about_text.append("<br><br>");
     }
     if (!info.author.empty()) {
         about_text.append("<b>Author:</b> ");
-        about_text.append(QString(info.author.c_str()).toHtmlEscaped());
+        about_text.append(QString::fromStdString(info.author).toHtmlEscaped());
         about_text.append("<br><br>");
     }
     if (!info.description.empty()) {
         about_text.append("<b>Description:</b> ");
-        about_text.append(QString(info.description.c_str()).toHtmlEscaped());
+        about_text.append(QString::fromStdString(info.description).toHtmlEscaped());
         about_text.append("<br><br>");
     }
     if (!info.website.empty()) {
         // Make the website link clickable
-        QString link(info.website.c_str());
+        QString link(QString::fromStdString(info.website));
         link = link.toHtmlEscaped();
         about_text.append("<b>Website:</b> <a href=\"");
         about_text.append(link);
@@ -86,17 +86,17 @@ void plugin_tab::select_plugin(int index) {
     }
     if (!info.copyright.empty()) {
         about_text.append("<b>Copyright:</b> ");
-        about_text.append(QString(info.copyright.c_str()).toHtmlEscaped());
+        about_text.append(QString::fromStdString(info.copyright).toHtmlEscaped());
         about_text.append("<br><br>");
     }
     if (!info.license.empty()) {
         about_text.append("<b>License:</b> ");
-        about_text.append(QString(info.license.c_str()).toHtmlEscaped());
+        about_text.append(QString::fromStdString(info.license).toHtmlEscaped());
         about_text.append("<br><br>");
     }
     if (!info.path.empty()) {
         about_text.append("<b>Path:</b> ");
-        about_text.append(QString(info.path.c_str()).toHtmlEscaped());
+        about_text.append(QString::fromStdString(info.path).toHtmlEscaped());
     }
     ui->pluginAboutText->setText(about_text);
 }
