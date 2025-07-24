@@ -1,8 +1,8 @@
 #ifndef STRTB_GUI_CHAT_TAB_H
 #define STRTB_GUI_CHAT_TAB_H
 
-#include "../chat/subscription.h"
-#include "../logging/logging.h"
+#include "../libstrtb/chat/subscription.h"
+#include "../libstrtb/logging/logging.h"
 #include "chat_subscription_thread.h"
 
 #include <QWidget>

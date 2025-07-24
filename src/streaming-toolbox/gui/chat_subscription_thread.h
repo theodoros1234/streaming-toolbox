@@ -1,7 +1,7 @@
 #ifndef STRTB_GUI_CHAT_SUBSCRIPTION_THREAD_H
 #define STRTB_GUI_CHAT_SUBSCRIPTION_THREAD_H
 
-#include "../chat/subscription.h"
+#include "../libstrtb/chat/subscription.h"
 
 #include <QThread>
 #include <QString>

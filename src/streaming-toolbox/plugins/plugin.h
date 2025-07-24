@@ -1,8 +1,8 @@
 #ifndef STRTB_PLUGINS_PLUGIN_H
 #define STRTB_PLUGINS_PLUGIN_H
 
-#include "link.h"
-#include "../common/version.h"
+#include "../libstrtb/plugins/link.h"
+#include "../libstrtb/common/version.h"
 #include <filesystem>
 #include <QWidget>
 

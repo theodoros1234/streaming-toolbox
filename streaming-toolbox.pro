@@ -1,7 +1,8 @@
 QT       += core gui
 
 TEMPLATE = subdirs
-SUBDIRS = libstrtb streaming-toolbox
+SUBDIRS = src/libstrtb src/streaming-toolbox
+src/streaming-toolbox.depends = src/libstrtb
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

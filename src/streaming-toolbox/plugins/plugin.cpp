@@ -1,7 +1,7 @@
 #include "plugin.h"
-#include "link.h"
-#include "../logging/logging.h"
-#include "../common/strescape.h"
+#include "../libstrtb/plugins/link.h"
+#include "../libstrtb/logging/logging.h"
+#include "../libstrtb/common/strescape.h"
 
 #include <filesystem>
 #include <stdexcept>

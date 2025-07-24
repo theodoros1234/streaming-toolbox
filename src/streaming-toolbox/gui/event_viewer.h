@@ -1,7 +1,7 @@
 #ifndef EVENT_VIEWER_H
 #define EVENT_VIEWER_H
 
-#include "../event/system.h"
+#include "../libstrtb/event/item.h"
 #include <QWidget>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>

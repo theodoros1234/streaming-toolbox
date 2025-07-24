@@ -1,9 +1,9 @@
 #include "main_window.h"
 #include "ui_main_window.h"
 #include "../plugins/list.h"
-#include "../common/version.h"
-#include "../config/system.h"
-#include "../json/holder.h"
+#include "../libstrtb/common/version.h"
+#include "../libstrtb/config/system.h"
+#include "../libstrtb/json/holder.h"
 
 #include <QObject>
 #include <QListWidget>

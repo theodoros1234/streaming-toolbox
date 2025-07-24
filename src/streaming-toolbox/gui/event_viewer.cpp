@@ -1,6 +1,7 @@
 #include "event_viewer.h"
 #include "ui_event_viewer.h"
-#include "../json/value_utils.h"
+#include "../libstrtb/event/system.h"
+#include "../libstrtb/json/value_utils.h"
 
 using namespace strtb::gui;
 

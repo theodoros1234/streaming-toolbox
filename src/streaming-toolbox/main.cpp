@@ -1,10 +1,10 @@
 #include "gui/main_window.h"
 #include "plugins/loader.h"
-#include "chat/system.h"
-#include "logging/logging.h"
-#include "config/system.h"
-#include "common/version.h"
-#include "event/system.h"
+#include "../libstrtb/chat/system.h"
+#include "../libstrtb/logging/logging.h"
+#include "../libstrtb/config/system.h"
+#include "../libstrtb/common/version.h"
+#include "../libstrtb/event/system.h"
 
 #include <QApplication>
 #include <cstdlib>

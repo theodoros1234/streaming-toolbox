@@ -1,6 +1,6 @@
 #include "chat_tab.h"
 #include "ui_chat_tab.h"
-#include "../chat/system.h"
+#include "../libstrtb/chat/system.h"
 
 #include <QScrollBar>
 
