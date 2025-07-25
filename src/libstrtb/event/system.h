@@ -20,6 +20,7 @@ private:
         std::string display_name, description;
         uint64_t provider_id = 0;
         // TODO: maybe a resource string for an icon for better GUI appearance?
+        virtual ~res_item() = default;
     };
 
     struct res_item_category : public res_item {

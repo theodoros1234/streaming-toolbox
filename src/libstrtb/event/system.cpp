@@ -289,9 +289,19 @@ void system::_provider_item_remove(res_item_category* location, const std::strin
     location->list.erase(cat_entry);
 
     // Delete actual resource
-    if (_items.erase(rid) == 0)
-        log.put(logging::WARNING, {"Deleted entry ", common::string_escape(name),
-                                   " that referred to an invalid resource ID of ", rid});
+    auto item = _items.find(rid);
+
+    if (item == _items.end()) {
+        log.put(logging::WARNING, {"Deleting entry ", common::string_escape(name),
+                                   " that refers to an invalid resource ID of ", rid});
+        return;
+    }
+
+    // If item is a subcategory, clear it recursively
+    if (item->second.type() == ITEM_CATEGORY)
+        _provider_category_clear(item->second.as_category());
+
+    _items.erase(item);
 }
 
 void system::provider_item_remove(uint64_t provider_id, uint64_t target_location, const std::string& name) {
@@ -323,10 +333,23 @@ void system::provider_item_remove(uint64_t provider_id, const item_path& target_
 
 void system::_provider_category_clear(res_item_category* location) {
     // Delete all held resources
-    for (auto& entry : location->list)
-        if (_items.erase(entry.second) == 0)
-            log.put(logging::WARNING, {"Deleted entry ", common::string_escape(entry.first),
-                                       " that referred to an invalid resource ID of ", entry.second});
+    for (auto& entry : location->list) {
+        auto item = _items.find(entry.second);
+
+        // Make sure the item actually exists
+        if (item == _items.end()) {
+            log.put(logging::WARNING, {"Deleting entry ", common::string_escape(entry.first),
+                                       " that refers to an invalid resource ID of ", entry.second});
+            continue;
+        }
+
+        // If item is a subcategory, clear it recursively
+        if (item->second.type() == ITEM_CATEGORY)
+            _provider_category_clear(item->second.as_category());
+
+        // Delete resource
+        _items.erase(item);
+    }
 
     // Delete all entries in the category
     location->list.clear();
