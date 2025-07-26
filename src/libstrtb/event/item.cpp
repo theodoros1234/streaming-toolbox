@@ -18,27 +18,30 @@ already_exists::already_exists(const std::string& what) : event_exception(what) 
 parsing_error::parsing_error(const std::string& what) : event_exception(what) {}
 invalid_path::invalid_path(const std::string& what, ssize_t pos) : event_exception(what), pos(pos) {}
 
-param_definition::param_definition(const param_definition& from) {
-    name = from.name;
-    type = from.type;
-    required = from.required;
+param_definition::param_definition(const param_definition& from) :
+    name(from.name),
+    description(from.description),
+    type(from.type),
+    required(from.required) {
 
     if (from.array_definition)
         array_definition = new param_definition(*from.array_definition);
 
     if (!from.object_definition.empty()) {
-        object_definition.resize(from.object_definition.size());
-        for (size_t i=0; i<from.object_definition.size(); i++)
-            object_definition.at(i) = new param_definition(*from.object_definition.at(i));
+        object_definition.reserve(from.object_definition.size());
+        for (auto i : from.object_definition)
+            object_definition.push_back(new param_definition(*i));
+        // TODO: Potential memory leak above if an exception happens during this loop. FIX LATER
     }
 }
 
 param_definition::param_definition(param_definition&& from) :
     name(std::move(from.name)),
+    description(std::move(from.description)),
     type(from.type),
     required(from.required),
     array_definition(from.array_definition),
-    object_definition(from.object_definition)
+    object_definition(std::move(from.object_definition))
 {
     from.type = json::VAL_UNDEFINED;
     from.array_definition = nullptr;
@@ -47,8 +50,11 @@ param_definition::param_definition(param_definition&& from) :
 
 param_definition::param_definition(json::val_type type) : type(type) {}
 
-param_definition::param_definition(const std::string& name, json::val_type type, bool required) :
-    name(name), type(type), required(required) {}
+param_definition::param_definition(const std::string& name,
+                                   const std::string& description,
+                                   json::val_type type,
+                                   bool required) :
+    name(name), description(description), type(type), required(required) {}
 
 param_definition::param_definition(const json::value_object* from) {
     if (!from)
@@ -61,6 +67,14 @@ param_definition::param_definition(const json::value_object* from) {
         } catch (std::out_of_range&) {
         } catch (json::wrong_type&) {
             throw parsing_error("\"name\" is not a string");
+        }
+
+        // Description
+        try {
+            description = json::cast_string(&from->at("description"))->value();
+        } catch (std::out_of_range&) {
+        } catch (json::wrong_type&) {
+            throw parsing_error("\"description\" is not a string");
         }
 
         // Type
@@ -146,6 +160,7 @@ param_definition& param_definition::operator=(const param_definition& from) {
 
     // Copy attributes from the other object
     name = from.name;
+    description = from.description;
     type = from.type;
     required = from.required;
 
@@ -172,13 +187,12 @@ param_definition& param_definition::operator=(param_definition&& from) {
 
     // Copy attributes from the other object
     name = std::move(from.name);
+    description = std::move(from.description);
     type = from.type;
     required = from.required;
 
-    if (from.array_definition) {
-        array_definition = from.array_definition;
-        from.array_definition = nullptr;
-    }
+    array_definition = from.array_definition;
+    from.array_definition = nullptr;
 
     object_definition = std::move(from.object_definition);
     from.object_definition.clear();
@@ -205,11 +219,11 @@ void param_definition::array_clear_definition() {
     }
 }
 
-void param_definition::object_add_definition(const std::string& name, json::val_type type, bool required) {
+void param_definition::object_add_definition(const std::string& name, const std::string &description, json::val_type type, bool required) {
     if (this->type != json::VAL_OBJECT)
         throw wrong_type("not an object");
 
-    param_definition* new_def = new param_definition(name, type, required);
+    param_definition* new_def = new param_definition(name, description, type, required);
     try {
         object_definition.push_back(new_def);
     } catch (...) {

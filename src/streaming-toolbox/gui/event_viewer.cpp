@@ -57,6 +57,8 @@ static void list_param(QString& text, const strtb::event::param_definition& p) {
             text.append(", required");
         else
             text.append(", optional");
+        text.append("<br>Description: ");
+        text.append(QString::fromStdString(p.description));
 
         if (!p.object_definition.empty()) {
             text.append("<br><b>Object definition:</b><ul>");
