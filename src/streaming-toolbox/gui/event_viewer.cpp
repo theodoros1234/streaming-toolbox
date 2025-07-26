@@ -46,7 +46,6 @@ void event_viewer::tree_item::populate() {
 }
 
 static void list_param(QString& text, const strtb::event::param_definition& p) {
-
         text.append("<li><b>");
         text.append(QString::fromStdString(p.name));
         text.append(":</b> ");

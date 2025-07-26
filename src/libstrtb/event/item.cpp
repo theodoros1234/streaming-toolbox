@@ -27,11 +27,19 @@ param_definition::param_definition(const param_definition& from) :
     if (from.array_definition)
         array_definition = new param_definition(*from.array_definition);
 
-    if (!from.object_definition.empty()) {
-        object_definition.reserve(from.object_definition.size());
-        for (auto i : from.object_definition)
-            object_definition.push_back(new param_definition(*i));
-        // TODO: Potential memory leak above if an exception happens during this loop. FIX LATER
+    try {
+        if (!from.object_definition.empty()) {
+            object_definition.assign(from.object_definition.size(), nullptr);
+            for (size_t i=0; i<object_definition.size(); i++)
+                object_definition[i] = new param_definition(*from.object_definition[i]);
+        }
+    } catch (...) {
+        if (array_definition)
+            delete array_definition;
+        for (auto i : object_definition)
+            if (i)
+                delete i;
+        throw;
     }
 }
 
@@ -158,19 +166,34 @@ param_definition& param_definition::operator=(const param_definition& from) {
         delete i;
     object_definition.clear();
 
-    // Copy attributes from the other object
-    name = from.name;
-    description = from.description;
-    type = from.type;
-    required = from.required;
+    try {
+        // Copy attributes from the other object
+        name = from.name;
+        description = from.description;
+        type = from.type;
+        required = from.required;
 
-    if (from.array_definition)
-        array_definition = new param_definition(*from.array_definition);
+        if (from.array_definition)
+            array_definition = new param_definition(*from.array_definition);
 
-    if (!from.object_definition.empty()) {
-        object_definition.resize(from.object_definition.size());
-        for (size_t i=0; i<from.object_definition.size(); i++)
-            object_definition.at(i) = new param_definition(*from.object_definition.at(i));
+        if (!from.object_definition.empty()) {
+            object_definition.assign(from.object_definition.size(), nullptr);
+            for (size_t i=0; i<object_definition.size(); i++)
+                object_definition[i] = new param_definition(*from.object_definition[i]);
+        }
+    } catch (...) {
+        if (array_definition)
+            delete array_definition;
+        array_definition = nullptr;
+        for (auto i : object_definition)
+            if (i)
+                delete i;
+        object_definition.clear();
+        name.clear();
+        description.clear();
+        type = json::VAL_UNDEFINED;
+        required = false;
+        throw;
     }
 
     return *this;
@@ -262,8 +285,15 @@ example_definition::example_definition(json::value_object&& params, json::value_
     params(params), returns(returns) {}
 
 example_definition& example_definition::operator=(const example_definition& other) {
-    params = other.params;
-    returns = other.returns;
+    try {
+        params = other.params;
+        returns = other.returns;
+    } catch (...) {
+        params.clear();
+        returns.clear();
+        throw;
+    }
+
     return *this;
 }
 
@@ -334,7 +364,7 @@ item_info::item_info(const json::value_object* from) {
         try {
             const json::value_array* return_list = json::cast_array(&from->at("returns"));
             for (json::value* i : *return_list) {    // TODO: make i const after adding const JSON cast functions
-                // Parse all returneters
+                // Parse all returns
                 try {
                     returns.emplace_back(json::cast_object(i));
                 } catch (parsing_error& e) {
