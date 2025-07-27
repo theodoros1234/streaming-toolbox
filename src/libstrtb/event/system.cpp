@@ -3,6 +3,7 @@
 #include "system.h"
 #include "../logging/logging.h"
 #include "../common/strescape.h"
+#include "../json/cast.h"
 
 using namespace strtb;
 using namespace strtb::event;
@@ -146,6 +147,16 @@ system::~system() {
     // maybe just warn about undeleted stuff
 }
 
+uint64_t system::_resid_new() {
+    if (_resid_counter == UINT64_MAX) {
+        log.put(logging::CRITICAL, {"Internal error: Out of available resource IDs. It is likely that "
+                                    "this is a bug or that your system is unstable, as it would normally "
+                                    "take hundreds of years at minimum for this to happen."});
+        throw internal_error("out of available resource ids");
+    }
+    return _resid_counter++;
+}
+
 uint64_t system::_follow_path(uint64_t start, const item_path& path) {
     uint64_t current_pos = start;
     ssize_t path_validate = item_path_validate(path);
@@ -189,28 +200,22 @@ system::res_item_category* system::_get_category(uint64_t start, const item_path
     }
 }
 
-uint64_t system::_provider_item_add(uint64_t provider_id,
+std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provider_id,
                                     res_item_category* location,
                                     const std::string& name,
                                     const item_info& item) {
-    if (_resid_counter == UINT64_MAX) {
-        log.put(logging::CRITICAL, {"Internal error: Out of available resource IDs. It is likely that "
-                                    "this is a bug or that your system is unstable, as it would normally "
-                                    "take hundreds of years at minimum for this to happen."});
-        throw internal_error("out of available resource ids");
-    }
-
     if (!item_path_validate_segment(name))
         throw invalid_path("name " + common::string_escape(name) + " is invalid", -1);
 
     uint64_t& new_entry = location->list[name];
     if (new_entry != 0)
         throw already_exists("target location already has an item named " + common::string_escape(name));
-    new_entry = _resid_counter;
+    uint64_t new_res_id = _resid_new();
+    new_entry = new_res_id;
 
     bool resource_created = false;
     try {
-        res_cnt& new_item = _items[_resid_counter];
+        res_cnt& new_item = _items[new_res_id];
         if (new_item.ptr != nullptr)
             throw internal_error("failed to claim a resource id for the new item", log);
         resource_created = true;
@@ -224,14 +229,14 @@ uint64_t system::_provider_item_add(uint64_t provider_id,
             item.returns,
             item.examples
         );
+
+        return std::pair<uint64_t, res_cnt&>(new_res_id, new_item);
     } catch (...) {
         location->list.erase(name);
         if (resource_created)
-            _items.erase(_resid_counter);
+            _items.erase(new_res_id);
         throw;
     }
-
-    return _resid_counter++;
 }
 
 uint64_t system::provider_item_add(uint64_t provider_id,
@@ -253,7 +258,7 @@ uint64_t system::provider_item_add(uint64_t provider_id,
         throw out_of_scope("target location does not belong to this provider");
     }
 
-    return _provider_item_add(provider_id, location, name, item);
+    return _provider_item_add(provider_id, location, name, item).first;
 }
 
 uint64_t system::provider_item_add(uint64_t provider_id,
@@ -270,7 +275,7 @@ uint64_t system::provider_item_add(uint64_t provider_id,
     if (provider_id != location->provider_id)
         throw internal_error("category entry has a wrong provider id set", log);
 
-    return _provider_item_add(provider_id, location, name, item);
+    return _provider_item_add(provider_id, location, name, item).first;
 }
 
 void system::_provider_item_remove(res_item_category* location, const std::string& name) {
@@ -465,4 +470,67 @@ std::vector<item_listing> system::list(const item_path& path) {
     std::lock_guard<std::mutex> guard(_lock);
     res_item_category* location = _get_category(STRTB_EVENT_ROOT, path);
     return _list(location);
+}
+
+void system::_provider_import(uint64_t provider_id, res_item_category* location, const json::value_object* entries) {
+    for (auto entry = entries->begin(); entry != entries->end(); entry++) {
+        const std::string& name = entry->first;
+        json::value* item_def_value = entry->second;
+        try {
+            try {
+                const json::value_object* item_def = json::cast_object(item_def_value);
+                item_info item(item_def);
+                auto new_res = _provider_item_add(provider_id, location, name, item);
+
+                try {
+                    if (item.type == ITEM_CATEGORY) {
+                        // Recursively add all category entries, if specified
+                        try {
+                            const json::value_object* sub_entries = json::cast_object(&item_def->at("entries"));
+                            _provider_import(provider_id, new_res.second.as_category(), sub_entries);
+                        } catch (std::out_of_range&) {  // ignored, it's okay to not specify sub-items
+                        } catch (json::wrong_type&) {
+                            throw parsing_error("\"entries\" must be an object");
+                        }
+                    }
+                } catch (...) {
+                    _provider_item_remove(location, name);
+                    throw;
+                }
+            } catch (json::wrong_type&) {
+                throw parsing_error("item definition must be an object");
+            }
+        } catch (...) {     // Remove all added entries on exception
+            // Removes all entries from first to last added (NOT the current one, as this caused the exception)
+            while (entry != entries->begin()) {
+                entry--;
+                _provider_item_remove(location, entry->first);
+            }
+            throw;
+        }
+    }
+}
+
+void system::provider_import(uint64_t provider_id, uint64_t target_location, const json::value_object* entries) {
+    std::lock_guard<std::mutex> guard(_lock);
+    res_item_category* location = _get_category(target_location);
+
+    if (provider_id != location->provider_id)
+        throw out_of_scope("target location does not belong to this provider");
+
+    _provider_import(provider_id, location, entries);
+}
+
+void system::provider_import(uint64_t provider_id, const item_path& target_location, const json::value_object* entries) {
+    std::lock_guard<std::mutex> guard(_lock);
+
+    if (provider_id == 0)
+        throw internal_error("provider id was not specified", log);
+
+    res_item_category* location = _get_category(provider_id, target_location);
+
+    if (provider_id != location->provider_id)
+        throw internal_error("category entry has a wrong provider id set", log);
+
+    _provider_import(provider_id, location, entries);
 }

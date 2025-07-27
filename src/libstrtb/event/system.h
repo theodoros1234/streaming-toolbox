@@ -71,15 +71,17 @@ private:
     std::map<uint64_t, res_cnt> _items;
     uint64_t _resid_counter = STRTB_EVENT_ROOT + 1;
 
+    uint64_t _resid_new();
     uint64_t _follow_path(uint64_t start, const item_path& path);
     res_item_category* _get_category(uint64_t target_location);
     res_item_category* _get_category(uint64_t start, const item_path& target_location);
-    uint64_t _provider_item_add(uint64_t provider_id,
-                                res_item_category* location,
-                                const std::string& name,
-                                const item_info& item);
+    std::pair<uint64_t, res_cnt&> _provider_item_add(uint64_t provider_id,
+                                                     res_item_category* location,
+                                                     const std::string& name,
+                                                     const item_info& item);
     void _provider_item_remove(res_item_category* location, const std::string& name);
     void _provider_category_clear(res_item_category* location);
+    void _provider_import(uint64_t provider_id, res_item_category* location, const json::value_object* entries);
     void _info(uint64_t resource_id, item_info& item);
     std::vector<item_listing> _list(res_item_category* location);
 
@@ -98,6 +100,8 @@ protected:
     // TODO: bulk add/remove
     void provider_category_clear(uint64_t provider_id, uint64_t target_location);
     void provider_category_clear(uint64_t provider_id, const item_path& target_location);
+    void provider_import(uint64_t provider_id, uint64_t target_location, const json::value_object* entries);
+    void provider_import(uint64_t provider_id, const item_path& target_location, const json::value_object* entries);
 
 public:
     system();

@@ -79,3 +79,13 @@ void provider::category_clear(const item_path& target_location) {
     _setup_check();
     system_ptr->provider_category_clear(_id, target_location);
 }
+
+void provider::import(uint64_t target_location, const json::value_object* entries) {
+    _setup_check();
+    system_ptr->provider_import(_id, target_location, entries);
+}
+
+void provider::import(const item_path& target_location, const json::value_object* entries) {
+    _setup_check();
+    system_ptr->provider_import(_id, target_location, entries);
+}

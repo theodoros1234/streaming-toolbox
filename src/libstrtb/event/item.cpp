@@ -94,8 +94,9 @@ param_definition::param_definition(const json::value_object* from) {
         try {
             std::string type_str = json::cast_string(&from->at("type"))->value();
             type = json::type_from_string(type_str);
-            if (type == json::VAL_UNDEFINED || type == json::VAL_NULL)
-                throw parsing_error("\"type\" does not name an accepted type");
+            // TODO: Thinking of removing the following, to allow a parameter to have various different types
+            // if (type == json::VAL_UNDEFINED || type == json::VAL_NULL)
+            //     throw parsing_error(common::string_escape(type_str) + " is not an accepted type");
         } catch (std::out_of_range&) {
         } catch (json::wrong_type&) {
             throw parsing_error("\"type\" is not a string");
@@ -321,7 +322,7 @@ item_info::item_info(const json::value_object* from) {
         else if (type_str == "category")
             type = ITEM_CATEGORY;
         else
-            throw parsing_error("\"type\" does not name a valid type");
+            throw parsing_error(common::string_escape(type_str) + " is not a valid item type");
     } catch (std::out_of_range&) {
         throw parsing_error("\"type\" is missing");
     } catch (json::wrong_type&) {
