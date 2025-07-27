@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "../json/value_object.h"
+#include "../logging/logging.h"
 #include <stdint.h>
 
 namespace strtb::event {
@@ -19,6 +20,7 @@ public:
 class internal_error : public event_exception {
 public:
     internal_error(const std::string& what);
+    internal_error(const std::string& what, logging::source& log_to);
 };
 
 class not_found : public event_exception {

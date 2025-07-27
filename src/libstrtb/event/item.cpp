@@ -11,6 +11,11 @@ const char* event_exception::what() const noexcept {
 }
 
 internal_error::internal_error(const std::string& what) : event_exception(what) {}
+
+internal_error::internal_error(const std::string& what, logging::source& log_to) : event_exception(what) {
+    log_to.put(logging::ERROR, {"Internal error: ", what});
+}
+
 not_found::not_found(const std::string& what) : event_exception(what) {}
 wrong_type::wrong_type(const std::string& what) : event_exception(what) {}
 out_of_scope::out_of_scope(const std::string& what) : event_exception(what) {}
