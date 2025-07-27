@@ -94,9 +94,9 @@ param_definition::param_definition(const json::value_object* from) {
         try {
             std::string type_str = json::cast_string(&from->at("type"))->value();
             type = json::type_from_string(type_str);
-            // TODO: Thinking of removing the following, to allow a parameter to have various different types
-            // if (type == json::VAL_UNDEFINED || type == json::VAL_NULL)
-            //     throw parsing_error(common::string_escape(type_str) + " is not an accepted type");
+            // DON'T remove the following check. If the type is unspecified, it can just be ommited.
+            if (type == json::VAL_UNDEFINED || type == json::VAL_NULL)
+                throw parsing_error(common::string_escape(type_str) + " is not an accepted type");
         } catch (std::out_of_range&) {
         } catch (json::wrong_type&) {
             throw parsing_error("\"type\" is not a string");
