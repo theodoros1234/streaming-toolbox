@@ -19,6 +19,7 @@ SOURCES += \
     common/version.cpp \
     config/system.cpp \
     config/id_type.cpp \
+    event/event_listener.cpp \
     event/item.cpp \
     event/provider.cpp \
     event/system.cpp \
@@ -64,6 +65,7 @@ HEADERS += \
     common/version.h \
     config/id_type.h \
     config/system.h \
+    event/event_listener.h \
     event/item.h \
     event/provider.h \
     event/system.h \

@@ -1,8 +1,9 @@
 #ifndef STRTB_EVENT_SYSTEM_H
 #define STRTB_EVENT_SYSTEM_H
 
-#include "provider.h"
 #include "item.h"
+#include "provider.h"
+#include "event_listener.h"
 
 #include <map>
 #include <vector>
@@ -87,6 +88,8 @@ private:
 
 protected:
     friend provider;
+    friend event_listener;
+
     uint64_t provider_item_add(uint64_t provider_id,
                                uint64_t target_location,
                                const std::string& name,
@@ -102,6 +105,12 @@ protected:
     void provider_category_clear(uint64_t provider_id, const item_path& target_location);
     void provider_import(uint64_t provider_id, uint64_t target_location, const json::value_object* entries);
     void provider_import(uint64_t provider_id, const item_path& target_location, const json::value_object* entries);
+
+    uint64_t event_listener_subscribe(event_listener& listener,
+                                      const item_path& event_source,
+                                      const json::value* param);
+    void event_listener_unsubscribe(uint64_t subscription_id);
+    void event_listener_unsubscribe(const std::set<uint64_t>& subscription_ids);
 
 public:
     system();
