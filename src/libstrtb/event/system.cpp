@@ -492,27 +492,31 @@ void system::_provider_import(uint64_t provider_id, res_item_category* location,
         json::value* item_def_value = entry->second;
         try {
             try {
-                const json::value_object* item_def = json::cast_object(item_def_value);
-                item_info item(item_def);
-                auto new_res = _provider_item_add(provider_id, location, name, item);
-
                 try {
-                    if (item.type == ITEM_CATEGORY) {
-                        // Recursively add all category entries, if specified
-                        try {
-                            const json::value_object* sub_entries = json::cast_object(&item_def->at("entries"));
-                            _provider_import(provider_id, new_res.second.as_category(), sub_entries);
-                        } catch (std::out_of_range&) {  // ignored, it's okay to not specify sub-items
-                        } catch (json::wrong_type&) {
-                            throw parsing_error("\"entries\" must be an object");
+                    const json::value_object* item_def = json::cast_object(item_def_value);
+                    item_info item(item_def);
+                    auto new_res = _provider_item_add(provider_id, location, name, item);
+
+                    try {
+                        if (item.type == ITEM_CATEGORY) {
+                            // Recursively add all category entries, if specified
+                            try {
+                                const json::value_object* sub_entries = json::cast_object(&item_def->at("entries"));
+                                _provider_import(provider_id, new_res.second.as_category(), sub_entries);
+                            } catch (std::out_of_range&) {  // ignored, it's okay to not specify sub-items
+                            } catch (json::wrong_type&) {
+                                throw parsing_error("\"entries\" must be an object");
+                            }
                         }
+                    } catch (...) {
+                        _provider_item_remove(location, name);
+                        throw;
                     }
-                } catch (...) {
-                    _provider_item_remove(location, name);
-                    throw;
+                } catch (json::wrong_type&) {
+                    throw parsing_error("item definition must be an object");
                 }
-            } catch (json::wrong_type&) {
-                throw parsing_error("item definition must be an object");
+            } catch (parsing_error& e) {
+                throw parsing_error("item " + common::string_escape(name) + ": " + e.what());
             }
         } catch (...) {     // Remove all added entries on exception
             // Removes all entries from first to last added (NOT the current one, as this caused the exception)
