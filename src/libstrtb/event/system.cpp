@@ -48,9 +48,23 @@ void system::res_cnt::make_item(item_type type,
     try {
         switch (type) {
         case ITEM_EVENT_SRC: {
+            if (params.size() > 1) {
+                throw bad_definition("event sources can take at most one parameter");
+            } else if (params.size()) {
+                switch (params.back().type) {
+                case json::VAL_BOOL:
+                case json::VAL_INT:
+                case json::VAL_STRING:
+                    break;
+                default:
+                    throw wrong_type("event sources can only take a boolean, an integer or a string as a parameter");
+                }
+            }
+
             res_item_event_src* ptr_e = new res_item_event_src();
             ptr = ptr_e;
-            ptr_e->params = params;
+            if (params.size())
+                ptr_e->param = params.back();
             ptr_e->returns = returns;
             ptr_e->examples = examples;
         }
@@ -398,7 +412,7 @@ void system::_info(uint64_t resource_id, item_info& item) {
     switch (ref.type()) {
     case ITEM_EVENT_SRC: {
         res_item_event_src* p = ref.as_event_src();
-        item.params = p->params;
+        item.params.push_back(p->param);
         item.returns = p->returns;
         item.examples = p->examples;
     }

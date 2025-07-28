@@ -54,6 +54,11 @@ public:
     const ssize_t pos;
 };
 
+class bad_definition : public event_exception {
+public:
+    bad_definition(const std::string& what);
+};
+
 struct param_definition {
     std::string name, description;
     json::val_type type = json::VAL_UNDEFINED;

@@ -29,7 +29,8 @@ private:
     };
 
     struct res_item_event_src : public res_item {
-        std::vector<param_definition> params, returns;
+        param_definition param;
+        std::vector<param_definition> returns;
         std::vector<example_definition> examples;
         // TODO: list of event listeners
     };

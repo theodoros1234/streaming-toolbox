@@ -22,6 +22,7 @@ out_of_scope::out_of_scope(const std::string& what) : event_exception(what) {}
 already_exists::already_exists(const std::string& what) : event_exception(what) {}
 parsing_error::parsing_error(const std::string& what) : event_exception(what) {}
 invalid_path::invalid_path(const std::string& what, ssize_t pos) : event_exception(what), pos(pos) {}
+bad_definition::bad_definition(const std::string& what) : event_exception(what) {}
 
 param_definition::param_definition(const param_definition& from) :
     name(from.name),
@@ -345,9 +346,19 @@ item_info::item_info(const json::value_object* from) {
         throw parsing_error("\"description\" must be a string");
     }
 
-    if (type == ITEM_EVENT_SRC || type == ITEM_ACTION_SINK) {
-        // For events/actions: get parameter/return definition and examples
-
+    // For events/actions: get parameter/return definition and examples
+    if (type == ITEM_EVENT_SRC) {
+        // single param
+        try {
+            params.emplace_back(json::cast_object(&from->at("param")));
+        } catch (std::out_of_range&) {  // ignored, maybe it doesn't take a parameter
+        } catch (json::wrong_type&) {
+            throw parsing_error("\"param\" must be an object, or must be ommited"
+                                "if the event source doesn't take a parameter");
+        } catch (parsing_error& e) {
+            throw parsing_error(std::string("error parsing parameter definition: ") + e.what());
+        }
+    } else if (type == ITEM_ACTION_SINK) {
         // params
         try {
             const json::value_array* param_list = json::cast_array(&from->at("params"));
@@ -365,7 +376,9 @@ item_info::item_info(const json::value_object* from) {
         } catch (json::wrong_type&) {
             throw parsing_error("\"params\" must be an array");
         }
+    }
 
+    if (type == ITEM_EVENT_SRC || type == ITEM_ACTION_SINK) {
         // returns
         try {
             const json::value_array* return_list = json::cast_array(&from->at("returns"));
