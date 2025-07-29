@@ -33,12 +33,16 @@ private:
         uint64_t sub_rid = 0, target_rid = 0;
         res_path_follower_status status = PATH_FL_UNDEFINED;
         std::string diagnostic_info;
+
+        res_path_follower(const item_path& path, item_type wanted_type, uint64_t sub_rid);
     };
 
     struct res_event_sub {
         res_path_follower path;
         json::holder param;
         event_listener& listener;
+
+        res_event_sub(const item_path& path, const json::value* param, event_listener& listener, uint64_t rid);
     };
 
     struct res_item {
@@ -133,6 +137,7 @@ private:
                           uint64_t location_rid,
                           res_item_category* location,
                           const json::value_object* entries);
+    void _event_listener_unsubscribe(uint64_t subscription_id);
     void _info(uint64_t resource_id, item_info& item);
     std::vector<item_listing> _list(res_item_category* location);
 

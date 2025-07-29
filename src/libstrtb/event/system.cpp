@@ -13,6 +13,18 @@ using namespace strtb::event;
 event::system* strtb::event::system_ptr = nullptr;
 static logging::source log("Event System");
 
+system::res_path_follower::res_path_follower(const item_path& path, item_type wanted_type, uint64_t sub_rid) :
+    path(path), wanted_type(wanted_type), sub_rid(sub_rid) {}
+
+system::res_event_sub::res_event_sub(const item_path&path,
+                                     const json::value* param,
+                                     event_listener& listener,
+                                     uint64_t rid) :
+    path(path, ITEM_EVENT_SRC, rid), listener(listener) {
+    if (param)
+        this->param = param->copy();
+}
+
 void system::res_item_category::path_follower_attach(res_path_follower* path_fl, uint64_t my_rid) {
     uint64_t old_target_rid = path_fl->target_rid;
     path_fl->path_pos_found++;
@@ -897,4 +909,80 @@ void system::provider_import(uint64_t provider_id, const item_path& target_locat
         throw internal_error("category entry has a wrong provider id set", log);
 
     _provider_import(provider_id, location_rid, location, entries);
+}
+
+uint64_t system::event_listener_subscribe(event_listener& listener,
+                                          const item_path& event_source,
+                                          const json::value* param) {
+    std::lock_guard<std::mutex> guard(_lock);
+
+    if (param &&
+        param->type() != json::VAL_BOOL &&
+        param->type() != json::VAL_INT &&
+        param->type() != json::VAL_STRING)
+        throw wrong_type("param must be a nullptr, or it must be of types bool, int or string");
+
+    uint64_t new_sub_id = _resid_new();
+    res_event_sub* new_sub = new res_event_sub(event_source, param, listener, new_sub_id);
+    try {
+        auto [new_sub_entry, added] = _event_subs.emplace(new_sub_id, new_sub);
+        if (!added)
+            throw internal_error("duplicate resource id found for event subscription");
+
+        try {
+            _items.at(STRTB_EVENT_ROOT).as_category()->path_follower_attach(&new_sub->path, STRTB_EVENT_ROOT);
+        } catch (...) {
+            _event_subs.erase(new_sub_entry);
+            throw;
+        }
+    } catch (...) {
+        delete new_sub;
+        throw;
+    }
+
+    return new_sub_id;
+}
+
+void system::_event_listener_unsubscribe(uint64_t subscription_id) {
+    auto sub_itr = _event_subs.find(subscription_id);
+    if (sub_itr == _event_subs.end())
+        throw internal_error("event subscription not found");
+
+    res_event_sub* sub = sub_itr->second.get();
+    uint64_t remove_from = sub->path.target_rid;
+    if (remove_from == 0) {
+        _event_subs.erase(sub_itr);
+        throw internal_error("event subscription was abandoned");   // maybe should just be a warning instead?
+    }
+
+    try {
+        res_cnt& item = _items.at(remove_from);
+        switch (item.type()) {
+        case ITEM_CATEGORY:
+            item.as_category()->path_follower_detach(&sub->path);
+            break;
+
+        case ITEM_EVENT_SRC:
+            item.as_event_src()->sub_detach(sub);
+            break;
+
+        default:
+            _event_subs.erase(sub_itr);
+            throw internal_error("event subscription was held by an item of unsupported type");
+        }
+    } catch (std::out_of_range&) {
+        _event_subs.erase(sub_itr);
+        throw internal_error("event subscription was held by an item that no longer exists");
+    }
+}
+
+void system::event_listener_unsubscribe(uint64_t subscription_id) {
+    std::lock_guard<std::mutex> guard(_lock);
+    _event_listener_unsubscribe(subscription_id);
+}
+
+void system::event_listener_unsubscribe(const std::set<uint64_t>& subscription_ids) {
+    std::lock_guard<std::mutex> guard(_lock);
+    for (auto sub_id : subscription_ids)
+        _event_listener_unsubscribe(sub_id);
 }
