@@ -1,15 +1,274 @@
 #include <stdexcept>
 #include <cstdint>
+#include <cassert>
 #include "system.h"
 #include "../logging/logging.h"
 #include "../common/strescape.h"
 #include "../json/cast.h"
+#include "../json/value_utils.h"
 
 using namespace strtb;
 using namespace strtb::event;
 
 event::system* strtb::event::system_ptr = nullptr;
 static logging::source log("Event System");
+
+void system::res_item_category::path_follower_attach(res_path_follower* path_fl, uint64_t my_rid) {
+    uint64_t old_target_rid = path_fl->target_rid;
+    path_fl->path_pos_found++;
+    path_fl->target_rid = my_rid;
+
+    try {
+        std::string& name = path_fl->path.at(path_fl->path_pos_found);
+
+        // First check if we can pass this on to one of our entries
+        if (!list.empty()) {
+            auto itr = list.find(name);
+            if (itr != list.end()) {
+                try {
+                    res_cnt& res = system_ptr->_items.at(itr->second);
+
+                    if (path_fl->path_pos_found == path_fl->path.size() - 1) {
+                        // Attaching to final piece
+                        if (path_fl->wanted_type != res.type()) {
+                            path_fl->status = PATH_FL_WRONG_TYPE;
+                            path_fl->diagnostic_info = "target item has a different type than expected";
+                        } else {
+                            switch (res.type()) {
+                            case ITEM_EVENT_SRC:
+                                if (res.as_event_src()->sub_attach(*path_fl, itr->second))
+                                    return;
+                                break;
+
+                            default:
+                                throw internal_error("path follower is targetting an item type that isn't yet supported");
+                            }
+                        }
+                    } else {
+                        // Attaching to another subcategory inbetween
+                        if (res.type() != ITEM_CATEGORY) {
+                            path_fl->status = PATH_FL_WRONG_TYPE;
+                            path_fl->diagnostic_info = "a category in this path was changed to another item type";
+                        } else {
+                            res.as_category()->path_follower_attach(path_fl, itr->second);
+                        }
+                    }
+                } catch (std::out_of_range&) {
+                    throw internal_error("resource id " + std::to_string(itr->second) + " not found", log);
+                }
+            }
+        }
+
+        // If we don't have anyone to pass it to, hold it here for now.
+        waiting_path_followers[name].insert(path_fl);
+    } catch (std::out_of_range&) {
+        path_fl->path_pos_found--;
+        path_fl->target_rid = old_target_rid;
+        throw internal_error("path follower's position went out of bounds");
+    } catch (...) {
+        path_fl->path_pos_found--;
+        path_fl->target_rid = old_target_rid;
+        throw;
+    }
+}
+
+void system::res_item_category::path_follower_detach(res_path_follower* path_fl) {
+    path_fl->target_rid = 0;
+    auto itr = waiting_path_followers.find(path_fl->path[path_fl->path_pos_found]);
+
+    if (itr == waiting_path_followers.end())
+        throw internal_error("key not found for current path follower's position");
+
+    if (itr->second.erase(path_fl) < 1)
+        throw internal_error("couldn't find path follower");
+
+    if (itr->second.empty())
+        waiting_path_followers.erase(itr);
+}
+
+void system::res_item_category::path_follower_detach_all(std::set<res_path_follower*>& move_into,
+                                                         uint64_t cat_rid) {
+    for (auto& set : waiting_path_followers) {
+        for (auto path_fl : set.second) {
+            move_into.insert(path_fl);
+            path_fl->path_pos_found--;
+            path_fl->target_rid = cat_rid;
+        }
+    }
+    waiting_path_followers.clear();
+}
+
+bool system::res_item_category::has_path_followers() {
+    return !waiting_path_followers.empty();
+}
+
+bool system::res_item_event_src::sub_attach(res_path_follower &path_fl, uint64_t my_rid) {
+    res_event_sub* sub_ptr = nullptr;
+    assert(path_fl.wanted_type == ITEM_EVENT_SRC);
+
+    // Find event sub resource
+    try {
+        sub_ptr = system_ptr->_event_subs.at(path_fl.sub_rid).get();
+    } catch (std::out_of_range&) {
+        throw internal_error("couldn't find event subscription with this resource id");
+    }
+
+    if (sub_ptr == nullptr)
+        throw internal_error("resource id points to null event subscription");
+
+    // Type checking
+    json::val_type sub_param_type = sub_ptr->param.type();
+
+    if (param.type == json::VAL_UNDEFINED &&
+        sub_param_type != json::VAL_UNDEFINED) {    // param given but event source doesn't take any
+        path_fl.status = PATH_FL_BAD_PARAM;
+        path_fl.diagnostic_info = "event source doesn't take any parameters";
+        return false;
+    }
+
+    if (param.required && sub_param_type == json::VAL_UNDEFINED) {  // param required but not given
+        path_fl.status = PATH_FL_BAD_PARAM;
+        path_fl.diagnostic_info = "parameter is required";
+        return false;
+    }
+
+    if (param.type != json::VAL_UNDEFINED &&
+        sub_param_type != json::VAL_UNDEFINED &&
+        param.type != sub_param_type) {                             // params given but of wrong type
+        path_fl.status = PATH_FL_BAD_PARAM;
+        path_fl.diagnostic_info = "parameter of type " + json::type_to_string(param.type) + "needed, " +
+                                  json::type_to_string(sub_param_type) + " given";
+        return false;
+    }
+
+    // Attach event sub
+    switch (sub_param_type) {
+    case json::VAL_UNDEFINED:
+        if (!subs_none.insert(sub_ptr).second)
+            throw internal_error("event subscription is already attached");
+        break;
+
+    case json::VAL_BOOL:
+        if (!subs_bool[sub_ptr->param.as_bool().value()].insert(sub_ptr).second)
+            throw internal_error("event subscription appears to be already attached");
+        break;
+
+    case json::VAL_INT:
+        if (!subs_int[sub_ptr->param.as_int().value()].insert(sub_ptr).second)
+            throw internal_error("event subscription appears to be already attached");
+        break;
+
+    case json::VAL_STRING:
+        if (!subs_string[sub_ptr->param.as_string().value()].insert(sub_ptr).second)
+            throw internal_error("event subscription appears to be already attached");
+        break;
+
+    default:
+        throw internal_error("event source and subscription are holding an unsupported param type");
+    }
+
+    path_fl.status = PATH_FL_READY;
+    path_fl.target_rid = my_rid;
+    path_fl.path_pos_found++;
+    assert(path_fl.path_pos_found == path_fl.path.size());
+    return true;
+}
+
+void system::res_item_event_src::sub_detach(res_event_sub* sub_ptr) {
+    sub_ptr->path.target_rid = 0;
+    switch (sub_ptr->param.type()) {
+    case json::VAL_UNDEFINED: {
+        if (subs_none.erase(sub_ptr) < 1)
+            throw internal_error("couldn't find event subscription");
+    }
+    break;
+
+    case json::VAL_BOOL: {
+        if (subs_bool[sub_ptr->param.as_bool().value()].erase(sub_ptr) < 1)
+            throw internal_error("couldn't find event subscription");
+    }
+    break;
+
+    case json::VAL_INT: {
+        auto itr = subs_int.find(sub_ptr->param.as_int().value());
+
+        if (itr == subs_int.end())
+            throw internal_error("couldn't find required key in event source");
+
+        if (itr->second.erase(sub_ptr) < 1)
+            throw internal_error("couldn't find event subscription");
+
+        if (itr->second.empty())    // remove map entry if its set is empty
+            subs_int.erase(itr);
+    }
+    break;
+
+    case json::VAL_STRING: {
+        auto itr = subs_string.find(sub_ptr->param.as_string().value());
+
+        if (itr == subs_string.end())
+            throw internal_error("couldn't find required key in event source");
+
+        if (itr->second.erase(sub_ptr) < 1)
+            throw internal_error("couldn't find event subscription");
+
+        if (itr->second.empty())    // remove map entry if its set is empty
+            subs_string.erase(itr);
+    }
+    break;
+
+    default:
+        throw internal_error("event subscription has an invalid parameter type");
+    }
+}
+
+void system::res_item_event_src::sub_detach_all(std::set<res_path_follower*> &move_into, uint64_t cat_rid) {
+    for (auto sub : subs_none) {
+        move_into.insert(&sub->path);
+        sub->path.status = PATH_FL_WAITING;
+        sub->path.target_rid = cat_rid;
+        sub->path.path_pos_found--;
+    }
+    subs_none.clear();
+
+    for (size_t i=0; i<=1; i++) {
+        for (auto sub : subs_bool[i]) {
+            move_into.insert(&sub->path);
+            sub->path.status = PATH_FL_WAITING;
+            sub->path.target_rid = cat_rid;
+            sub->path.path_pos_found--;
+        }
+        subs_bool[i].clear();
+    }
+
+    for (auto& set : subs_int) {
+        for (auto sub : set.second) {
+            move_into.insert(&sub->path);
+            sub->path.status = PATH_FL_WAITING;
+            sub->path.target_rid = cat_rid;
+            sub->path.path_pos_found--;
+        }
+    }
+    subs_int.clear();
+
+    for (auto& set : subs_string) {
+        for (auto sub : set.second) {
+            move_into.insert(&sub->path);
+            sub->path.status = PATH_FL_WAITING;
+            sub->path.target_rid = cat_rid;
+            sub->path.path_pos_found--;
+        }
+    }
+    subs_string.clear();
+}
+
+bool system::res_item_event_src::has_subs() {
+    return !(subs_none.empty() &&
+             subs_bool[0].empty() &&
+             subs_bool[1].empty() &&
+             subs_int.empty() &&
+             subs_string.empty());
+}
 
 system::res_cnt::res_cnt(res_item* ptr) : ptr(ptr) {}
 
@@ -206,9 +465,10 @@ system::res_item_category* system::_get_category(uint64_t target_location) {
     }
 }
 
-system::res_item_category* system::_get_category(uint64_t start, const item_path& target_location) {
+std::pair<system::res_item_category*, uint64_t> system::_get_category(uint64_t start, const item_path& target_location) {
     try {
-        return _items.at(_follow_path(start, target_location)).as_category();
+        uint64_t rid = _follow_path(start, target_location);
+        return std::make_pair(_items.at(rid).as_category(), rid);
     } catch (std::out_of_range& e) {
         throw internal_error("category entry has an invalid resource id", log);
     }
@@ -243,6 +503,55 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
             item.returns,
             item.examples
         );
+
+        // Forward any path followers to the new item
+        auto path_fl_set_itr = location->waiting_path_followers.find(name);
+        if (path_fl_set_itr != location->waiting_path_followers.end()) {
+            std::vector<res_path_follower*> moved;
+
+            try {
+                for (auto path_fl : path_fl_set_itr->second) {
+                    if (path_fl->path_pos_found == path_fl->path.size() - 1) {
+                        // Attaching to final piece
+                        if (path_fl->wanted_type != item.type) {
+                            path_fl->status = PATH_FL_WRONG_TYPE;
+                            path_fl->diagnostic_info = "target item has a different type than expected";
+                        } else {
+                            switch (item.type) {
+                            case ITEM_EVENT_SRC:
+                                if (new_item.as_event_src()->sub_attach(*path_fl, new_res_id))
+                                    moved.push_back(path_fl);
+                                break;
+
+                            default:
+                                throw internal_error("path follower is targetting an item type that isn't yet supported");
+                            }
+                        }
+                    } else {
+                        // Attaching to another subcategory inbetween
+                        if (new_item.type() != ITEM_CATEGORY) {
+                            path_fl->status = PATH_FL_WRONG_TYPE;
+                            path_fl->diagnostic_info = "a category in this path was changed to another item type";
+                        } else {
+                            new_item.as_category()->path_follower_attach(path_fl, new_res_id);
+                        }
+                    }
+                }
+            } catch (...) {
+                // Remove all moved path followers before passing up the exception
+                for (auto i : moved)
+                    path_fl_set_itr->second.erase(i);
+                throw;
+            }
+
+            // Remove all moved path followers
+            for (auto i : moved)
+                path_fl_set_itr->second.erase(i);
+
+            // Remove set from map if empty
+            if (path_fl_set_itr->second.empty())
+                location->waiting_path_followers.erase(path_fl_set_itr);
+        }
 
         return std::pair<uint64_t, res_cnt&>(new_res_id, new_item);
     } catch (...) {
@@ -284,7 +593,7 @@ uint64_t system::provider_item_add(uint64_t provider_id,
     if (provider_id == 0)
         throw internal_error("provider id was not specified", log);
 
-    res_item_category* location = _get_category(provider_id, target_location);
+    auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
         throw internal_error("category entry has a wrong provider id set", log);
@@ -292,7 +601,39 @@ uint64_t system::provider_item_add(uint64_t provider_id,
     return _provider_item_add(provider_id, location, name, item).first;
 }
 
-void system::_provider_item_remove(res_item_category* location, const std::string& name) {
+void system::_provider_item_remove_path_followers(uint64_t location_rid,
+                                                  res_item_category* location,
+                                                  const std::string& name,
+                                                  res_cnt& item) {
+    // Make sure there's something to do first
+    if (location->waiting_path_followers.count(name) ||
+        (item.type() == ITEM_CATEGORY && item.as_category()->has_path_followers()) ||
+        (item.type() == ITEM_EVENT_SRC && item.as_event_src()->has_subs())) {
+        auto& path_fl_set = location->waiting_path_followers[name];
+
+        // Clear error status of held back path followers
+        for (auto path_fl : path_fl_set) {
+            path_fl->status = PATH_FL_WAITING;
+            path_fl->diagnostic_info.clear();
+        }
+
+        // Pull back path followers from deleted item
+        switch (item.type()) {
+        case ITEM_CATEGORY:
+            item.as_category()->path_follower_detach_all(path_fl_set, location_rid);
+            break;
+
+        case ITEM_EVENT_SRC:
+            item.as_event_src()->sub_detach_all(path_fl_set, location_rid);
+            break;
+
+        default:    // just makes clangd shut up
+            break;
+        }
+    }
+}
+
+void system::_provider_item_remove(uint64_t location_rid, res_item_category* location, const std::string& name) {
     uint64_t rid = 0;
 
     if (!item_path_validate_segment(name))
@@ -316,8 +657,9 @@ void system::_provider_item_remove(res_item_category* location, const std::strin
 
     // If item is a subcategory, clear it recursively
     if (item->second.type() == ITEM_CATEGORY)
-        _provider_category_clear(item->second.as_category());
+        _provider_category_clear(location_rid, item->second.as_category());
 
+    _provider_item_remove_path_followers(location_rid, location, name, item->second);
     _items.erase(item);
 }
 
@@ -331,7 +673,7 @@ void system::provider_item_remove(uint64_t provider_id, uint64_t target_location
     if (provider_id != location->provider_id)
         throw out_of_scope("target location does not belong to this provider");
 
-    _provider_item_remove(location, name);
+    _provider_item_remove(target_location, location, name);
 }
 
 void system::provider_item_remove(uint64_t provider_id, const item_path& target_location, const std::string& name) {
@@ -340,15 +682,15 @@ void system::provider_item_remove(uint64_t provider_id, const item_path& target_
     if (provider_id == 0)
         throw internal_error("provider id was not specified", log);
 
-    res_item_category* location = _get_category(provider_id, target_location);
+    auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
         throw internal_error("category entry has a wrong provider id set", log);
 
-    _provider_item_remove(location, name);
+    _provider_item_remove(location_rid, location, name);
 }
 
-void system::_provider_category_clear(res_item_category* location) {
+void system::_provider_category_clear(uint64_t location_rid, res_item_category* location) {
     // Delete all held resources
     for (auto& entry : location->list) {
         auto item = _items.find(entry.second);
@@ -362,9 +704,10 @@ void system::_provider_category_clear(res_item_category* location) {
 
         // If item is a subcategory, clear it recursively
         if (item->second.type() == ITEM_CATEGORY)
-            _provider_category_clear(item->second.as_category());
+            _provider_category_clear(location_rid, item->second.as_category());
 
         // Delete resource
+        _provider_item_remove_path_followers(location_rid, location, entry.first, item->second);
         _items.erase(item);
     }
 
@@ -383,7 +726,7 @@ void system::provider_category_clear(uint64_t provider_id, uint64_t target_locat
     if (provider_id != location->provider_id)
         throw out_of_scope("target location does not belong to this provider");
 
-    _provider_category_clear(location);
+    _provider_category_clear(target_location, location);
 }
 
 void system::provider_category_clear(uint64_t provider_id, const item_path& target_location) {
@@ -392,12 +735,12 @@ void system::provider_category_clear(uint64_t provider_id, const item_path& targ
     if (provider_id == 0)
         throw internal_error("provider id was not specified", log);
 
-    res_item_category* location = _get_category(provider_id, target_location);
+    auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
         throw internal_error("category entry has a wrong provider id set", log);
 
-    _provider_category_clear(location);
+    _provider_category_clear(location_rid, location);
 }
 
 void system::_info(uint64_t resource_id, item_info& item) {
@@ -482,11 +825,14 @@ std::vector<item_listing> system::list(uint64_t resource_id) {
 
 std::vector<item_listing> system::list(const item_path& path) {
     std::lock_guard<std::mutex> guard(_lock);
-    res_item_category* location = _get_category(STRTB_EVENT_ROOT, path);
+    auto [location, location_rid] = _get_category(STRTB_EVENT_ROOT, path);
     return _list(location);
 }
 
-void system::_provider_import(uint64_t provider_id, res_item_category* location, const json::value_object* entries) {
+void system::_provider_import(uint64_t provider_id,
+                              uint64_t location_rid,
+                              res_item_category* location,
+                              const json::value_object* entries) {
     for (auto entry = entries->begin(); entry != entries->end(); entry++) {
         const std::string& name = entry->first;
         json::value* item_def_value = entry->second;
@@ -502,14 +848,14 @@ void system::_provider_import(uint64_t provider_id, res_item_category* location,
                             // Recursively add all category entries, if specified
                             try {
                                 const json::value_object* sub_entries = json::cast_object(&item_def->at("entries"));
-                                _provider_import(provider_id, new_res.second.as_category(), sub_entries);
+                                _provider_import(provider_id, location_rid, new_res.second.as_category(), sub_entries);
                             } catch (std::out_of_range&) {  // ignored, it's okay to not specify sub-items
                             } catch (json::wrong_type&) {
                                 throw parsing_error("\"entries\" must be an object");
                             }
                         }
                     } catch (...) {
-                        _provider_item_remove(location, name);
+                        _provider_item_remove(location_rid, location, name);
                         throw;
                     }
                 } catch (json::wrong_type&) {
@@ -522,7 +868,7 @@ void system::_provider_import(uint64_t provider_id, res_item_category* location,
             // Removes all entries from first to last added (NOT the current one, as this caused the exception)
             while (entry != entries->begin()) {
                 entry--;
-                _provider_item_remove(location, entry->first);
+                _provider_item_remove(location_rid, location, entry->first);
             }
             throw;
         }
@@ -536,7 +882,7 @@ void system::provider_import(uint64_t provider_id, uint64_t target_location, con
     if (provider_id != location->provider_id)
         throw out_of_scope("target location does not belong to this provider");
 
-    _provider_import(provider_id, location, entries);
+    _provider_import(provider_id, target_location, location, entries);
 }
 
 void system::provider_import(uint64_t provider_id, const item_path& target_location, const json::value_object* entries) {
@@ -545,10 +891,10 @@ void system::provider_import(uint64_t provider_id, const item_path& target_locat
     if (provider_id == 0)
         throw internal_error("provider id was not specified", log);
 
-    res_item_category* location = _get_category(provider_id, target_location);
+    auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
         throw internal_error("category entry has a wrong provider id set", log);
 
-    _provider_import(provider_id, location, entries);
+    _provider_import(provider_id, location_rid, location, entries);
 }

@@ -9,6 +9,7 @@
 #include <vector>
 #include <mutex>
 #include <string>
+#include <memory>
 
 #define STRTB_EVENT_ROOT 1
 
@@ -16,6 +17,30 @@ namespace strtb::event {
 
 class system {
 private:
+    // used by event subs (and more later) to locate an item that hasn't been registered yet by its provider
+    enum res_path_follower_status {
+        PATH_FL_UNDEFINED,  // must be changed immediately after creation by the event system
+        PATH_FL_READY,      // resource is attached to its wanted target
+        PATH_FL_WAITING,    // resource is attached to a category waiting for its wanted target
+        PATH_FL_WRONG_TYPE, // resource cannot attach to its wanted target cause it was a different item type
+        PATH_FL_BAD_PARAM   // resource cannot attach to its wanted target due to having wrong parameters
+    };
+
+    struct res_path_follower {
+        item_path path;
+        size_t path_pos_found = 0;  // position of path segment it's currently looking for, path.size() if found
+        item_type wanted_type = ITEM_UNDEFINED;
+        uint64_t sub_rid = 0, target_rid = 0;
+        res_path_follower_status status = PATH_FL_UNDEFINED;
+        std::string diagnostic_info;
+    };
+
+    struct res_event_sub {
+        res_path_follower path;
+        json::holder param;
+        event_listener& listener;
+    };
+
     struct res_item {
         item_type type = ITEM_UNDEFINED;
         std::string display_name, description;
@@ -26,13 +51,29 @@ private:
 
     struct res_item_category : public res_item {
         std::map<std::string, uint64_t> list;
+        std::map<std::string, std::set<res_path_follower*> > waiting_path_followers;
+
+        void path_follower_attach(res_path_follower* path_fl, uint64_t my_rid);
+        void path_follower_detach(res_path_follower* path_fl);
+        void path_follower_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid);
+        bool has_path_followers();
     };
 
     struct res_item_event_src : public res_item {
         param_definition param;
         std::vector<param_definition> returns;
         std::vector<example_definition> examples;
-        // TODO: list of event listeners
+
+        // Subscribed event listeners, based on parameter type
+        std::set<res_event_sub*> subs_none;
+        std::set<res_event_sub*> subs_bool[2];
+        std::map<long long, std::set<res_event_sub*> > subs_int;
+        std::map<std::string, std::set<res_event_sub*> > subs_string;
+
+        bool sub_attach(res_path_follower& path_fl, uint64_t my_rid);
+        void sub_detach(res_event_sub* sub_ptr);
+        void sub_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid);
+        bool has_subs();
     };
 
     struct res_item_action_sink : public res_item {
@@ -71,19 +112,27 @@ private:
 
     std::mutex _lock;
     std::map<uint64_t, res_cnt> _items;
+    std::map<uint64_t, std::unique_ptr<res_event_sub> > _event_subs;
     uint64_t _resid_counter = STRTB_EVENT_ROOT + 1;
 
     uint64_t _resid_new();
     uint64_t _follow_path(uint64_t start, const item_path& path);
     res_item_category* _get_category(uint64_t target_location);
-    res_item_category* _get_category(uint64_t start, const item_path& target_location);
+    std::pair<res_item_category*, uint64_t> _get_category(uint64_t start, const item_path& target_location);
     std::pair<uint64_t, res_cnt&> _provider_item_add(uint64_t provider_id,
                                                      res_item_category* location,
                                                      const std::string& name,
                                                      const item_info& item);
-    void _provider_item_remove(res_item_category* location, const std::string& name);
-    void _provider_category_clear(res_item_category* location);
-    void _provider_import(uint64_t provider_id, res_item_category* location, const json::value_object* entries);
+    void _provider_item_remove_path_followers(uint64_t location_rid,
+                                              res_item_category* location,
+                                              const std::string& name,
+                                              res_cnt& item);
+    void _provider_item_remove(uint64_t location_rid, res_item_category* location, const std::string& name);
+    void _provider_category_clear(uint64_t location_rid, res_item_category* location);
+    void _provider_import(uint64_t provider_id,
+                          uint64_t location_rid,
+                          res_item_category* location,
+                          const json::value_object* entries);
     void _info(uint64_t resource_id, item_info& item);
     std::vector<item_listing> _list(res_item_category* location);
 
