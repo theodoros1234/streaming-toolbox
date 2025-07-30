@@ -6,6 +6,7 @@
 #include "../json/value_object.h"
 #include "../logging/logging.h"
 #include <stdint.h>
+#include "../json/holder.h"
 
 namespace strtb::event {
 
@@ -123,6 +124,27 @@ struct item_info {
 struct item_listing : public item_info {
     uint64_t resource_id = 0;
     std::string name;
+};
+
+enum path_follower_status {
+    PATH_FL_UNDEFINED,  // must be changed immediately after creation by the event system
+    PATH_FL_READY,      // resource is attached to its wanted target
+    PATH_FL_WAITING,    // resource is attached to a category waiting for its wanted target
+    PATH_FL_WRONG_TYPE, // resource cannot attach to its wanted target cause it was a different item type
+    PATH_FL_BAD_PARAM   // resource cannot attach to its wanted target due to having wrong parameters
+};
+
+struct item_info_path_follower {
+    uint64_t sub_rid = 0;
+    item_path path;
+    item_type wanted_type = ITEM_UNDEFINED;
+    path_follower_status status = PATH_FL_UNDEFINED;
+    std::string diagnostic_info;
+};
+
+struct item_info_event_sub {
+    uint64_t event_sub_rid = 0;
+    json::holder param;
 };
 
 }

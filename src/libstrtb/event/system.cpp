@@ -486,6 +486,14 @@ std::pair<system::res_item_category*, uint64_t> system::_get_category(uint64_t s
     }
 }
 
+system::res_item_event_src* system::_get_event_src(uint64_t target_location) {
+    try {
+        return _items.at(target_location).as_event_src();
+    } catch (std::out_of_range&) {
+        throw not_found("target location not found");
+    }
+}
+
 std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provider_id,
                                     res_item_category* location,
                                     const std::string& name,
@@ -767,7 +775,8 @@ void system::_info(uint64_t resource_id, item_info& item) {
     switch (ref.type()) {
     case ITEM_EVENT_SRC: {
         res_item_event_src* p = ref.as_event_src();
-        item.params.push_back(p->param);
+        if (p->param.type != json::VAL_UNDEFINED)
+            item.params.push_back(p->param);
         item.returns = p->returns;
         item.examples = p->examples;
     }
@@ -985,4 +994,59 @@ void system::event_listener_unsubscribe(const std::set<uint64_t>& subscription_i
     std::lock_guard<std::mutex> guard(_lock);
     for (auto sub_id : subscription_ids)
         _event_listener_unsubscribe(sub_id);
+}
+
+std::vector<item_info_path_follower> system::info_path_followers(uint64_t resource_id) {
+    std::lock_guard<std::mutex> guard(_lock);
+    res_item_category* category = _get_category(resource_id);
+
+    std::vector<item_info_path_follower> info_returned;
+
+    for (const auto& set : category->waiting_path_followers) {
+        for (const auto path_fl : set.second) {
+            item_info_path_follower i = {
+                .sub_rid = path_fl->sub_rid,
+                .path = path_fl->path,
+                .wanted_type = path_fl->wanted_type,
+                .status = path_fl->status,
+                .diagnostic_info = path_fl->diagnostic_info
+            };
+            info_returned.push_back(std::move(i));
+        }
+    }
+
+    return info_returned;
+}
+
+std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
+    std::lock_guard<std::mutex> guard(_lock);
+    res_item_event_src* event_src = _get_event_src(resource_id);
+
+    std::vector<item_info_event_sub> info_returned;
+
+    // using lambda to avoid copy-pasting this code many times
+    auto add = [&info_returned](res_event_sub* event_sub) {
+        item_info_event_sub i = {
+            .event_sub_rid = event_sub->path.sub_rid,
+            .param = event_sub->param
+        };
+        info_returned.push_back(std::move(i));
+    };
+
+    for (const auto event_sub : event_src->subs_none)
+        add(event_sub);
+
+    for (size_t i=0; i<1; i++)
+        for (const auto event_sub : event_src->subs_bool[i])
+            add(event_sub);
+
+    for (const auto& set : event_src->subs_int)
+        for (const auto event_sub : set.second)
+            add(event_sub);
+
+    for (const auto& set : event_src->subs_string)
+        for (const auto event_sub : set.second)
+            add(event_sub);
+
+    return info_returned;
 }

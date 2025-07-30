@@ -18,20 +18,12 @@ namespace strtb::event {
 class system {
 private:
     // used by event subs (and more later) to locate an item that hasn't been registered yet by its provider
-    enum res_path_follower_status {
-        PATH_FL_UNDEFINED,  // must be changed immediately after creation by the event system
-        PATH_FL_READY,      // resource is attached to its wanted target
-        PATH_FL_WAITING,    // resource is attached to a category waiting for its wanted target
-        PATH_FL_WRONG_TYPE, // resource cannot attach to its wanted target cause it was a different item type
-        PATH_FL_BAD_PARAM   // resource cannot attach to its wanted target due to having wrong parameters
-    };
-
     struct res_path_follower {
         item_path path;
         size_t path_pos_found = 0;  // position of path segment it's currently looking for, path.size() if found
         item_type wanted_type = ITEM_UNDEFINED;
         uint64_t sub_rid = 0, target_rid = 0;
-        res_path_follower_status status = PATH_FL_UNDEFINED;
+        path_follower_status status = PATH_FL_WAITING;
         std::string diagnostic_info;
 
         res_path_follower(const item_path& path, item_type wanted_type, uint64_t sub_rid);
@@ -123,6 +115,7 @@ private:
     uint64_t _follow_path(uint64_t start, const item_path& path);
     res_item_category* _get_category(uint64_t target_location);
     std::pair<res_item_category*, uint64_t> _get_category(uint64_t start, const item_path& target_location);
+    res_item_event_src* _get_event_src(uint64_t target_location);
     std::pair<uint64_t, res_cnt&> _provider_item_add(uint64_t provider_id,
                                                      res_item_category* location,
                                                      const std::string& name,
@@ -174,6 +167,8 @@ public:
     item_listing info(const item_path& path);
     std::vector<item_listing> list(uint64_t resource_id);
     std::vector<item_listing> list(const item_path& path);
+    std::vector<item_info_path_follower> info_path_followers(uint64_t resource_id);
+    std::vector<item_info_event_sub> info_event_subs(uint64_t resource_id);
 };
 
 extern system* system_ptr;
