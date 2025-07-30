@@ -68,6 +68,11 @@ void provider::item_remove(const item_path& target_location, const std::string &
     system_ptr->provider_item_remove(_id, target_location, name);
 }
 
+uint64_t provider::item_get_id(const item_path& target) {
+    _setup_check();
+    return system_ptr->provider_item_get_id(_id, target);
+}
+
 void provider::category_clear(uint64_t target_location) {
     _setup_check();
     if (target_location == 0)

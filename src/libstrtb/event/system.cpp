@@ -704,6 +704,15 @@ void system::provider_item_remove(uint64_t provider_id, const item_path& target_
     _provider_item_remove(location_rid, location, name);
 }
 
+uint64_t system::provider_item_get_id(uint64_t provider_id, const item_path& target) {
+    std::lock_guard<std::mutex> guard(_lock);
+
+    if (provider_id == 0)
+        throw internal_error("provider id was not specified", log);
+
+    return _follow_path(provider_id, target);
+}
+
 void system::_provider_category_clear(uint64_t location_rid, res_item_category* location) {
     // Delete all held resources
     for (auto& entry : location->list) {

@@ -25,6 +25,7 @@ public:
     uint64_t item_add(const item_path& target_location, const std::string& name, const item_info& item);
     void item_remove(uint64_t target_location, const std::string& name);
     void item_remove(const item_path& target_location, const std::string& name);
+    uint64_t item_get_id(const item_path& target);
     void category_clear(uint64_t target_location);
     void category_clear(const item_path& target_location);
     void import(uint64_t target_location, const json::value_object* entries);

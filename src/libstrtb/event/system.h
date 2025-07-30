@@ -149,6 +149,7 @@ protected:
                                const item_info& item);
     void provider_item_remove(uint64_t provider_id, uint64_t target_location, const std::string& name);
     void provider_item_remove(uint64_t provider_id, const item_path& target_location, const std::string& name);
+    uint64_t provider_item_get_id(uint64_t provider_id, const item_path& target);
     // TODO: bulk add/remove
     void provider_category_clear(uint64_t provider_id, uint64_t target_location);
     void provider_category_clear(uint64_t provider_id, const item_path& target_location);
