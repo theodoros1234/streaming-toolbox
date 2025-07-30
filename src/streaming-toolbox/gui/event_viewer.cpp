@@ -173,13 +173,13 @@ void event_viewer::show_info() {
             for (const auto& path_fl : event::system_ptr->info_path_followers(info.resource_id)) {
                 text.append("<li><b>");
                 text.append(QString::fromStdString(path_fl.owner_name));
-                text.append(" (");
+                text.append(" (rid=");
                 text.append(QString::number(path_fl.sub_rid));
-                text.append("):</b><br>Wants: ");
+                text.append(")</b><br><b>Wants:</b> ");
                 text.append(item_type_to_str(path_fl.wanted_type));
-                text.append("<br>Path: ");
+                text.append("<br><b>Path:</b> ");
                 text.append(QString::fromStdString(event::item_path_to_string(path_fl.path)));
-                text.append("<br>Status: ");
+                text.append("<br><b>Status:</b> ");
 
                 switch (path_fl.status) {
                 case event::PATH_FL_UNDEFINED:
@@ -201,7 +201,7 @@ void event_viewer::show_info() {
                     text.append("Invalid Status");
                 }
                 if (!path_fl.diagnostic_info.empty()) {
-                    text.append("<br>Diagnostic Info: ");
+                    text.append("<br><b>Diagnostic Info:</b> ");
                     text.append(QString::fromStdString(path_fl.diagnostic_info));
                 }
 
@@ -215,16 +215,16 @@ void event_viewer::show_info() {
             for (const auto& event_sub : event::system_ptr->info_event_subs(info.resource_id)) {
                 text.append("<li><b>");
                 text.append(QString::fromStdString(event_sub.listener_name));
-                text.append("(");
+                text.append(" (rid=");
                 text.append(QString::number(event_sub.event_sub_rid));
-                text.append("): ");
+                text.append("):</b> ");
 
                 if (event_sub.param.type() == json::VAL_UNDEFINED) {
                     text.append("param not set</li>");
                 } else {
-                    text.append("param = <pre><code>");
+                    text.append("param=");
                     text.append(QString::fromStdString(event_sub.param.value()->write_to_string()).toHtmlEscaped());
-                    text.append("</code></pre></li>");
+                    text.append("</li>");
                 }
             }
             text.append("</ul>");

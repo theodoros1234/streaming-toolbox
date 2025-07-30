@@ -21,7 +21,7 @@ private:
     struct res_path_follower {
         const std::string& owner_name;
         item_path path;
-        size_t path_pos_found = 0;  // position of path segment it's currently looking for, path.size() if found
+        size_t path_pos_found = -1; // position of path segment it's currently looking for, path.size() if found
         item_type wanted_type = ITEM_UNDEFINED;
         uint64_t sub_rid = 0, target_rid = 0;
         path_follower_status status = PATH_FL_WAITING;

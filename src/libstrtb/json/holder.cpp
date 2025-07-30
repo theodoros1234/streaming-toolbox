@@ -6,7 +6,8 @@ using namespace strtb::json;
 holder::holder() : _v(nullptr) {}
 
 holder::holder(const holder& o) {
-    _v = o.value()->copy();
+    if (o._v)
+        _v = o.value()->copy();
 }
 
 holder::holder(holder&& o) {

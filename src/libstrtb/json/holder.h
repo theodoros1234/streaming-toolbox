@@ -7,7 +7,7 @@ namespace strtb::json {
 
 class holder {
 private:
-    json::value* _v;
+    json::value* _v = nullptr;
 public:
     holder();
     holder(const holder& o);

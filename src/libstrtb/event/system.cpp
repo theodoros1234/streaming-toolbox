@@ -66,6 +66,7 @@ void system::res_item_category::path_follower_attach(res_path_follower* path_fl,
                             path_fl->diagnostic_info = "a category in this path was changed to another item type";
                         } else {
                             res.as_category()->path_follower_attach(path_fl, itr->second);
+                            return;
                         }
                     }
                 } catch (std::out_of_range&) {
@@ -151,7 +152,7 @@ bool system::res_item_event_src::sub_attach(res_path_follower &path_fl, uint64_t
         sub_param_type != json::VAL_UNDEFINED &&
         param.type != sub_param_type) {                             // params given but of wrong type
         path_fl.status = PATH_FL_BAD_PARAM;
-        path_fl.diagnostic_info = "parameter of type " + json::type_to_string(param.type) + "needed, " +
+        path_fl.diagnostic_info = "parameter of type " + json::type_to_string(param.type) + " needed, " +
                                   json::type_to_string(sub_param_type) + " given";
         return false;
     }
@@ -547,6 +548,7 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
                             path_fl->diagnostic_info = "a category in this path was changed to another item type";
                         } else {
                             new_item.as_category()->path_follower_attach(path_fl, new_res_id);
+                            moved.push_back(path_fl);
                         }
                     }
                 }
@@ -918,6 +920,9 @@ uint64_t system::event_listener_subscribe(event_listener& listener,
                                           const json::value* param) {
     std::lock_guard<std::mutex> guard(_lock);
 
+    if (event_source.empty())
+        throw out_of_scope("cannot subscribe to root category");
+
     if (param &&
         param->type() != json::VAL_BOOL &&
         param->type() != json::VAL_INT &&
@@ -925,20 +930,17 @@ uint64_t system::event_listener_subscribe(event_listener& listener,
         throw wrong_type("param must be a nullptr, or it must be of types bool, int or string");
 
     uint64_t new_sub_id = _resid_new();
-    res_event_sub* new_sub = new res_event_sub(event_source, param, listener, new_sub_id);
-    try {
-        auto [new_sub_entry, added] = _event_subs.emplace(new_sub_id, new_sub);
-        if (!added)
-            throw internal_error("duplicate resource id found for event subscription");
+    std::unique_ptr<res_event_sub> new_sub(new res_event_sub(event_source, param, listener, new_sub_id));
+    res_path_follower* path_fl = &new_sub->path;
+    auto [new_sub_entry, added] = _event_subs.emplace(new_sub_id, std::move(new_sub));
 
-        try {
-            _items.at(STRTB_EVENT_ROOT).as_category()->path_follower_attach(&new_sub->path, STRTB_EVENT_ROOT);
-        } catch (...) {
-            _event_subs.erase(new_sub_entry);
-            throw;
-        }
+    if (!added)
+        throw internal_error("duplicate resource id found for event subscription");
+
+    try {
+        _items.at(STRTB_EVENT_ROOT).as_category()->path_follower_attach(path_fl, STRTB_EVENT_ROOT);
     } catch (...) {
-        delete new_sub;
+        _event_subs.erase(new_sub_entry);
         throw;
     }
 
@@ -962,10 +964,12 @@ void system::_event_listener_unsubscribe(uint64_t subscription_id) {
         switch (item.type()) {
         case ITEM_CATEGORY:
             item.as_category()->path_follower_detach(&sub->path);
+            _event_subs.erase(sub_itr);
             break;
 
         case ITEM_EVENT_SRC:
             item.as_event_src()->sub_detach(sub);
+            _event_subs.erase(sub_itr);
             break;
 
         default:
