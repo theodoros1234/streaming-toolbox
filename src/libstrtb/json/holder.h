@@ -17,6 +17,7 @@ public:
     holder& operator=(json::value* other);
     void set(json::value* v);
     val_type type() const;
+    bool empty() const;
     class value* detach(bool ignore_undefined = false);
 
     const json::value* value(bool ignore_undefined = false) const;

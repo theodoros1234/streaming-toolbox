@@ -352,12 +352,12 @@ json::val_type system::get_category_root_type(const std::string &category_name) 
 
 void system::set_category_root(const std::string &category_name, const json::val_type type) {
     std::lock_guard<std::mutex> guard(_lock);
-    json::value_utils::change_default(&find_category(category_name, true).root, type);
+    json::change_default(&find_category(category_name, true).root, type);
 }
 
 void system::set_category_root(const std::string &category_name, const json::value_auto &value) {
     std::lock_guard<std::mutex> guard(_lock);
-    json::value_utils::change_auto(&find_category(category_name, true).root, value);
+    json::change_auto(&find_category(category_name, true).root, value);
 }
 
 void system::set_category_root_move(const std::string &category_name, json::value *value) {

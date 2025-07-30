@@ -34,7 +34,6 @@ SOURCES += \
     json/value_null.cpp \
     json/value_object.cpp \
     json/value_string.cpp \
-    json/value_utils.cpp \
     logging/logging.cpp \
     chat/channel.cpp \
     chat/provider.cpp \
@@ -81,7 +80,6 @@ HEADERS += \
     json/value_null.h \
     json/value_object.h \
     json/value_string.h \
-    json/value_utils.h \
     logging/logging.h \
     networking/exceptions.h \
     networking/sigpipe_suppressor.h \

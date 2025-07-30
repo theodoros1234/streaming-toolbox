@@ -42,6 +42,10 @@ val_type holder::type() const {
         return VAL_UNDEFINED;
 }
 
+bool holder::empty() const {
+    return _v == nullptr;
+}
+
 class value* holder::detach(bool ignore_undefined) {
     if (!_v && !ignore_undefined)
         throw undefined_exception();

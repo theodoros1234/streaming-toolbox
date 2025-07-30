@@ -78,10 +78,10 @@ void value_object::set(const std::string &key, val_type type) {
     auto itr = _contents.find(key);
     if (itr == _contents.end()) {
         // Create new key with default value
-        _contents[key] = value_utils::new_default(type);
+        _contents[key] = new_default(type);
     } else {
         // Replace existing value
-        value_utils::change_default(&itr->second, type);
+        change_default(&itr->second, type);
     }
 }
 
@@ -89,10 +89,10 @@ void value_object::set(const std::string &key, const value_auto &new_val) {
     auto itr = _contents.find(key);
     if (itr == _contents.end()) {
         // Create new key with this value
-        _contents[key] = value_utils::new_auto(new_val);
+        _contents[key] = new_auto(new_val);
     } else {
         // Replace existing value
-        value_utils::change_auto(&itr->second, new_val);
+        change_auto(&itr->second, new_val);
     }
 }
 
@@ -111,11 +111,11 @@ void value_object::set_move(const std::string &key, value* new_val) {
 }
 
 void value_object::set(iterator pos, val_type type) {
-    value_utils::change_default(&pos->second, type);
+    change_default(&pos->second, type);
 }
 
 void value_object::set(iterator pos, const value_auto &new_val) {
-    value_utils::change_auto(&pos->second, new_val);
+    change_auto(&pos->second, new_val);
 }
 
 void value_object::set_move(iterator pos, value* new_val) {

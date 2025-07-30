@@ -1,7 +1,6 @@
 #include "event_viewer.h"
 #include "ui_event_viewer.h"
 #include "../libstrtb/event/system.h"
-#include "../libstrtb/json/value_utils.h"
 #include <QGuiApplication>
 #include <QClipboard>
 
@@ -219,7 +218,7 @@ void event_viewer::show_info() {
                 text.append(QString::number(event_sub.event_sub_rid));
                 text.append("):</b> ");
 
-                if (event_sub.param.type() == json::VAL_UNDEFINED) {
+                if (event_sub.param.empty()) {
                     text.append("param not set</li>");
                 } else {
                     text.append("param=");

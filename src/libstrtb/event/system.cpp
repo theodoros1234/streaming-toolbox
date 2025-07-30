@@ -5,7 +5,6 @@
 #include "../logging/logging.h"
 #include "../common/strescape.h"
 #include "../json/cast.h"
-#include "../json/value_utils.h"
 
 using namespace strtb;
 using namespace strtb::event;

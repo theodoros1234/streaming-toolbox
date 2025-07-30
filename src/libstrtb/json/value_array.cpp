@@ -50,11 +50,11 @@ value& value_array::at(const size_t pos) const {return *_contents.at(pos);}
 value* value_array::get(const size_t pos) const {return at(pos).copy();}
 
 void value_array::set(const size_t pos, val_type type) {
-    value_utils::change_default(&_contents.at(pos), type);
+    change_default(&_contents.at(pos), type);
 }
 
 void value_array::set(const size_t pos, const value_auto &new_val) {
-    value_utils::change_auto(&_contents.at(pos), new_val);
+    change_auto(&_contents.at(pos), new_val);
 }
 
 void value_array::set_move(const size_t pos, value* new_val) {
@@ -65,11 +65,11 @@ void value_array::set_move(const size_t pos, value* new_val) {
 }
 
 void value_array::set(iterator pos, val_type type) {
-    value_utils::change_default(&(*pos), type);
+    change_default(&(*pos), type);
 }
 
 void value_array::set(iterator pos, const value_auto &new_val) {
-    value_utils::change_auto(&(*pos), new_val);
+    change_auto(&(*pos), new_val);
 }
 
 void value_array::set_move(iterator pos, value* new_val) {
@@ -88,7 +88,7 @@ value& value_array::at_back() {
 value* value_array::back() {return at_back().copy();}
 
 void value_array::push_back(val_type type) {
-    value* new_obj = value_utils::new_default(type);
+    value* new_obj = new_default(type);
     try {
         _contents.push_back(new_obj);
     } catch (...) {
@@ -98,7 +98,7 @@ void value_array::push_back(val_type type) {
 }
 
 void value_array::push_back(const value_auto &new_val) {
-    value* new_obj = value_utils::new_auto(new_val);
+    value* new_obj = new_auto(new_val);
     try {
         _contents.push_back(new_obj);
     } catch (...) {
@@ -123,7 +123,7 @@ void value_array::pop_back() {
 void value_array::insert(const size_t pos, val_type type) {
     if (pos > _contents.size())
         throw std::out_of_range("Out of range");
-    value* new_obj = value_utils::new_default(type);
+    value* new_obj = new_default(type);
     try {
         _contents.insert(_contents.begin()+pos, new_obj);
     } catch (...) {
@@ -135,7 +135,7 @@ void value_array::insert(const size_t pos, val_type type) {
 void value_array::insert(const size_t pos, const value_auto &new_val) {
     if (pos > _contents.size())
         throw std::out_of_range("Out of range");
-    value* new_obj = value_utils::new_auto(new_val);
+    value* new_obj = new_auto(new_val);
     try {
         _contents.insert(_contents.begin()+pos, new_obj);
     } catch (...) {
@@ -155,7 +155,7 @@ void value_array::insert_move(const size_t pos, value* new_val) {
 void value_array::insert(const_iterator pos, val_type type) {
     if (pos < _contents.begin() && _contents.end() < pos)
         throw std::out_of_range("Out of range");
-    value* new_obj = value_utils::new_default(type);
+    value* new_obj = new_default(type);
     try {
         _contents.insert(pos, new_obj);
     } catch (...) {
@@ -167,7 +167,7 @@ void value_array::insert(const_iterator pos, val_type type) {
 void value_array::insert(const_iterator pos, const value_auto &new_val) {
     if (pos < _contents.begin() && _contents.end() < pos)
         throw std::out_of_range("Out of range");
-    value* new_obj = value_utils::new_auto(new_val);
+    value* new_obj = new_auto(new_val);
     try {
         _contents.insert(pos, new_obj);
     } catch (...) {
