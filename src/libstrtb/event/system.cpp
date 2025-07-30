@@ -235,42 +235,32 @@ void system::res_item_event_src::sub_detach(res_event_sub* sub_ptr) {
 }
 
 void system::res_item_event_src::sub_detach_all(std::set<res_path_follower*> &move_into, uint64_t cat_rid) {
-    for (auto sub : subs_none) {
+    // Using a lambda to avoid copy-pasting this code many times
+    static const auto detach = [](res_event_sub* sub, std::set<res_path_follower*>& move_into, uint64_t cat_rid) {
         move_into.insert(&sub->path);
         sub->path.status = PATH_FL_WAITING;
         sub->path.target_rid = cat_rid;
         sub->path.path_pos_found--;
-    }
+    };
+
+    for (auto sub : subs_none)
+        detach(sub, move_into, cat_rid);
     subs_none.clear();
 
     for (size_t i=0; i<=1; i++) {
-        for (auto sub : subs_bool[i]) {
-            move_into.insert(&sub->path);
-            sub->path.status = PATH_FL_WAITING;
-            sub->path.target_rid = cat_rid;
-            sub->path.path_pos_found--;
-        }
+        for (auto sub : subs_bool[i])
+            detach(sub, move_into, cat_rid);
         subs_bool[i].clear();
     }
 
-    for (auto& set : subs_int) {
-        for (auto sub : set.second) {
-            move_into.insert(&sub->path);
-            sub->path.status = PATH_FL_WAITING;
-            sub->path.target_rid = cat_rid;
-            sub->path.path_pos_found--;
-        }
-    }
+    for (auto& set : subs_int)
+        for (auto sub : set.second)
+            detach(sub, move_into, cat_rid);
     subs_int.clear();
 
-    for (auto& set : subs_string) {
-        for (auto sub : set.second) {
-            move_into.insert(&sub->path);
-            sub->path.status = PATH_FL_WAITING;
-            sub->path.target_rid = cat_rid;
-            sub->path.path_pos_found--;
-        }
-    }
+    for (auto& set : subs_string)
+        for (auto sub : set.second)
+            detach(sub, move_into, cat_rid);
     subs_string.clear();
 }
 
@@ -1025,7 +1015,7 @@ std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
     std::vector<item_info_event_sub> info_returned;
 
     // using lambda to avoid copy-pasting this code many times
-    auto add = [&info_returned](res_event_sub* event_sub) {
+    static const auto add = [](res_event_sub* event_sub, std::vector<item_info_event_sub>& info_returned) {
         item_info_event_sub i = {
             .event_sub_rid = event_sub->path.sub_rid,
             .param = event_sub->param
@@ -1034,19 +1024,19 @@ std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
     };
 
     for (const auto event_sub : event_src->subs_none)
-        add(event_sub);
+        add(event_sub, info_returned);
 
     for (size_t i=0; i<1; i++)
         for (const auto event_sub : event_src->subs_bool[i])
-            add(event_sub);
+            add(event_sub, info_returned);
 
     for (const auto& set : event_src->subs_int)
         for (const auto event_sub : set.second)
-            add(event_sub);
+            add(event_sub, info_returned);
 
     for (const auto& set : event_src->subs_string)
         for (const auto event_sub : set.second)
-            add(event_sub);
+            add(event_sub, info_returned);
 
     return info_returned;
 }
