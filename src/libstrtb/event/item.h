@@ -97,7 +97,12 @@ struct example_definition {
 
 enum item_type {ITEM_UNDEFINED, ITEM_CATEGORY, ITEM_EVENT_SRC, ITEM_ACTION_SINK};
 
-typedef std::vector<std::string> item_path;
+class item_path : public std::vector<std::string> {
+    using std::vector<std::string>::vector;
+public:
+    item_path(const std::string& path, size_t max_segment_length = 256, size_t max_depth = 64);
+    item_path(const char* path, size_t max_segment_length = 256, size_t max_depth = 64);
+};
 
 bool item_path_validate_segment(const std::string& segment);
 ssize_t item_path_validate(const item_path& path);

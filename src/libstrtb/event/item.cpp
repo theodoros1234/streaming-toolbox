@@ -463,20 +463,22 @@ std::string strtb::event::item_path_to_string(const item_path& path) {
 }
 
 item_path strtb::event::to_item_path(const std::string& path_str, size_t max_segment_length, size_t max_depth) {
-    item_path path;
+    return item_path(path_str, max_segment_length, max_depth);
+}
 
+item_path::item_path(const std::string& path, size_t max_segment_length, size_t max_depth) {
     std::string::size_type from = 0, to = 1, segment_length = 0;
-    if (path_str.size() < 1 || path_str.at(0) != '/')
+    if (path.size() < 1 || path.at(0) != '/')
         throw parsing_error("path must start with /");
 
-    while (path.size() <= max_depth) {
-        if (to >= path_str.size())
-            return path;
+    while (size() <= max_depth) {
+        if (to >= path.size())
+            return;
 
         from = to;
-        to = path_str.find('/', from);
-        if (to == path_str.npos) {  // end of string
-            to = path_str.size();
+        to = path.find('/', from);
+        if (to == path.npos) {  // end of string
+            to = path.size();
             segment_length = to - from;
         } else {                    // found slash, skip it for next iteration
             segment_length = to - from;
@@ -489,16 +491,16 @@ item_path strtb::event::to_item_path(const std::string& path_str, size_t max_seg
         if (segment_length > max_segment_length)
             throw parsing_error("segment exceeds maximum segment length");
 
-        std::string segment = path_str.substr(from, segment_length);
+        std::string segment = path.substr(from, segment_length);
 
         if (!item_path_validate_segment(segment))
             throw parsing_error("path contains invalid characters");
 
-        if (path.size() >= max_depth)
+        if (size() >= max_depth)
             throw parsing_error("path exceeds maximum depth");
 
         if (item_path_validate_segment(segment))
-            path.push_back(std::move(segment));
+            push_back(std::move(segment));
         else
             throw parsing_error("path segment " + common::string_escape(segment) + " is invalid");
     }
@@ -506,3 +508,5 @@ item_path strtb::event::to_item_path(const std::string& path_str, size_t max_seg
     throw parsing_error("path exceeds maximum depth");
 }
 
+item_path::item_path(const char* path, size_t max_segment_length, size_t max_depth)
+    : item_path(std::string(path), max_segment_length, max_depth) {}
