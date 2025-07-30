@@ -24,6 +24,7 @@ private:
     public:
         event::item_listing event_item_info;
         void populate();
+        void get_path(event::item_path& path);
     };
 
     Ui::event_viewer *ui;
@@ -31,6 +32,8 @@ private:
 public slots:
     void populate();
     void show_info();
+private slots:
+    void on_item_path_copy_clicked();
 };
 
 }

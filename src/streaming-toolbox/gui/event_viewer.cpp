@@ -2,6 +2,8 @@
 #include "ui_event_viewer.h"
 #include "../libstrtb/event/system.h"
 #include "../libstrtb/json/value_utils.h"
+#include <QGuiApplication>
+#include <QClipboard>
 
 using namespace strtb::gui;
 
@@ -82,12 +84,51 @@ static void list_params(QString& text, const std::vector<strtb::event::param_def
     text.append("</ul>");
 }
 
+static const char* item_type_to_str(strtb::event::item_type type) {
+    switch (type) {
+    case strtb::event::ITEM_UNDEFINED:
+        return "Undefined";
+        break;
+    case strtb::event::ITEM_CATEGORY:
+        return "Category";
+        break;
+    case strtb::event::ITEM_EVENT_SRC:
+        return "Event Source";
+        break;
+    case strtb::event::ITEM_ACTION_SINK:
+        return "Action Sink";
+        break;
+    default:
+        return "Invalid Type";
+    }
+}
+
+void event_viewer::tree_item::get_path(event::item_path &path) {
+    if (event_item_info.resource_id == STRTB_EVENT_ROOT)
+        return;
+    ((tree_item*) parent())->get_path(path);
+    path.push_back(event_item_info.name);
+}
+
 void event_viewer::show_info() {
     auto selected_items = ui->item_tree->selectedItems();
 
     if (selected_items.size() == 1) {
         // Show item info
-        const auto& info = ((tree_item*) selected_items.value(0))->event_item_info;
+        tree_item* item = (tree_item*) selected_items.value(0);
+        const auto& info = item->event_item_info;
+
+        event::item_path path;
+        item->get_path(path);
+        try {
+            ui->item_path->setText(QString::fromStdString(event::item_path_to_string(path)));
+            ui->item_path_copy->setEnabled(true);
+        } catch (event::invalid_path& e) {
+            ui->item_path->setText("invalid path: ");
+            ui->item_path->insert(e.what());
+            ui->item_path_copy->setDisabled(true);
+        }
+
         QString text;
         text.append("<h2>Basic Info</h2>");
         text.append("<p><b>Resource ID:</b> ");
@@ -106,24 +147,7 @@ void event_viewer::show_info() {
         text.append(QString::fromStdString(info.description));
         text.append("</p>");
         text.append("<p><b>Type:</b> ");
-        switch (info.type) {
-        case event::ITEM_UNDEFINED:
-            text.append("Undefined");
-            break;
-        case event::ITEM_CATEGORY:
-            text.append("Category");
-            break;
-        case event::ITEM_EVENT_SRC:
-            text.append("Event Source");
-            break;
-        case event::ITEM_ACTION_SINK:
-            text.append("Action Sink");
-            break;
-        default:
-            text.append("Invalid Type (");
-            text.append(QString::number(info.type));
-            text.append(")");
-        }
+        text.append(item_type_to_str(info.type));
         text.append("</p>");
 
         if (info.type == event::ITEM_EVENT_SRC || info.type == event::ITEM_ACTION_SINK) {
@@ -144,10 +168,78 @@ void event_viewer::show_info() {
             text.append("</ul>");
         }
 
+        if (info.type == event::ITEM_CATEGORY) {
+            text.append("<h2>Waiting Path Followers</h2><ul>");
+            for (const auto& path_fl : event::system_ptr->info_path_followers(info.resource_id)) {
+                text.append("<li><b>");
+                text.append(QString::fromStdString(path_fl.owner_name));
+                text.append(" (");
+                text.append(QString::number(path_fl.sub_rid));
+                text.append("):</b><br>Wants: ");
+                text.append(item_type_to_str(path_fl.wanted_type));
+                text.append("<br>Path: ");
+                text.append(QString::fromStdString(event::item_path_to_string(path_fl.path)));
+                text.append("<br>Status: ");
+
+                switch (path_fl.status) {
+                case event::PATH_FL_UNDEFINED:
+                    text.append("Undefined");
+                    break;
+                case event::PATH_FL_READY:
+                    text.append("Ready");
+                    break;
+                case event::PATH_FL_WAITING:
+                    text.append("Waiting");
+                    break;
+                case event::PATH_FL_WRONG_TYPE:
+                    text.append("Wrong Type");
+                    break;
+                case event::PATH_FL_BAD_PARAM:
+                    text.append("Bad Parameter");
+                    break;
+                default:
+                    text.append("Invalid Status");
+                }
+                if (!path_fl.diagnostic_info.empty()) {
+                    text.append("<br>Diagnostic Info: ");
+                    text.append(QString::fromStdString(path_fl.diagnostic_info));
+                }
+
+                text.append("</li>");
+            }
+            text.append("</ul>");
+        }
+
+        if (info.type == event::ITEM_EVENT_SRC) {
+            text.append("<h2>Event Subscriptions</h2><ul>");
+            for (const auto& event_sub : event::system_ptr->info_event_subs(info.resource_id)) {
+                text.append("<li><b>");
+                text.append(QString::fromStdString(event_sub.listener_name));
+                text.append("(");
+                text.append(QString::number(event_sub.event_sub_rid));
+                text.append("): ");
+
+                if (event_sub.param.type() == json::VAL_UNDEFINED) {
+                    text.append("param not set</li>");
+                } else {
+                    text.append("param = <pre><code>");
+                    text.append(QString::fromStdString(event_sub.param.value()->write_to_string()).toHtmlEscaped());
+                    text.append("</code></pre></li>");
+                }
+            }
+            text.append("</ul>");
+        }
+
         ui->item_info->setHtml(text);
     } else {
         // Don't show info if either nothing or multiple items are selected
         ui->item_info->clear();
+        ui->item_path->clear();
+        ui->item_path_copy->setDisabled(true);
     }
 }
 
+
+void event_viewer::on_item_path_copy_clicked() {
+    QGuiApplication::clipboard()->setText(ui->item_path->text());
+}

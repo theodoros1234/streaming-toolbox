@@ -441,6 +441,9 @@ ssize_t strtb::event::item_path_validate(const item_path& path) {
 }
 
 std::string strtb::event::item_path_to_string(const item_path& path) {
+    if (path.empty())   // root path
+        return "/";
+
     std::string str;
     ssize_t path_validate = item_path_validate(path);
     if (path_validate != -1)
