@@ -27,11 +27,12 @@ private:
 protected:
     friend system;
     std::mutex _lock;
+    const std::string _name;
     std::condition_variable _cv;
     std::deque<event_holder> _queue;
 
 public:
-    event_listener() = default;
+    event_listener(const std::string& name);
     ~event_listener();
     uint64_t subscribe(const item_path& event_source, const json::value* param = nullptr);
     void unsubscribe(uint64_t subscription_id);

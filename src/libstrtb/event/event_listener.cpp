@@ -8,6 +8,8 @@ using namespace strtb::event;
 
 static strtb::logging::source log("Event Listener");
 
+event_listener::event_listener(const std::string& name) : _name(name) {}
+
 event_listener::~event_listener() {
     shutdown();
 }

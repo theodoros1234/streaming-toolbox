@@ -19,6 +19,7 @@ class system {
 private:
     // used by event subs (and more later) to locate an item that hasn't been registered yet by its provider
     struct res_path_follower {
+        const std::string& owner_name;
         item_path path;
         size_t path_pos_found = 0;  // position of path segment it's currently looking for, path.size() if found
         item_type wanted_type = ITEM_UNDEFINED;
@@ -26,7 +27,7 @@ private:
         path_follower_status status = PATH_FL_WAITING;
         std::string diagnostic_info;
 
-        res_path_follower(const item_path& path, item_type wanted_type, uint64_t sub_rid);
+        res_path_follower(const std::string& owner_name, const item_path& path, item_type wanted_type, uint64_t sub_rid);
     };
 
     struct res_event_sub {

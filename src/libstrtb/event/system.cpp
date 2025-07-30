@@ -13,14 +13,17 @@ using namespace strtb::event;
 event::system* strtb::event::system_ptr = nullptr;
 static logging::source log("Event System");
 
-system::res_path_follower::res_path_follower(const item_path& path, item_type wanted_type, uint64_t sub_rid) :
-    path(path), wanted_type(wanted_type), sub_rid(sub_rid) {}
+system::res_path_follower::res_path_follower(const std::string& owner_name,
+                                             const item_path& path,
+                                             item_type wanted_type,
+                                             uint64_t sub_rid) :
+    owner_name(owner_name), path(path), wanted_type(wanted_type), sub_rid(sub_rid) {}
 
 system::res_event_sub::res_event_sub(const item_path&path,
                                      const json::value* param,
                                      event_listener& listener,
                                      uint64_t rid) :
-    path(path, ITEM_EVENT_SRC, rid), listener(listener) {
+    path(listener._name, path, ITEM_EVENT_SRC, rid), listener(listener) {
     if (param)
         this->param = param->copy();
 }
@@ -995,6 +998,7 @@ std::vector<item_info_path_follower> system::info_path_followers(uint64_t resour
     for (const auto& set : category->waiting_path_followers) {
         for (const auto path_fl : set.second) {
             item_info_path_follower i = {
+                .owner_name = path_fl->owner_name,
                 .sub_rid = path_fl->sub_rid,
                 .path = path_fl->path,
                 .wanted_type = path_fl->wanted_type,
@@ -1017,6 +1021,7 @@ std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
     // using lambda to avoid copy-pasting this code many times
     static const auto add = [](res_event_sub* event_sub, std::vector<item_info_event_sub>& info_returned) {
         item_info_event_sub i = {
+            .listener_name = event_sub->listener._name,
             .event_sub_rid = event_sub->path.sub_rid,
             .param = event_sub->param
         };

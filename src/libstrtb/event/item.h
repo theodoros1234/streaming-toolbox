@@ -135,6 +135,7 @@ enum path_follower_status {
 };
 
 struct item_info_path_follower {
+    std::string owner_name;
     uint64_t sub_rid = 0;
     item_path path;
     item_type wanted_type = ITEM_UNDEFINED;
@@ -143,6 +144,7 @@ struct item_info_path_follower {
 };
 
 struct item_info_event_sub {
+    std::string listener_name;
     uint64_t event_sub_rid = 0;
     json::holder param;
 };
