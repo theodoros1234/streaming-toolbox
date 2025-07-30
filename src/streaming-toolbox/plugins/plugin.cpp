@@ -12,7 +12,7 @@ using namespace strtb;
 
 namespace strtb::plugins {
 
-static logging::source log("Plugin Loader");
+static logging::source log("Plugin Loader", false);
 
 plugin::plugin(fs::path path) {
     this->_path = path;

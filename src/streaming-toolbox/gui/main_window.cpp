@@ -26,7 +26,7 @@ main_window::main_window(plugins::list *plugin_list, QWidget *parent)
     , ui(new Ui::MainWindow)
     , _plugin_tab(plugin_list)
     , _chat_tab()
-    , log("GUI: Main Window") {
+    , log("GUI: Main Window", false) {
 
     // Set up window and tabs
     ui->setupUi(this);

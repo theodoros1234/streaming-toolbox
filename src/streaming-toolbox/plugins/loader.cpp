@@ -11,7 +11,7 @@ namespace fs = std::filesystem;
 using namespace strtb;
 using namespace strtb::plugins;
 
-loader::loader() : log("Plugin Loader") {}
+loader::loader() : log("Plugin Loader", false) {}
 
 void loader::load_plugins(std::string path) {
     std::lock_guard guard(this->lock);

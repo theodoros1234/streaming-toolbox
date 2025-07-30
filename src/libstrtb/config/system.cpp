@@ -201,7 +201,7 @@ json::value* system::follow_path(const std::string &category_name, const path_ty
     return current;
 }
 
-system::system(const std::filesystem::path &config_dir) : log("Config System"), _config_dir(config_dir) {
+system::system(const std::filesystem::path &config_dir) : log("Config System", false), _config_dir(config_dir) {
     log.put(logging::DEBUG, {"Initialized with config dir ", common::string_escape(config_dir)});
 }
 

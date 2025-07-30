@@ -11,7 +11,7 @@
 
 using namespace strtb::networking;
 
-static strtb::logging::source log("SSL Helper Thread");
+static strtb::logging::source log("SSL Helper Thread", false);
 
 tcp_socket_ssl_thread::tcp_socket_ssl_thread() {
     _eventfd = eventfd(0, 0);

@@ -142,8 +142,11 @@ void message_part::put_into_stream(std::ostream *stream) const {
     }
 }
 
-source::source(std::string name) {
-    this->name = name;
+source::source(const std::string &name, bool is_plugin) {
+    if (is_plugin)
+        _name = "Plugin: " + name;
+    else
+        _name = name;
 }
 
 void source::put(level type, const std::vector<message_part>& message) {
@@ -166,10 +169,10 @@ void source::put(level type, const std::vector<message_part>& message) {
             // Color and format message appropriately: print timestamp, log level and object name
             switch (output.formatting) {
             case NONE:
-                *output.stream << "[" << timestamp_buffer << "] [" << level_name[type] << "] [" << this->name << "] ";
+                *output.stream << "[" << timestamp_buffer << "] [" << level_name[type] << "] [" << _name << "] ";
                 break;
             case ANSI_ESCAPE_CODES:
-                *output.stream << "\e[90m[\e[1m" << timestamp_buffer << "\e[0m\e[90m] [\e[0m\e[1m" << level_ansi_color[type] << level_name[type] << "\e[0m\e[90m] [\e[0m\e[1m" << this->name << "\e[0m\e[90m]\e[0m ";
+                *output.stream << "\e[90m[\e[1m" << timestamp_buffer << "\e[0m\e[90m] [\e[0m\e[1m" << level_ansi_color[type] << level_name[type] << "\e[0m\e[90m] [\e[0m\e[1m" << this->_name << "\e[0m\e[90m]\e[0m ";
                 break;
             }
             // Print actual message

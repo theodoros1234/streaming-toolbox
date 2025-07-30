@@ -50,9 +50,9 @@ protected:
 
 class source {
 private:
-    std::string name;
+    std::string _name;
 public:
-    source(std::string name);
+    source(const std::string& name, bool is_plugin = true);
     void put(level type, const std::vector<message_part>& message);
     void debug(const std::vector<message_part>& message);
     void info(const std::vector<message_part>& message);

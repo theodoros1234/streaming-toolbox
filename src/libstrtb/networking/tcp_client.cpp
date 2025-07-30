@@ -16,7 +16,7 @@
 
 using namespace strtb::networking;
 
-static strtb::logging::source log("TCP Client");
+static strtb::logging::source log("TCP Client", false);
 
 tcp_client::tcp_client() : tcp_client(STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT) {}
 

@@ -14,7 +14,7 @@ invalid_json::invalid_json(size_t line, size_t col) : _what("invalid JSON at lin
 
 const char* invalid_json::what() const noexcept {return _what.c_str();}
 
-static logging::source log("JSON Parser");
+static logging::source log("JSON Parser", false);
 
 // Helper functions (declarations only)
 static void eat_whitespace(std::istream &stream, size_t &line, size_t &col);

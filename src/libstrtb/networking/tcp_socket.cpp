@@ -12,7 +12,7 @@
 using namespace strtb;
 using namespace strtb::networking;
 
-static logging::source log("TCP Socket");
+static logging::source log("TCP Socket", false);
 
 tcp_socket::tcp_socket() : tcp_socket(STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT) {}
 

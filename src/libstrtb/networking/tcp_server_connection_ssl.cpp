@@ -5,7 +5,7 @@
 
 using namespace strtb::networking;
 
-static strtb::logging::source log("TCP Socket");
+static strtb::logging::source log("TCP Socket", false);
 
 tcp_server_connection_ssl::tcp_server_connection_ssl(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
                                                      size_t recv_buffer_size,

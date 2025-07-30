@@ -8,7 +8,7 @@ using namespace strtb;
 using namespace strtb::gui;
 
 chat_tab::chat_tab(QWidget *parent)
-    : QWidget(parent), log("GUI: Chat tab"), ui(new Ui::chat_tab) {
+    : QWidget(parent), log("GUI: Chat tab", false), ui(new Ui::chat_tab) {
     // Set up UI and objects
     ui->setupUi(this);
     this->chat_view_scrollbar = this->ui->chatView->verticalScrollBar();

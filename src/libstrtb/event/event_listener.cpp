@@ -6,7 +6,7 @@
 
 using namespace strtb::event;
 
-static strtb::logging::source log("Event Listener");
+static strtb::logging::source log("Event Listener", false);
 
 event_listener::event_listener(const std::string& name) : _name(name) {}
 

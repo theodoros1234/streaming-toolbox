@@ -5,7 +5,7 @@ using namespace strtb::chat;
 
 subscription::subscription(std::string provider_id, std::string channel_id,
                                    class queue *queue, common::deregistration_interface<subscription*> *deregister)
-    : log("Chat Subscription: " + provider_id + ":" + channel_id), provider_id(provider_id), channel_id(channel_id), queue(queue), deregister(deregister) {}
+    : log("Chat Subscription: " + provider_id + ":" + channel_id, false), provider_id(provider_id), channel_id(channel_id), queue(queue), deregister(deregister) {}
 
 std::string subscription::get_provider_id() {
     return this->provider_id;

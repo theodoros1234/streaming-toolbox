@@ -10,7 +10,7 @@
 using namespace strtb;
 using namespace strtb::networking;
 
-static logging::source log("TCP Client with SSL/TLS");
+static logging::source log("TCP Client with SSL/TLS", false);
 
 // Default context wrapped in a struct so that it gets automatically created and freed on program load/unload
 static struct default_context_container {

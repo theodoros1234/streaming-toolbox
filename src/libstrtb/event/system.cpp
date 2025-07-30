@@ -10,7 +10,7 @@ using namespace strtb;
 using namespace strtb::event;
 
 event::system* strtb::event::system_ptr = nullptr;
-static logging::source log("Event System");
+static logging::source log("Event System", false);
 
 system::res_path_follower::res_path_follower(const std::string& owner_name,
                                              const item_path& path,

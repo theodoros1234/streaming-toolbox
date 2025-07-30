@@ -4,7 +4,7 @@ using namespace strtb;
 using namespace strtb::chat;
 
 provider::provider(std::string id, std::string name, class queue *queue, deregistration_interface<provider*> *deregister)
-    : log("Chat Provider: " + id), queue(queue), deregister_provider(deregister), id(id), name(name) {}
+    : log("Chat Provider: " + id, false), queue(queue), deregister_provider(deregister), id(id), name(name) {}
 
 std::string provider::get_id() {
     return this->id;

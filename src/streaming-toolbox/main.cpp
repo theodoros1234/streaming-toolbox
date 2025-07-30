@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     if (home_path != NULL)
         logging::add_output_file(std::string(home_path) + "/.local/share/streaming-toolbox/streaming-toolbox.log",
                                  logging::INFO, logging::LINUX, false, logging::NONE);
-    logging::source log("Main");
+    logging::source log("Main", false);
 
     // Check libstrtb version
     if (!common::versions_equal(common::get_libstrtb_version(),

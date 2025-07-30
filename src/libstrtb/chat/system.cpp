@@ -7,7 +7,7 @@ using namespace strtb::chat;
 
 chat::system *chat::main = nullptr;
 
-system::system() : log("Chat System") {
+system::system() : log("Chat System", false) {
     // Start incoming message thread
     this->incoming = new queue();
     this->incoming->block_deletion();

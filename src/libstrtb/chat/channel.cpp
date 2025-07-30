@@ -6,7 +6,7 @@ using namespace strtb::chat;
 channel::channel(std::string provider_id, std::string provider_name,
                          std::string channel_id, std::string channel_name,
                          class queue *queue, common::deregistration_interface<channel*> *deregister)
-    : log("Chat Channel: " + provider_id + ":" + channel_id), queue(queue), deregister(deregister),
+    : log("Chat Channel: " + provider_id + ":" + channel_id, false), queue(queue), deregister(deregister),
     provider_id(provider_id), provider_name(provider_name), channel_id(channel_id), channel_name(channel_name) {}
 
 std::string channel::get_id() {
