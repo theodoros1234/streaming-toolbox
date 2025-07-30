@@ -104,7 +104,7 @@ message_part::message_part(std::filesystem::path value) {
     type = PATH;
 }
 
-void message_part::put_into_stream(std::ostream *stream) {
+void message_part::put_into_stream(std::ostream *stream) const {
     switch (type) {
     case STR:
         *stream << v_str;
@@ -146,7 +146,7 @@ source::source(std::string name) {
     this->name = name;
 }
 
-void source::put(level type, std::vector<message_part> message) {
+void source::put(level type, const std::vector<message_part>& message) {
     // Skip if no outputs accept this level
     if (type < min_level)
         return;
@@ -182,5 +182,11 @@ void source::put(level type, std::vector<message_part> message) {
         }
     }
 }
+
+void source::debug(const std::vector<message_part>& message) {put(DEBUG, message);}
+void source::info(const std::vector<message_part>& message) {put(INFO, message);}
+void source::warning(const std::vector<message_part>& message) {put(WARNING, message);}
+void source::error(const std::vector<message_part>& message) {put(ERROR, message);}
+void source::critical(const std::vector<message_part>& message) {put(CRITICAL, message);}
 
 }

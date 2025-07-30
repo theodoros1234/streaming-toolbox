@@ -45,7 +45,7 @@ public:
     message_part(std::filesystem::path value);
 protected:
     friend class source;
-    void put_into_stream(std::ostream *stream);
+    void put_into_stream(std::ostream *stream) const;
 };
 
 class source {
@@ -53,7 +53,12 @@ private:
     std::string name;
 public:
     source(std::string name);
-    void put(level type, std::vector<message_part> message);
+    void put(level type, const std::vector<message_part>& message);
+    void debug(const std::vector<message_part>& message);
+    void info(const std::vector<message_part>& message);
+    void warning(const std::vector<message_part>& message);
+    void error(const std::vector<message_part>& message);
+    void critical(const std::vector<message_part>& message);
 };
 
 }
