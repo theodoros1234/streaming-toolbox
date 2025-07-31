@@ -22,18 +22,20 @@ typedef struct event_holder {
 class event_listener {
 private:
     std::set<uint64_t> _subs;
-    bool _active = true;
+    bool _active = true, _post_first_sub = false;
 
 protected:
     friend system;
     std::mutex _lock;
-    const std::string _name;
+    std::string _name;
     std::condition_variable _cv;
     std::deque<event_holder> _queue;
 
 public:
+    event_listener() = default;
     event_listener(const std::string& name);
     ~event_listener();
+    void set_name(const std::string& name);
     uint64_t subscribe(const item_path& event_source, const json::value* param = nullptr);
     void unsubscribe(uint64_t subscription_id);
     void shutdown();

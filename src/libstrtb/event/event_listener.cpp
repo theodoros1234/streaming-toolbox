@@ -14,7 +14,16 @@ event_listener::~event_listener() {
     shutdown();
 }
 
+void event_listener::set_name(const std::string& name) {
+    if (_post_first_sub)
+        throw event_exception("event listener can only set its name before subscribing");
+
+    _name = name;
+}
+
 uint64_t event_listener::subscribe(const item_path& event_source, const json::value *param) {
+    _post_first_sub = true;
+
     uint64_t new_sub = system_ptr->event_listener_subscribe(*this, event_source, param);
 
     try {
