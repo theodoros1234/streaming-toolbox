@@ -76,6 +76,7 @@ struct param_definition {
     ~param_definition();
     param_definition& operator=(const param_definition& from);
     param_definition& operator=(param_definition&& from);
+    void set(const std::string& name, const std::string& description, json::val_type type, bool required);
     void array_define(json::val_type type);
     void array_clear_definition();
     void object_add_definition(const std::string& name, const std::string& description, json::val_type type, bool required);
@@ -83,14 +84,12 @@ struct param_definition {
 };
 
 struct example_definition {
-    json::value_object params, returns;
+    json::holder params, returns;
 
     example_definition() = default;
     example_definition(const example_definition& other);
     example_definition(example_definition&& other);
-    example_definition(const json::value_object* params, const json::value_object* returns);
-    example_definition(const json::value_object& params, const json::value_object& returns);
-    example_definition(json::value_object&& params, json::value_object&& returns);
+    example_definition(const json::value* params, const json::value* returns);
     example_definition& operator=(const example_definition& other);
     example_definition& operator=(example_definition&& other);
 };
@@ -118,7 +117,8 @@ struct item_info {
     uint64_t provider_id = 0;
     item_type type = ITEM_UNDEFINED;
     std::string display_name, description;
-    std::vector<param_definition> params, returns;
+    std::vector<param_definition> params;
+    param_definition returns;
     std::vector<example_definition> examples;
 
     item_info() = default;

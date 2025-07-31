@@ -153,15 +153,22 @@ void event_viewer::show_info() {
             text.append("<h2>Parameters</h2>");
             list_params(text, info.params);
 
-            text.append("<h2>Returns</h2>");
-            list_params(text, info.returns);
+            text.append("<h2>Returns</h2><ul>");
+            list_param(text, info.returns);
 
-            text.append("<h2>Examples</h2> <ul>");
+            text.append("</ul><h2>Examples</h2> <ul>");
             for (auto& i : info.examples) {
                 text.append("<li><b>Parameters:</b><pre><code>");
-                text.append(QString::fromStdString(i.params.write_to_string(2)).toHtmlEscaped());
+                if (i.params.empty())
+                    text.append("no parameters are specified");
+                else
+                    text.append(QString::fromStdString(i.params.value()->write_to_string(2)).toHtmlEscaped());
+
                 text.append("</code></pre><br><b>Returned data:</b><pre><code>");
-                text.append(QString::fromStdString(i.returns.write_to_string(2)).toHtmlEscaped());
+                if (i.returns.empty())
+                    text.append("nothing is returned");
+                else
+                    text.append(QString::fromStdString(i.returns.value()->write_to_string(2)).toHtmlEscaped());
                 text.append("</code></pre></li>");
             }
             text.append("</ul>");

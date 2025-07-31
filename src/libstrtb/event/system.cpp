@@ -304,7 +304,7 @@ void system::res_cnt::make_item(item_type type,
                                 const std::string& description,
                                 uint64_t provider_id,
                                 const std::vector<param_definition>& params,
-                                const std::vector<param_definition>& returns,
+                                const param_definition &returns,
                                 const std::vector<example_definition>& examples) {
     if (ptr != nullptr)
         throw internal_error("resource container already holding an item", log);

@@ -13,9 +13,14 @@ public:
     holder(const holder& o);
     holder(holder&& o);
     holder(json::value* v);
+    holder(const value_auto& v);
     ~holder();
     holder& operator=(json::value* other);
+    holder& operator=(const json::holder& other);
+    holder& operator=(json::holder&& other);
+    holder& operator=(const value_auto& v);
     void set(json::value* v);
+    void clear();
     val_type type() const;
     bool empty() const;
     class value* detach(bool ignore_undefined = false);

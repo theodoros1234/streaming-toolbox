@@ -57,8 +57,7 @@ private:
     };
 
     struct res_item_event_src : public res_item {
-        param_definition param;
-        std::vector<param_definition> returns;
+        param_definition param, returns;
         std::vector<example_definition> examples;
 
         // Subscribed event listeners, based on parameter type
@@ -74,7 +73,8 @@ private:
     };
 
     struct res_item_action_sink : public res_item {
-        std::vector<param_definition> params, returns;
+        std::vector<param_definition> params;
+        param_definition returns;
         std::vector<example_definition> examples;
         // TODO: list of action handlers (listeners?)
     };
@@ -99,7 +99,7 @@ private:
                        const std::string& description,
                        uint64_t provider_id,
                        const std::vector<param_definition>& params,
-                       const std::vector<param_definition>& returns,
+                       const param_definition& returns,
                        const std::vector<example_definition>& examples);
         item_type type() const;
         res_item_category* as_category() const;

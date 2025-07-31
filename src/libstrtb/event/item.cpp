@@ -230,6 +230,16 @@ param_definition& param_definition::operator=(param_definition&& from) {
     return *this;
 }
 
+void param_definition::set(const std::string& name,
+                           const std::string& description,
+                           json::val_type type,
+                           bool required) {
+    this->name = name;
+    this->description = description;
+    this->type = type;
+    this->required = required;
+}
+
 void param_definition::array_define(json::val_type type) {
     if (this->type != json::VAL_ARRAY)
         throw wrong_type("not an array");
@@ -278,18 +288,12 @@ example_definition::example_definition(example_definition&& other) {
     returns = std::move(other.returns);
 }
 
-example_definition::example_definition(const json::value_object* params, const json::value_object* returns) {
+example_definition::example_definition(const json::value* params, const json::value *returns) {
     if (params == nullptr || returns == nullptr)
-        throw std::invalid_argument("parmas and returns can't be null");
-    this->params = *params;
-    this->returns = *returns;
+        throw std::invalid_argument("params and returns can't be null");
+    this->params = params;
+    this->returns = returns;
 }
-
-example_definition::example_definition(const json::value_object& params, const json::value_object& returns) :
-    params(params), returns(returns) {}
-
-example_definition::example_definition(json::value_object&& params, json::value_object&& returns) :
-    params(params), returns(returns) {}
 
 example_definition& example_definition::operator=(const example_definition& other) {
     try {
@@ -381,17 +385,7 @@ item_info::item_info(const json::value_object* from) {
     if (type == ITEM_EVENT_SRC || type == ITEM_ACTION_SINK) {
         // returns
         try {
-            const json::value_array* return_list = json::cast_array(&from->at("returns"));
-            for (json::value* i : *return_list) {    // TODO: make i const after adding const JSON cast functions
-                // Parse all returns
-                try {
-                    returns.emplace_back(json::cast_object(i));
-                } catch (parsing_error& e) {
-                    throw parsing_error(std::string("error parsing a value inside \"returns\": ") + e.what());
-                } catch (json::wrong_type&) {
-                    throw parsing_error("\"returns\" must only contain objects");
-                }
-            }
+            returns = json::cast_object(&from->at("returns"));
         } catch (std::out_of_range&) {  // ignored, maybe it doesn't return anything
         } catch (json::wrong_type&) {
             throw parsing_error("\"returns\" must be an array");
@@ -401,13 +395,13 @@ item_info::item_info(const json::value_object* from) {
         try {
             const json::value_array* example_list = json::cast_array(&from->at("examples"));
             for (json::value* i : *example_list) {  // TODO: make i const after adding const JSON cast functions
-                const json::value_object *i_params = nullptr, *i_returns = nullptr;
+                const json::value *i_params = nullptr, *i_returns = nullptr;
 
                 try {
-                    i_params = json::cast_object(&json::cast_object(i)->at("params"));
-                    i_returns = json::cast_object(&json::cast_object(i)->at("returns"));
+                    i_params = &json::cast_object(i)->at("params");
+                    i_returns = &json::cast_object(i)->at("returns");
                 } catch (json::wrong_type&) {
-                    throw parsing_error("invalid example: must be an object that contains values \"params\" and \"returns\" as objects");
+                    throw parsing_error("invalid example: must be an object");
                 } catch (std::out_of_range&) {
                     throw parsing_error("invalid example: must contain \"params\" and \"returns\"");
                 }
