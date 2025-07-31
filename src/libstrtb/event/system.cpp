@@ -275,6 +275,54 @@ bool system::res_item_event_src::has_subs() {
              subs_string.empty());
 }
 
+static void _verify_params(const param_definition& param) {
+    switch (param.type) {
+    case json::VAL_ARRAY: {
+        try {
+            if (param.array_definition != nullptr)
+                _verify_params(*param.array_definition);
+        } catch (bad_definition& e) {
+            throw bad_definition("in " + common::string_escape(param.name) + ": " + e.what());
+        }
+    }
+    break;
+
+    case json::VAL_OBJECT: {
+        std::set<std::string> names;
+
+        for (const param_definition* subparam : param.object_definition)
+            if (!names.insert(subparam->name).second)
+                throw bad_definition("in " + common::string_escape(param.name) +
+                                     ": duplicate parameter " + common::string_escape(subparam->name));
+        names.clear();
+
+        for (const param_definition* subparam : param.object_definition) {
+            try {
+                _verify_params(*subparam);
+            } catch (bad_definition& e) {
+                throw bad_definition("in " + common::string_escape(param.name) + ": " + e.what());
+            }
+        }
+    }
+    break;
+
+    default:    // shuts up clangd
+        break;
+    }
+}
+
+static void _verify_params(const std::vector<param_definition>& params) {
+    std::set<std::string> names;
+
+    for (const param_definition& subparam : params)
+        if (!names.insert(subparam.name).second)
+            throw bad_definition("duplicate parameter " + common::string_escape(subparam.name));
+    names.clear();
+
+    for (const param_definition& subparam : params)
+        _verify_params(subparam);
+}
+
 system::res_cnt::res_cnt(res_item* ptr) : ptr(ptr) {}
 
 void system::res_cnt::make_item(item_type type,
@@ -323,7 +371,9 @@ void system::res_cnt::make_item(item_type type,
                 default:
                     throw wrong_type("event sources can only take a boolean, an integer or a string as a parameter");
                 }
+                _verify_params(params.back());
             }
+            _verify_params(returns);
 
             res_item_event_src* ptr_e = new res_item_event_src();
             ptr = ptr_e;
@@ -335,6 +385,9 @@ void system::res_cnt::make_item(item_type type,
         break;
 
         case ITEM_ACTION_SINK: {
+            _verify_params(params);
+            _verify_params(returns);
+
             res_item_action_sink* ptr_a = new res_item_action_sink();
             ptr = ptr_a;
             ptr_a->params = params;
