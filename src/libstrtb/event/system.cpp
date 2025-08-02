@@ -1188,3 +1188,26 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
         for (const auto sub : event_src->subs_none)
             sub->listener.push_event(sub->path.sub_rid, event);
 }
+
+void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const json::value* filter) {
+    if (filter == nullptr)
+        return provider_push_event(provider_id, target, event);
+
+    switch (filter->type()) {
+    case json::VAL_NULL:
+        return provider_push_event(provider_id, target, event);
+
+    case json::VAL_BOOL:
+        return provider_push_event(provider_id, target, event, json::cast_bool(filter)->value());
+
+    case json::VAL_INT:
+        return provider_push_event(provider_id, target, event, json::cast_int(filter)->value());
+
+    case json::VAL_STRING:
+        return provider_push_event(provider_id, target, event, json::cast_string(filter)->value());
+
+    default:
+        throw wrong_type("event sources only take a parameter of type bool, int or string, "
+                         "or null if its unspecified or optional");
+    }
+}

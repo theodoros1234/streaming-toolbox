@@ -137,3 +137,12 @@ void provider::push_event(uint64_t target, const json::value* event, unsigned lo
 void provider::push_event(uint64_t target, const json::value* event, unsigned long long filter) {
     push_event(target, event, (long long) filter);
 }
+
+void provider::push_event(uint64_t target, const json::value* event, const char* filter) {
+    push_event(target, event, std::string(filter));
+}
+
+void provider::push_event(uint64_t target, const json::value* event, const json::value* filter) {
+    _setup_check();
+    system_ptr->provider_push_event(_id, target, event, filter);
+}

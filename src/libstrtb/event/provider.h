@@ -39,7 +39,9 @@ public:
     void push_event(uint64_t target, const json::value* event, unsigned int filter);
     void push_event(uint64_t target, const json::value* event, unsigned long filter);
     void push_event(uint64_t target, const json::value* event, unsigned long long filter);
+    void push_event(uint64_t target, const json::value* event, const char* filter);
     void push_event(uint64_t target, const json::value* event, const std::string& filter);
+    void push_event(uint64_t target, const json::value* event, const json::value* filter);
 };
 
 }

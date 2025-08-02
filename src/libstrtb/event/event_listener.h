@@ -37,7 +37,17 @@ public:
     event_listener(const std::string& name);
     ~event_listener();
     void set_name(const std::string& name);
-    uint64_t subscribe(const item_path& event_source, const json::value* param = nullptr);
+    uint64_t subscribe(const item_path& event_source);
+    uint64_t subscribe(const item_path& event_source, bool param);
+    uint64_t subscribe(const item_path& event_source, int param);
+    uint64_t subscribe(const item_path& event_source, long param);
+    uint64_t subscribe(const item_path& event_source, long long param);
+    uint64_t subscribe(const item_path& event_source, unsigned int param);
+    uint64_t subscribe(const item_path& event_source, unsigned long param);
+    uint64_t subscribe(const item_path& event_source, unsigned long long param);
+    uint64_t subscribe(const item_path& event_source, const char* param);
+    uint64_t subscribe(const item_path& event_source, const std::string& param);
+    uint64_t subscribe(const item_path& event_source, const json::value* param);
     void unsubscribe(uint64_t subscription_id);
     void shutdown();
     void start();

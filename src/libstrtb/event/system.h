@@ -159,10 +159,9 @@ protected:
     void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, bool filter);
     void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, long long filter);
     void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const std::string& filter);
+    void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const json::value* filter);
 
-    uint64_t event_listener_subscribe(event_listener& listener,
-                                      const item_path& event_source,
-                                      const json::value* param);
+    uint64_t event_listener_subscribe(event_listener& listener, const item_path& event_source, const json::value* param);
     void event_listener_unsubscribe(uint64_t subscription_id);
     void event_listener_unsubscribe(const std::set<uint64_t>& subscription_ids);
 

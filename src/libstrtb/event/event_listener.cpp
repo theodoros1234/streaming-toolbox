@@ -45,6 +45,55 @@ uint64_t event_listener::subscribe(const item_path& event_source, const json::va
     return new_sub;
 }
 
+uint64_t event_listener::subscribe(const item_path& event_source) {
+    return subscribe(event_source, (const json::value*) nullptr);
+}
+
+uint64_t event_listener::subscribe(const item_path& event_source, bool param) {
+    json::value_bool p(param);
+    return subscribe(event_source, &p);
+}
+
+uint64_t event_listener::subscribe(const item_path& event_source, int param) {
+    json::value_int p(param);
+    return subscribe(event_source, &p);
+}
+
+uint64_t event_listener::subscribe(const item_path& event_source, long param) {
+    json::value_int p(param);
+    return subscribe(event_source, &p);
+}
+
+uint64_t event_listener::subscribe(const item_path& event_source, long long param) {
+    json::value_int p(param);
+    return subscribe(event_source, &p);
+}
+
+uint64_t event_listener::subscribe(const item_path& event_source, unsigned int param) {
+    json::value_int p(param);
+    return subscribe(event_source, &p);
+}
+
+uint64_t event_listener::subscribe(const item_path& event_source, unsigned long param) {
+    json::value_int p(param);
+    return subscribe(event_source, &p);
+}
+
+uint64_t event_listener::subscribe(const item_path& event_source, unsigned long long param) {
+    json::value_int p(param);
+    return subscribe(event_source, &p);
+}
+
+uint64_t event_listener::subscribe(const item_path& event_source, const char* param) {
+    json::value_string p(param);
+    return subscribe(event_source, &p);
+}
+
+uint64_t event_listener::subscribe(const item_path& event_source, const std::string& param) {
+    json::value_string p(param);
+    return subscribe(event_source, &p);
+}
+
 void event_listener::unsubscribe(uint64_t subscription_id) {
     {
         std::lock_guard<std::mutex> guard(_lock);
