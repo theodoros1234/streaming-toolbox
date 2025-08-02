@@ -28,8 +28,18 @@ public:
     uint64_t item_get_id(const item_path& target);
     void category_clear(uint64_t target_location);
     void category_clear(const item_path& target_location);
+    void category_clear_root();
     void import(uint64_t target_location, const json::value_object* entries);
     void import(const item_path& target_location, const json::value_object* entries);
+    void push_event(uint64_t target, const json::value* event);
+    void push_event(uint64_t target, const json::value* event, bool filter);
+    void push_event(uint64_t target, const json::value* event, int filter);
+    void push_event(uint64_t target, const json::value* event, long filter);
+    void push_event(uint64_t target, const json::value* event, long long filter);
+    void push_event(uint64_t target, const json::value* event, unsigned int filter);
+    void push_event(uint64_t target, const json::value* event, unsigned long filter);
+    void push_event(uint64_t target, const json::value* event, unsigned long long filter);
+    void push_event(uint64_t target, const json::value* event, const std::string& filter);
 };
 
 }

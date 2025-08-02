@@ -133,7 +133,7 @@ private:
                           const json::value_object* entries);
     void _event_listener_unsubscribe(uint64_t subscription_id);
     void _info(uint64_t resource_id, item_info& item);
-    std::vector<item_listing> _list(res_item_category* location);
+    std::vector<item_listing> _list(const res_item_category *location);
 
 protected:
     friend provider;
@@ -155,6 +155,10 @@ protected:
     void provider_category_clear(uint64_t provider_id, const item_path& target_location);
     void provider_import(uint64_t provider_id, uint64_t target_location, const json::value_object* entries);
     void provider_import(uint64_t provider_id, const item_path& target_location, const json::value_object* entries);
+    void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event);
+    void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, bool filter);
+    void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, long long filter);
+    void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const std::string& filter);
 
     uint64_t event_listener_subscribe(event_listener& listener,
                                       const item_path& event_source,

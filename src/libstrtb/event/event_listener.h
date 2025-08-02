@@ -21,15 +21,16 @@ typedef struct event_holder {
 
 class event_listener {
 private:
+    std::mutex _lock;
     std::set<uint64_t> _subs;
-    bool _active = true, _post_first_sub = false;
+    bool _active = false, _post_first_sub = false;
+    std::condition_variable _cv;
+    std::deque<event_holder> _queue;
 
 protected:
     friend system;
-    std::mutex _lock;
     std::string _name;
-    std::condition_variable _cv;
-    std::deque<event_holder> _queue;
+    virtual void push_event(uint64_t sub_id, const json::value* event);
 
 public:
     event_listener() = default;
@@ -39,8 +40,7 @@ public:
     uint64_t subscribe(const item_path& event_source, const json::value* param = nullptr);
     void unsubscribe(uint64_t subscription_id);
     void shutdown();
-    void reset();
-    size_t discard();
+    void start();
     event_holder listen();
     void listen(std::vector<event_holder>& destination);
 

@@ -496,7 +496,7 @@ uint64_t system::_follow_path(uint64_t start, const item_path& path) {
 
     for (const std::string& next_piece : path) {
         try {
-            res_item_category* cat = _items.at(current_pos).as_category();
+            const res_item_category* cat = _items.at(current_pos).as_category();
             try {
                 current_pos = cat->list.at(next_piece);
             } catch (std::out_of_range&) {
@@ -820,7 +820,7 @@ void system::provider_category_clear(uint64_t provider_id, const item_path& targ
 }
 
 void system::_info(uint64_t resource_id, item_info& item) {
-    auto& ref = _items.at(resource_id);
+    const auto& ref = _items.at(resource_id);
     if (ref.type() == ITEM_UNDEFINED)
         throw internal_error("resource container has undefined type", log);
     item.provider_id = ref.ptr->provider_id;
@@ -830,7 +830,7 @@ void system::_info(uint64_t resource_id, item_info& item) {
 
     switch (ref.type()) {
     case ITEM_EVENT_SRC: {
-        res_item_event_src* p = ref.as_event_src();
+        const res_item_event_src* p = ref.as_event_src();
         if (p->param.type != json::VAL_UNDEFINED)
             item.params.push_back(p->param);
         item.returns = p->returns;
@@ -839,7 +839,7 @@ void system::_info(uint64_t resource_id, item_info& item) {
     break;
 
     case ITEM_ACTION_SINK: {
-        res_item_action_sink* p = ref.as_action_sink();
+        const res_item_action_sink* p = ref.as_action_sink();
         item.params = p->params;
         item.returns = p->returns;
         item.examples = p->examples;
@@ -879,7 +879,7 @@ item_listing system::info(const item_path& path) {
     }
 }
 
-std::vector<item_listing> system::_list(res_item_category* location) {
+std::vector<item_listing> system::_list(const res_item_category* location) {
     std::vector<item_listing> items;
     items.reserve(location->list.size());
 
@@ -1056,7 +1056,7 @@ void system::event_listener_unsubscribe(const std::set<uint64_t>& subscription_i
 
 std::vector<item_info_path_follower> system::info_path_followers(uint64_t resource_id) {
     std::lock_guard<std::mutex> guard(_lock);
-    res_item_category* category = _get_category(resource_id);
+    const res_item_category* category = _get_category(resource_id);
 
     std::vector<item_info_path_follower> info_returned;
 
@@ -1079,7 +1079,7 @@ std::vector<item_info_path_follower> system::info_path_followers(uint64_t resour
 
 std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
     std::lock_guard<std::mutex> guard(_lock);
-    res_item_event_src* event_src = _get_event_src(resource_id);
+    const res_item_event_src* event_src = _get_event_src(resource_id);
 
     std::vector<item_info_event_sub> info_returned;
 
@@ -1109,4 +1109,82 @@ std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
             add(event_sub, info_returned);
 
     return info_returned;
+}
+
+void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event) {
+    std::lock_guard<std::mutex> guard(_lock);
+    const res_item_event_src* event_src = _get_event_src(target);
+
+    if (event_src->provider_id != provider_id)
+        throw out_of_scope("target does not belong to this provider");
+
+    if (event_src->param.required)
+        throw wrong_type("target requires a parameter by subscribers, "
+                         "a filter is required to target specific subscriber groups");
+
+    for (const auto sub : event_src->subs_none)
+        sub->listener.push_event(sub->path.sub_rid, event);
+}
+
+void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, bool filter) {
+    std::lock_guard<std::mutex> guard(_lock);
+    const res_item_event_src* event_src = _get_event_src(target);
+
+    if (event_src->provider_id != provider_id)
+        throw out_of_scope("target does not belong to this provider");
+
+    if (event_src->param.type != json::VAL_BOOL)
+        throw wrong_type("target takes a " + json::type_to_string(event_src->param.type) +
+                         " parameter by subscribers, but a bool filter was given");
+
+    for (const auto sub : event_src->subs_bool[filter])
+        sub->listener.push_event(sub->path.sub_rid, event);
+
+    if (!event_src->param.required)
+        for (const auto sub : event_src->subs_none)
+            sub->listener.push_event(sub->path.sub_rid, event);
+}
+
+void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, long long filter) {
+    std::lock_guard<std::mutex> guard(_lock);
+    const res_item_event_src* event_src = _get_event_src(target);
+
+    if (event_src->provider_id != provider_id)
+        throw out_of_scope("target does not belong to this provider");
+
+    if (event_src->param.type != json::VAL_INT)
+        throw wrong_type("target takes a " + json::type_to_string(event_src->param.type) +
+                         " parameter by subscribers, but an int filter was given");
+
+    auto set_itr = event_src->subs_int.find(filter);
+
+    if (set_itr != event_src->subs_int.end())
+        for (const auto sub : set_itr->second)
+            sub->listener.push_event(sub->path.sub_rid, event);
+
+    if (!event_src->param.required)
+        for (const auto sub : event_src->subs_none)
+            sub->listener.push_event(sub->path.sub_rid, event);
+}
+
+void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const std::string& filter) {
+    std::lock_guard<std::mutex> guard(_lock);
+    const res_item_event_src* event_src = _get_event_src(target);
+
+    if (event_src->provider_id != provider_id)
+        throw out_of_scope("target does not belong to this provider");
+
+    if (event_src->param.type != json::VAL_STRING)
+        throw wrong_type("target takes a " + json::type_to_string(event_src->param.type) +
+                         " parameter by subscribers, but a string filter was given");
+
+    auto set_itr = event_src->subs_string.find(filter);
+
+    if (set_itr != event_src->subs_string.end())
+        for (const auto sub : set_itr->second)
+            sub->listener.push_event(sub->path.sub_rid, event);
+
+    if (!event_src->param.required)
+        for (const auto sub : event_src->subs_none)
+            sub->listener.push_event(sub->path.sub_rid, event);
 }

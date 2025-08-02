@@ -2,6 +2,7 @@
 #include "system.h"
 #include "item.h"
 #include "../logging/logging.h"
+#include "../common/strescape.h"
 #include <cassert>
 
 using namespace strtb::event;
@@ -11,6 +12,9 @@ static strtb::logging::source log("Event Listener", false);
 event_listener::event_listener(const std::string& name) : _name(name) {}
 
 event_listener::~event_listener() {
+    if (_active)
+        log.warning({"Destroying listener ", common::string_escape(_name), " while it's still active"});
+
     shutdown();
 }
 
@@ -70,32 +74,10 @@ void event_listener::shutdown() {
     system_ptr->event_listener_unsubscribe(old_subs);
 }
 
-void event_listener::reset() {
-    std::set<uint64_t> old_subs;
-
-    {
-        std::lock_guard<std::mutex> guard(_lock);
-
-        // Get subs so we can cancel them
-        old_subs = std::move(_subs);
-        _subs.clear();
-
-        // Discard any unprocessed events
-        _queue.clear();
-
-        // Event listener can now be listened to again
-        _active = true;
-    }
-
-    // Cancel old subs
-    system_ptr->event_listener_unsubscribe(old_subs);
-}
-
-size_t event_listener::discard() {
+void event_listener::start() {
     std::lock_guard<std::mutex> guard(_lock);
-    size_t count = _queue.size();
     _queue.clear();
-    return count;
+    _active = true;
 }
 
 event_holder event_listener::listen() {
@@ -133,4 +115,18 @@ void event_listener::listen(std::vector<event_holder>& destination) {
     for (auto& event : _queue)
         destination.emplace_back(std::move(event));
     _queue.clear();
+}
+
+void event_listener::push_event(uint64_t sub_id, const json::value* event) {
+    std::lock_guard<std::mutex> guard(_lock);
+
+    if (!_active)
+        return;
+
+    event_holder new_event = {
+        .sub_id = sub_id,
+        .event = json::holder(event)
+    };
+    _queue.push_back(std::move(new_event));
+    _cv.notify_one();
 }
