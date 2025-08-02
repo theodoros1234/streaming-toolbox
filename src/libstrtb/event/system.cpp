@@ -1115,6 +1115,67 @@ std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
     return info_returned;
 }
 
+static void param_type_check(const json::value* param, const param_definition* def) {
+    if (!((param->type() == def->type) ||                           // type is correct
+          (param->type() == json::VAL_NULL && !def->required) ||    // type is null when it's not required
+          (def->type == json::VAL_UNDEFINED)))                      // required type not defined
+        throw wrong_type("type does not match the definition");
+
+    if (param->type() == json::VAL_ARRAY &&
+        def->array_definition != nullptr &&
+        def->array_definition->type != json::VAL_UNDEFINED) {
+        const json::value_array* param_arr = json::cast_array(param);
+        for (size_t i = 0; i < param_arr->size(); i++) {
+            try {
+                param_type_check(&param_arr->at(i), def->array_definition);
+            } catch (wrong_type& e) {
+                throw wrong_type("at " + std::to_string(i) + ": " + e.what());
+            }
+        }
+    }
+
+    if (param->type() == json::VAL_OBJECT) {
+        // NOTE: extra keys in param won't cause an error
+        const json::value_object* param_obj = json::cast_object(param);
+        for (const param_definition* subdef : def->object_definition) {
+            if (!subdef->required && subdef->type == json::VAL_UNDEFINED)
+                continue;
+
+            try {
+                param_type_check(&param_obj->at(subdef->name), subdef);
+            } catch (std::out_of_range&) {
+                if (subdef->required)
+                    throw wrong_type("missing required key " + common::string_escape(subdef->name));
+            } catch (wrong_type& e) {
+                throw wrong_type("at " + common::string_escape(subdef->name) + ": " + e.what());
+            }
+        }
+    }
+}
+
+static void param_type_check(const json::value* param, const std::vector<param_definition>& defs) {
+    if (param == nullptr)
+        throw wrong_type("param cannot be nullptr");
+    if (param->type() != json::VAL_OBJECT)
+        throw wrong_type("must be an object");
+
+    // NOTE: extra keys in param won't cause an error
+    const json::value_object* param_obj = json::cast_object(param);
+    for (const param_definition& subdef : defs) {
+        if (!subdef.required && subdef.type == json::VAL_UNDEFINED)
+            continue;
+
+        try {
+            param_type_check(&param_obj->at(subdef.name), &subdef);
+        } catch (std::out_of_range&) {
+            if (subdef.required)
+                throw wrong_type("missing required key " + subdef.name);
+        } catch (wrong_type& e) {
+            throw wrong_type("at " + common::string_escape(subdef.name) + ": " + e.what());
+        }
+    }
+}
+
 void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event) {
     std::lock_guard<std::mutex> guard(_lock);
     const res_item_event_src* event_src = _get_event_src(target);
@@ -1125,6 +1186,14 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event_src->param.required)
         throw wrong_type("target requires a parameter by subscribers, "
                          "a filter is required to target specific subscriber groups");
+
+    if (event == nullptr)
+        throw wrong_type("event cannot be a nullptr");
+    try {
+        param_type_check(event, &event_src->returns);
+    } catch (wrong_type& e) {
+        throw wrong_type(std::string("invalid event: ") + e.what());
+    }
 
     for (const auto sub : event_src->subs_none)
         sub->listener.push_event(sub->path.sub_rid, event);
@@ -1140,6 +1209,14 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event_src->param.type != json::VAL_BOOL)
         throw wrong_type("target takes a " + json::type_to_string(event_src->param.type) +
                          " parameter by subscribers, but a bool filter was given");
+
+    if (event == nullptr)
+        throw wrong_type("event cannot be a nullptr");
+    try {
+        param_type_check(event, &event_src->returns);
+    } catch (wrong_type& e) {
+        throw wrong_type(std::string("invalid event: ") + e.what());
+    }
 
     for (const auto sub : event_src->subs_bool[filter])
         sub->listener.push_event(sub->path.sub_rid, event);
@@ -1159,6 +1236,14 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event_src->param.type != json::VAL_INT)
         throw wrong_type("target takes a " + json::type_to_string(event_src->param.type) +
                          " parameter by subscribers, but an int filter was given");
+
+    if (event == nullptr)
+        throw wrong_type("event cannot be a nullptr");
+    try {
+        param_type_check(event, &event_src->returns);
+    } catch (wrong_type& e) {
+        throw wrong_type(std::string("invalid event: ") + e.what());
+    }
 
     auto set_itr = event_src->subs_int.find(filter);
 
@@ -1181,6 +1266,14 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event_src->param.type != json::VAL_STRING)
         throw wrong_type("target takes a " + json::type_to_string(event_src->param.type) +
                          " parameter by subscribers, but a string filter was given");
+
+    if (event == nullptr)
+        throw wrong_type("event cannot be a nullptr");
+    try {
+        param_type_check(event, &event_src->returns);
+    } catch (wrong_type& e) {
+        throw wrong_type(std::string("invalid event: ") + e.what());
+    }
 
     auto set_itr = event_src->subs_string.find(filter);
 
