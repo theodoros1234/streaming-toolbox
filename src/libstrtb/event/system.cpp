@@ -985,10 +985,14 @@ uint64_t system::event_listener_subscribe(event_listener& listener,
         throw out_of_scope("cannot subscribe to root category");
 
     if (param &&
+        param->type() != json::VAL_NULL &&
         param->type() != json::VAL_BOOL &&
         param->type() != json::VAL_INT &&
         param->type() != json::VAL_STRING)
-        throw wrong_type("param must be a nullptr, or it must be of types bool, int or string");
+        throw wrong_type("param must be a nullptr, or it must be of types null, bool, int or string");
+
+    if (param && param->type() == json::VAL_NULL)
+        param = nullptr;
 
     uint64_t new_sub_id = _resid_new();
     std::unique_ptr<res_event_sub> new_sub(new res_event_sub(event_source, param, listener, new_sub_id));
