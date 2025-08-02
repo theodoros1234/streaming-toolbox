@@ -15,13 +15,25 @@ private:
     std::string _what;
 };
 
-value_null* cast_null(value* val, bool except = true);
-value_bool* cast_bool(value* val, bool except = true);
-value_int* cast_int(value* val, bool except = true);
-value_float* cast_float(value* val, bool except = true);
-value_string* cast_string(value* val, bool except = true);
-value_array* cast_array(value* val, bool except = true);
-value_object* cast_object(value* val, bool except = true);
+class nullptr_exception : public json_error {
+public:
+    const char* what() const noexcept;
+};
+
+value_null* cast_null(value* val);
+value_bool* cast_bool(value* val);
+value_int* cast_int(value* val);
+value_float* cast_float(value* val);
+value_string* cast_string(value* val);
+value_array* cast_array(value* val);
+value_object* cast_object(value* val);
+const value_null* cast_null(const value* val);
+const value_bool* cast_bool(const value* val);
+const value_int* cast_int(const value* val);
+const value_float* cast_float(const value* val);
+const value_string* cast_string(const value* val);
+const value_array* cast_array(const value* val);
+const value_object* cast_object(const value* val);
 
 }
 
