@@ -14,11 +14,13 @@ public:
     holder(holder&& o);
     holder(json::value* v);
     holder(const value_auto& v);
+    holder(val_type new_type);
     ~holder();
     holder& operator=(json::value* other);
     holder& operator=(const json::holder& other);
     holder& operator=(json::holder&& other);
     holder& operator=(const value_auto& v);
+    holder& operator=(val_type new_type);
     void set(json::value* v);
     void clear();
     val_type type() const;

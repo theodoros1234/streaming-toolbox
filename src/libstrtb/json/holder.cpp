@@ -21,6 +21,10 @@ holder::holder(const value_auto& v) {
         _v = new_auto(v);
 }
 
+holder::holder(val_type new_type) {
+    _v = new_default(new_type);
+}
+
 holder::~holder() {
     if (_v)
         delete _v;
@@ -64,6 +68,14 @@ holder& holder::operator=(const value_auto& v) {
     if (!v.is_ptr() || v.value_as_ptr() != nullptr)
         _v = new_auto(v);
 
+    return *this;
+}
+
+holder& holder::operator=(val_type new_type) {
+    if (_v)
+        delete _v;
+    _v = nullptr;
+    _v = new_default(new_type);
     return *this;
 }
 
