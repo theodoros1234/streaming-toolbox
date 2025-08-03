@@ -10,7 +10,6 @@
 namespace strtb::json {
 
 enum val_type {VAL_NULL, VAL_BOOL, VAL_INT, VAL_FLOAT, VAL_STRING, VAL_ARRAY, VAL_OBJECT, VAL_UNDEFINED};
-std::string val_type_str(val_type type);
 
 class json_error : public std::exception {};
 
