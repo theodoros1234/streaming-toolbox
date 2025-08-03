@@ -9,26 +9,93 @@ using namespace strtb::event;
 
 static strtb::logging::source log("Event Listener", false);
 
-event_listener::event_listener(const std::string& name) : _name(name) {}
+event_listener_base::event_listener_base(const std::string& name) : _name(name) {}
 
-event_listener::~event_listener() {
-    if (_active)
-        log.warning({"Destroying listener ", common::string_escape(_name), " while it's still active"});
-
-    shutdown();
-}
-
-void event_listener::set_name(const std::string& name) {
+void event_listener_base::set_name(const std::string& name) {
     if (_post_first_sub)
         throw event_exception("event listener can only set its name before subscribing");
 
     _name = name;
 }
 
-uint64_t event_listener::subscribe(const item_path& event_source, const json::value *param) {
+uint64_t event_listener_base::_system_subscribe(const item_path& event_source, const json::value* param) {
+    return system_ptr->event_listener_subscribe(*this, event_source, param);
+}
+
+void event_listener_base::_system_unsubscribe(uint64_t subscription_id) {
+    system_ptr->event_listener_unsubscribe(subscription_id);
+}
+
+void event_listener_base::_system_unsubscribe(const std::set<uint64_t>& subscription_ids) {
+    system_ptr->event_listener_unsubscribe(subscription_ids);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source) {
+    return _subscribe(event_source, (const json::value*) nullptr);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source, bool param) {
+    json::value_bool p(param);
+    return _subscribe(event_source, &p);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source, int param) {
+    json::value_int p(param);
+    return _subscribe(event_source, &p);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source, long param) {
+    json::value_int p(param);
+    return _subscribe(event_source, &p);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source, long long param) {
+    json::value_int p(param);
+    return _subscribe(event_source, &p);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source, unsigned int param) {
+    json::value_int p(param);
+    return _subscribe(event_source, &p);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source, unsigned long param) {
+    json::value_int p(param);
+    return _subscribe(event_source, &p);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source, unsigned long long param) {
+    json::value_int p(param);
+    return _subscribe(event_source, &p);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source, const char* param) {
+    json::value_string p(param);
+    return _subscribe(event_source, &p);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source, const std::string& param) {
+    json::value_string p(param);
+    return _subscribe(event_source, &p);
+}
+
+uint64_t event_listener_base::subscribe(const item_path& event_source, const json::value* param) {
+    return _subscribe(event_source, param);
+}
+
+event_listener_queued::~event_listener_queued() {
+    if (_active)
+        log.warning({"Destroying queued listener ", common::string_escape(_name), " while it's still active"});
+
+    shutdown();
+}
+
+event_listener_queued::event_listener_queued(const std::string& name) : event_listener_base(name) {}
+
+uint64_t event_listener_queued::_subscribe(const item_path& event_source, const json::value *param) {
     _post_first_sub = true;
 
-    uint64_t new_sub = system_ptr->event_listener_subscribe(*this, event_source, param);
+    uint64_t new_sub = _system_subscribe(event_source, param);
 
     try {
         std::lock_guard<std::mutex> guard(_lock);
@@ -38,73 +105,24 @@ uint64_t event_listener::subscribe(const item_path& event_source, const json::va
             throw internal_error("duplicate subscription resource id in event listener");
         }
     } catch (...) {
-        system_ptr->event_listener_unsubscribe(new_sub);
+        _system_unsubscribe(new_sub);
         throw;
     }
 
     return new_sub;
 }
 
-uint64_t event_listener::subscribe(const item_path& event_source) {
-    return subscribe(event_source, (const json::value*) nullptr);
-}
-
-uint64_t event_listener::subscribe(const item_path& event_source, bool param) {
-    json::value_bool p(param);
-    return subscribe(event_source, &p);
-}
-
-uint64_t event_listener::subscribe(const item_path& event_source, int param) {
-    json::value_int p(param);
-    return subscribe(event_source, &p);
-}
-
-uint64_t event_listener::subscribe(const item_path& event_source, long param) {
-    json::value_int p(param);
-    return subscribe(event_source, &p);
-}
-
-uint64_t event_listener::subscribe(const item_path& event_source, long long param) {
-    json::value_int p(param);
-    return subscribe(event_source, &p);
-}
-
-uint64_t event_listener::subscribe(const item_path& event_source, unsigned int param) {
-    json::value_int p(param);
-    return subscribe(event_source, &p);
-}
-
-uint64_t event_listener::subscribe(const item_path& event_source, unsigned long param) {
-    json::value_int p(param);
-    return subscribe(event_source, &p);
-}
-
-uint64_t event_listener::subscribe(const item_path& event_source, unsigned long long param) {
-    json::value_int p(param);
-    return subscribe(event_source, &p);
-}
-
-uint64_t event_listener::subscribe(const item_path& event_source, const char* param) {
-    json::value_string p(param);
-    return subscribe(event_source, &p);
-}
-
-uint64_t event_listener::subscribe(const item_path& event_source, const std::string& param) {
-    json::value_string p(param);
-    return subscribe(event_source, &p);
-}
-
-void event_listener::unsubscribe(uint64_t subscription_id) {
+void event_listener_queued::unsubscribe(uint64_t subscription_id) {
     {
         std::lock_guard<std::mutex> guard(_lock);
         if (_subs.erase(subscription_id) == 0)
             throw not_found("subscription doesn't exist or doesn't belong to this event listener");
     }
 
-    system_ptr->event_listener_unsubscribe(subscription_id);
+    _system_unsubscribe(subscription_id);
 }
 
-void event_listener::shutdown() {
+void event_listener_queued::shutdown() {
     std::set<uint64_t> old_subs;
 
     {
@@ -120,16 +138,16 @@ void event_listener::shutdown() {
     }
 
     // Cancel old subs
-    system_ptr->event_listener_unsubscribe(old_subs);
+    _system_unsubscribe(old_subs);
 }
 
-void event_listener::start() {
+void event_listener_queued::start() {
     std::lock_guard<std::mutex> guard(_lock);
     _queue.clear();
     _active = true;
 }
 
-event_holder event_listener::listen() {
+event_holder event_listener_queued::listen() {
     std::unique_lock<std::mutex> guard(_lock);
 
     // Wait for events or for shutdown
@@ -146,7 +164,7 @@ event_holder event_listener::listen() {
     return event;
 }
 
-void event_listener::listen(std::vector<event_holder>& destination) {
+void event_listener_queued::listen(std::vector<event_holder>& destination) {
     std::unique_lock<std::mutex> guard(_lock);
     destination.clear();
 
@@ -166,7 +184,7 @@ void event_listener::listen(std::vector<event_holder>& destination) {
     _queue.clear();
 }
 
-void event_listener::push_event(uint64_t sub_id, const json::value* event) {
+void event_listener_queued::push_event(uint64_t sub_id, const json::value* event) {
     std::lock_guard<std::mutex> guard(_lock);
 
     if (!_active)

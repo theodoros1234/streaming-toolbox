@@ -19,23 +19,23 @@ typedef struct event_holder {
     json::holder event;
 } event_holder;
 
-class event_listener {
-private:
-    std::mutex _lock;
-    std::set<uint64_t> _subs;
-    bool _active = false, _post_first_sub = false;
-    std::condition_variable _cv;
-    std::deque<event_holder> _queue;
-
+class event_listener_base {
 protected:
     friend system;
     std::string _name;
-    virtual void push_event(uint64_t sub_id, const json::value* event);
+    std::set<uint64_t> _subs;
+    bool _post_first_sub = false;
+    uint64_t _system_subscribe(const item_path& event_source, const json::value* param);
+    void _system_unsubscribe(uint64_t subscription_id);
+    void _system_unsubscribe(const std::set<uint64_t>& subscription_ids);
+
+    virtual void push_event(uint64_t sub_id, const json::value* event) = 0;
+    virtual uint64_t _subscribe(const item_path& event_source, const json::value* param) = 0;
 
 public:
-    event_listener() = default;
-    event_listener(const std::string& name);
-    ~event_listener();
+    event_listener_base() = default;
+    event_listener_base(const std::string& name);
+    virtual ~event_listener_base() = default;
     void set_name(const std::string& name);
     uint64_t subscribe(const item_path& event_source);
     uint64_t subscribe(const item_path& event_source, bool param);
@@ -48,6 +48,31 @@ public:
     uint64_t subscribe(const item_path& event_source, const char* param);
     uint64_t subscribe(const item_path& event_source, const std::string& param);
     uint64_t subscribe(const item_path& event_source, const json::value* param);
+
+    /* NOTE: subscribe() doesn't have a resource id variant, as the target event source
+     *       may be removed and re-added before or during a subscription (plugin reloads,
+     *       reconfiguration, etc.), which would change the resource id. The event system
+     *       handles these situations and internally keeps a resource id attached to the
+     *       subscription only while the event source is ready.
+     */
+};
+
+class event_listener_queued : public event_listener_base {
+private:
+    std::mutex _lock;
+    bool _active = false;
+    std::condition_variable _cv;
+    std::deque<event_holder> _queue;
+
+protected:
+    friend system;
+    virtual void push_event(uint64_t sub_id, const json::value* event);
+    virtual uint64_t _subscribe(const item_path& event_source, const json::value* param);
+
+public:
+    event_listener_queued() = default;
+    event_listener_queued(const std::string& name);
+    virtual ~event_listener_queued();
     void unsubscribe(uint64_t subscription_id);
     void shutdown();
     void start();

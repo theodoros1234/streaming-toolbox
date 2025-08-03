@@ -20,7 +20,7 @@ system::res_path_follower::res_path_follower(const std::string& owner_name,
 
 system::res_event_sub::res_event_sub(const item_path&path,
                                      const json::value* param,
-                                     event_listener& listener,
+                                     event_listener_base& listener,
                                      uint64_t rid) :
     path(listener._name, path, ITEM_EVENT_SRC, rid), listener(listener) {
     if (param)
@@ -976,7 +976,7 @@ void system::provider_import(uint64_t provider_id, const item_path& target_locat
     _provider_import(provider_id, location_rid, location, entries);
 }
 
-uint64_t system::event_listener_subscribe(event_listener& listener,
+uint64_t system::event_listener_subscribe(event_listener_base& listener,
                                           const item_path& event_source,
                                           const json::value* param) {
     std::lock_guard<std::mutex> guard(_lock);
@@ -989,7 +989,7 @@ uint64_t system::event_listener_subscribe(event_listener& listener,
         param->type() != json::VAL_BOOL &&
         param->type() != json::VAL_INT &&
         param->type() != json::VAL_STRING)
-        throw wrong_type("param must be a nullptr, or it must be of types null, bool, int or string");
+        throw wrong_type("param must be of types null, bool, int or string, or must be omitted");
 
     if (param && param->type() == json::VAL_NULL)
         param = nullptr;

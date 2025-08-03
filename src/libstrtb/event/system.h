@@ -33,9 +33,9 @@ private:
     struct res_event_sub {
         res_path_follower path;
         json::holder param;
-        event_listener& listener;
+        event_listener_base& listener;
 
-        res_event_sub(const item_path& path, const json::value* param, event_listener& listener, uint64_t rid);
+        res_event_sub(const item_path& path, const json::value* param, event_listener_base& listener, uint64_t rid);
     };
 
     struct res_item {
@@ -137,7 +137,7 @@ private:
 
 protected:
     friend provider;
-    friend event_listener;
+    friend event_listener_base;
 
     uint64_t provider_item_add(uint64_t provider_id,
                                uint64_t target_location,
@@ -161,7 +161,7 @@ protected:
     void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const std::string& filter);
     void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const json::value* filter);
 
-    uint64_t event_listener_subscribe(event_listener& listener, const item_path& event_source, const json::value* param);
+    uint64_t event_listener_subscribe(event_listener_base& listener, const item_path& event_source, const json::value* param);
     void event_listener_unsubscribe(uint64_t subscription_id);
     void event_listener_unsubscribe(const std::set<uint64_t>& subscription_ids);
 
