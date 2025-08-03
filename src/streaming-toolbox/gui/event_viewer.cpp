@@ -3,6 +3,7 @@
 #include "../libstrtb/event/system.h"
 #include <QGuiApplication>
 #include <QClipboard>
+#include "../libstrtb/logging/logging.h"
 
 using namespace strtb::gui;
 
@@ -12,11 +13,31 @@ event_viewer::event_viewer(QWidget *parent)
     ui->setupUi(this);
     QObject::connect(ui->button_refresh, &QPushButton::clicked, this, &event_viewer::populate);
     QObject::connect(ui->item_tree, &QTreeWidget::itemSelectionChanged, this, &event_viewer::show_info);
+    QObject::connect(ui->item_tree, &QTreeWidget::itemDoubleClicked, this, &event_viewer::launch_event_monitor);
     populate();
 }
 
 event_viewer::~event_viewer() {
     delete ui;
+}
+
+static const char* item_type_to_str(strtb::event::item_type type) {
+    switch (type) {
+    case strtb::event::ITEM_UNDEFINED:
+        return "Undefined";
+        break;
+    case strtb::event::ITEM_CATEGORY:
+        return "Category";
+        break;
+    case strtb::event::ITEM_EVENT_SRC:
+        return "Event Source";
+        break;
+    case strtb::event::ITEM_ACTION_SINK:
+        return "Action Sink";
+        break;
+    default:
+        return "Invalid Type";
+    }
 }
 
 void event_viewer::populate() {
@@ -30,6 +51,7 @@ void event_viewer::populate() {
     item->event_item_info.description = info.description;
     item->event_item_info.provider_id = info.provider_id;
     item->setText(0, QString::fromStdString(info.display_name));
+    item->setText(1, item_type_to_str(item->event_item_info.type));
     item->populate();
     ui->item_tree->expandItem(item);
 }
@@ -41,6 +63,7 @@ void event_viewer::tree_item::populate() {
         this->addChild(item);
         item->event_item_info = i;
         item->setText(0, QString::fromStdString(i.display_name));
+        item->setText(1, item_type_to_str(i.type));
         if (i.type == event::ITEM_CATEGORY)
             item->populate();
     }
@@ -81,25 +104,6 @@ static void list_params(QString& text, const std::vector<strtb::event::param_def
     for (auto& p : params)
         list_param(text, p);
     text.append("</ul>");
-}
-
-static const char* item_type_to_str(strtb::event::item_type type) {
-    switch (type) {
-    case strtb::event::ITEM_UNDEFINED:
-        return "Undefined";
-        break;
-    case strtb::event::ITEM_CATEGORY:
-        return "Category";
-        break;
-    case strtb::event::ITEM_EVENT_SRC:
-        return "Event Source";
-        break;
-    case strtb::event::ITEM_ACTION_SINK:
-        return "Action Sink";
-        break;
-    default:
-        return "Invalid Type";
-    }
 }
 
 void event_viewer::tree_item::get_path(event::item_path &path) {
@@ -249,3 +253,14 @@ void event_viewer::show_info() {
 void event_viewer::on_item_path_copy_clicked() {
     QGuiApplication::clipboard()->setText(ui->item_path->text());
 }
+
+void event_viewer::launch_event_monitor(QTreeWidgetItem* tree_widget_item, int) {
+    tree_item* item = (tree_item*) tree_widget_item;
+    if (item->event_item_info.type != event::ITEM_EVENT_SRC)
+        return;
+
+    event::item_path path;
+    item->get_path(path);
+    _event_monitor_ui.show_with_item(item->event_item_info, path);
+}
+

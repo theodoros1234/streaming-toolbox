@@ -49,12 +49,29 @@
        <property name="animated">
         <bool>true</bool>
        </property>
-       <attribute name="headerVisible">
+       <property name="headerHidden">
         <bool>false</bool>
+       </property>
+       <property name="expandsOnDoubleClick">
+        <bool>true</bool>
+       </property>
+       <property name="columnCount">
+        <number>2</number>
+       </property>
+       <attribute name="headerVisible">
+        <bool>true</bool>
+       </attribute>
+       <attribute name="headerDefaultSectionSize">
+        <number>250</number>
        </attribute>
        <column>
         <property name="text">
-         <string notr="true">1</string>
+         <string notr="true">Display Name</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Type</string>
         </property>
        </column>
       </widget>

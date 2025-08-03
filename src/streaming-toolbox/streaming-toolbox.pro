@@ -17,6 +17,7 @@ SOURCES += \
     gui/chat_subscription_thread.cpp \
     gui/chat_tab.cpp \
     gui/event_viewer.cpp \
+    gui/event_viewer_monitor.cpp \
     gui/main_window.cpp \
     gui/plugin_tab.cpp \
     main.cpp \
@@ -27,6 +28,7 @@ HEADERS += \
     gui/chat_subscription_thread.h \
     gui/chat_tab.h \
     gui/event_viewer.h \
+    gui/event_viewer_monitor.h \
     gui/main_window.h \
     gui/plugin_tab.h \
     plugins/plugin.h \
@@ -36,6 +38,7 @@ HEADERS += \
 FORMS += \
     gui/chat_tab.ui \
     gui/event_viewer.ui \
+    gui/event_viewer_monitor.ui \
     gui/main_window.ui \
     gui/plugin_tab.ui
 

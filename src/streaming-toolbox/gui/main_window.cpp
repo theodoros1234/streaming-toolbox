@@ -15,6 +15,7 @@
 #include <QResizeEvent>
 #include <QWidget>
 #include <Qt>
+#include <QApplication>
 
 using namespace strtb;
 using namespace strtb::gui;
@@ -83,4 +84,7 @@ void main_window::closeEvent(QCloseEvent*) {
     } catch (std::exception &e) {
         log.put(logging::DEBUG, {"Failed to save window size and state: ", e.what()});
     } catch (...) {}
+
+    // Close all windows and quit
+    QApplication::quit();
 }

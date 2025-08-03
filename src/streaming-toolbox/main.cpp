@@ -7,6 +7,7 @@
 #include "../libstrtb/event/system.h"
 
 #include <QApplication>
+#include <QGuiApplication>
 #include <cstdlib>
 #include <string>
 #include <QMessageBox>
@@ -19,6 +20,7 @@ int main(int argc, char *argv[]) {
     // Init QApplication
     QApplication a(argc, argv);
     QCoreApplication::setApplicationName("Streaming Toolbox");
+    QGuiApplication::setApplicationDisplayName("Streaming Toolbox");
 
     // Init logging system
     logging::add_output_stream(&std::clog, logging::INFO, logging::LINUX, true, logging::ANSI_ESCAPE_CODES);
