@@ -179,14 +179,14 @@
      <item>
       <widget class="QPushButton" name="button_scroll">
        <property name="text">
-        <string>Scroll to Bottom</string>
+        <string>Scroll to &amp;Bottom</string>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="button_clear">
        <property name="text">
-        <string>Clear</string>
+        <string>C&amp;lear</string>
        </property>
       </widget>
      </item>
@@ -206,14 +206,14 @@
      <item>
       <widget class="QPushButton" name="button_sub">
        <property name="text">
-        <string>Subscribe</string>
+        <string>&amp;Subscribe</string>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="button_close">
        <property name="text">
-        <string>Close</string>
+        <string>&amp;Close</string>
        </property>
       </widget>
      </item>
@@ -252,6 +252,22 @@
     <hint type="destinationlabel">
      <x>269</x>
      <y>239</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>param_string</sender>
+   <signal>returnPressed()</signal>
+   <receiver>button_sub</receiver>
+   <slot>click()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>269</x>
+     <y>233</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>403</x>
+     <y>456</y>
     </hint>
    </hints>
   </connection>

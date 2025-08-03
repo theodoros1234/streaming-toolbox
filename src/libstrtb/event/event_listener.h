@@ -70,8 +70,7 @@ protected:
     virtual uint64_t _subscribe(const item_path& event_source, const json::value* param);
 
 public:
-    event_listener_queued() = default;
-    event_listener_queued(const std::string& name);
+    using event_listener_base::event_listener_base;
     virtual ~event_listener_queued();
     void unsubscribe(uint64_t subscription_id);
     void stop();
@@ -106,8 +105,8 @@ protected:
 
 public:
     event_listener_qt_signal_emitter emitter;
-    event_listener_qt_signal() = default;
-    event_listener_qt_signal(const std::string& name);
+
+    using event_listener_base::event_listener_base;
     virtual ~event_listener_qt_signal();
     void unsubscribe(uint64_t subscription_id);
     void stop();

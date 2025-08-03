@@ -26,6 +26,7 @@ private:
         event::item_listing event_item_info;
         void populate();
         void get_path(event::item_path& path);
+        void find_item(const event::item_path& path, size_t pos);
     };
 
     Ui::event_viewer *ui;
@@ -33,9 +34,9 @@ private:
 
 private slots:
     void populate();
-    void show_info();
     void on_item_path_copy_clicked();
     void launch_event_monitor(QTreeWidgetItem* tree_widget_item, int column);
+    void on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTreeWidgetItem* previous);
 };
 
 }

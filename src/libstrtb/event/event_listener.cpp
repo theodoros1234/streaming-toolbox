@@ -90,8 +90,6 @@ event_listener_queued::~event_listener_queued() {
     stop();
 }
 
-event_listener_queued::event_listener_queued(const std::string& name) : event_listener_base(name) {}
-
 uint64_t event_listener_queued::_subscribe(const item_path& event_source, const json::value *param) {
     _post_first_sub = true;
 
@@ -194,8 +192,6 @@ void event_listener_queued::push_event(uint64_t sub_id, const json::value* event
     _queue.push_back(std::move(new_event));
     _cv.notify_one();
 }
-
-event_listener_qt_signal::event_listener_qt_signal(const std::string& name) : event_listener_base(name) {}
 
 event_listener_qt_signal::~event_listener_qt_signal() {
     if (!_subs.empty()) {

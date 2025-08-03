@@ -1100,7 +1100,7 @@ std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
     for (const auto event_sub : event_src->subs_none)
         add(event_sub, info_returned);
 
-    for (size_t i=0; i<1; i++)
+    for (size_t i=0; i<=1; i++)
         for (const auto event_sub : event_src->subs_bool[i])
             add(event_sub, info_returned);
 

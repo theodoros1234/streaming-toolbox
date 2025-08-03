@@ -21,21 +21,21 @@
        <item>
         <widget class="QPushButton" name="button_refresh">
          <property name="text">
-          <string>Refresh</string>
+          <string>&amp;Refresh</string>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QPushButton" name="button_expand">
          <property name="text">
-          <string>Expand All</string>
+          <string>&amp;Expand All</string>
          </property>
         </widget>
        </item>
        <item>
         <widget class="QPushButton" name="button_collapse">
          <property name="text">
-          <string>Collapse All</string>
+          <string>&amp;Collapse All</string>
          </property>
         </widget>
        </item>
@@ -43,8 +43,14 @@
      </item>
      <item>
       <widget class="QTreeWidget" name="item_tree">
+       <property name="editTriggers">
+        <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+       </property>
        <property name="rootIsDecorated">
         <bool>false</bool>
+       </property>
+       <property name="sortingEnabled">
+        <bool>true</bool>
        </property>
        <property name="animated">
         <bool>true</bool>
@@ -71,7 +77,7 @@
        </column>
        <column>
         <property name="text">
-         <string>Type</string>
+         <string notr="true">Type</string>
         </property>
        </column>
       </widget>
@@ -95,7 +101,7 @@
           <bool>false</bool>
          </property>
          <property name="text">
-          <string>Copy</string>
+          <string>C&amp;opy</string>
          </property>
         </widget>
        </item>

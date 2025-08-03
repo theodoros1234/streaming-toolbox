@@ -3,7 +3,6 @@
 #include "../libstrtb/event/system.h"
 #include <QGuiApplication>
 #include <QClipboard>
-#include "../libstrtb/logging/logging.h"
 
 using namespace strtb::gui;
 
@@ -12,9 +11,9 @@ event_viewer::event_viewer(QWidget *parent)
     , ui(new Ui::event_viewer) {
     ui->setupUi(this);
     QObject::connect(ui->button_refresh, &QPushButton::clicked, this, &event_viewer::populate);
-    QObject::connect(ui->item_tree, &QTreeWidget::itemSelectionChanged, this, &event_viewer::show_info);
-    QObject::connect(ui->item_tree, &QTreeWidget::itemDoubleClicked, this, &event_viewer::launch_event_monitor);
+    QObject::connect(ui->item_tree, &QTreeWidget::itemActivated, this, &event_viewer::launch_event_monitor);
     populate();
+    ui->item_tree->sortByColumn(0, Qt::AscendingOrder);
 }
 
 event_viewer::~event_viewer() {
@@ -41,6 +40,13 @@ static const char* item_type_to_str(strtb::event::item_type type) {
 }
 
 void event_viewer::populate() {
+    // Save path so we can try and find the item again after refresh
+    event::item_path old_path;
+    QTreeWidgetItem* selection = ui->item_tree->currentItem();
+    if (selection)
+        ((tree_item*) selection)->get_path(old_path);
+
+    // Refresh and populate list with items
     ui->item_tree->clear();
     event::item_info info = event::system_ptr->info(STRTB_EVENT_ROOT);
     tree_item* item = new tree_item();
@@ -54,6 +60,10 @@ void event_viewer::populate() {
     item->setText(1, item_type_to_str(item->event_item_info.type));
     item->populate();
     ui->item_tree->expandItem(item);
+
+    // Try to find and select that previous item again
+    if (!old_path.empty())
+        item->find_item(old_path, 0);
 }
 
 void event_viewer::tree_item::populate() {
@@ -69,34 +79,50 @@ void event_viewer::tree_item::populate() {
     }
 }
 
+void event_viewer::tree_item::find_item(const event::item_path& path, size_t pos) {
+    if (pos >= path.size())
+        return treeWidget()->setCurrentItem(this);
+
+    if (event_item_info.type == event::ITEM_CATEGORY) {
+        for (int i=0; i<childCount(); i++) {
+            tree_item* c = (tree_item*) child(i);
+            if (c->event_item_info.name == path[pos])
+                return c->find_item(path, pos+1);
+        }
+    }
+
+    // Couldn't find full path, select until this item
+    treeWidget()->setCurrentItem(this);
+}
+
 static void list_param(QString& text, const strtb::event::param_definition& p) {
-        text.append("<li><b>");
-        text.append(QString::fromStdString(p.name));
-        text.append(":</b> ");
+    text.append("<li><b>");
+    text.append(QString::fromStdString(p.name));
+    text.append(":</b> ");
 
-        text.append(QString::fromStdString(strtb::json::type_to_string(p.type)));
+    text.append(QString::fromStdString(strtb::json::type_to_string(p.type)));
 
-        if (p.required)
-            text.append(", required");
-        else
-            text.append(", optional");
-        text.append("<br>Description: ");
-        text.append(QString::fromStdString(p.description));
+    if (p.required)
+        text.append(", required");
+    else
+        text.append(", optional");
+    text.append("<br>Description: ");
+    text.append(QString::fromStdString(p.description));
 
-        if (!p.object_definition.empty()) {
-            text.append("<br><b>Object definition:</b><ul>");
-            for (auto po : p.object_definition)
-                list_param(text, *po);
-            text.append("</ul>");
-        }
+    if (!p.object_definition.empty()) {
+        text.append("<br><b>Object definition:</b><ul>");
+        for (auto po : p.object_definition)
+            list_param(text, *po);
+        text.append("</ul>");
+    }
 
-        if (p.array_definition) {
-            text.append("<br><b>Array definition:</b><ul>");
-            list_param(text, *p.array_definition);
-            text.append("</ul>");
-        }
+    if (p.array_definition) {
+        text.append("<br><b>Array definition:</b><ul>");
+        list_param(text, *p.array_definition);
+        text.append("</ul>");
+    }
 
-        text.append("</li>");
+    text.append("</li>");
 }
 
 static void list_params(QString& text, const std::vector<strtb::event::param_definition>& params) {
@@ -113,12 +139,25 @@ void event_viewer::tree_item::get_path(event::item_path &path) {
     path.push_back(event_item_info.name);
 }
 
-void event_viewer::show_info() {
-    auto selected_items = ui->item_tree->selectedItems();
+void event_viewer::on_item_path_copy_clicked() {
+    QGuiApplication::clipboard()->setText(ui->item_path->text());
+}
 
-    if (selected_items.size() == 1) {
+void event_viewer::launch_event_monitor(QTreeWidgetItem* tree_widget_item, int) {
+    tree_item* item = (tree_item*) tree_widget_item;
+    if (item->event_item_info.type != event::ITEM_EVENT_SRC)
+        return;
+
+    event::item_path path;
+    item->get_path(path);
+    _event_monitor_ui.show_with_item(item->event_item_info, path);
+}
+
+
+void event_viewer::on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTreeWidgetItem*) {
+    if (current) {
         // Show item info
-        tree_item* item = (tree_item*) selected_items.value(0);
+        tree_item* item = (tree_item*) current;
         const auto& info = item->event_item_info;
 
         event::item_path path;
@@ -152,6 +191,9 @@ void event_viewer::show_info() {
         text.append("<p><b>Type:</b> ");
         text.append(item_type_to_str(info.type));
         text.append("</p>");
+
+        if (info.type == event::ITEM_EVENT_SRC)
+            text.append("<p><i>Tip: Double click on the event source to monitor for events.</i></p>");
 
         if (info.type == event::ITEM_EVENT_SRC || info.type == event::ITEM_ACTION_SINK) {
             text.append("<h2>Parameters</h2>");
@@ -224,7 +266,10 @@ void event_viewer::show_info() {
             text.append("<h2>Event Subscriptions</h2><ul>");
             for (const auto& event_sub : event::system_ptr->info_event_subs(info.resource_id)) {
                 text.append("<li><b>");
-                text.append(QString::fromStdString(event_sub.listener_name));
+                if (event_sub.listener_name.empty())
+                    text.append("(untitled event listener)");
+                else
+                    text.append(QString::fromStdString(event_sub.listener_name));
                 text.append(" (rid=");
                 text.append(QString::number(event_sub.event_sub_rid));
                 text.append("):</b> ");
@@ -242,25 +287,10 @@ void event_viewer::show_info() {
 
         ui->item_info->setHtml(text);
     } else {
-        // Don't show info if either nothing or multiple items are selected
+        // Don't show info if nothing is selected
         ui->item_info->clear();
         ui->item_path->clear();
         ui->item_path_copy->setDisabled(true);
     }
-}
-
-
-void event_viewer::on_item_path_copy_clicked() {
-    QGuiApplication::clipboard()->setText(ui->item_path->text());
-}
-
-void event_viewer::launch_event_monitor(QTreeWidgetItem* tree_widget_item, int) {
-    tree_item* item = (tree_item*) tree_widget_item;
-    if (item->event_item_info.type != event::ITEM_EVENT_SRC)
-        return;
-
-    event::item_path path;
-    item->get_path(path);
-    _event_monitor_ui.show_with_item(item->event_item_info, path);
 }
 
