@@ -12,6 +12,11 @@ using namespace strtb::event;
 event::system* strtb::event::system_ptr = nullptr;
 static logging::source log_s("Event System", false);
 
+static void _verify_params(const param_definition& param);
+static void _verify_params(const std::vector<param_definition>& params);
+static void _param_type_check(const json::value* param, const param_definition* def);
+static void _param_type_check(const json::value* param, const std::vector<param_definition>& defs);
+
 system::res_path_follower::res_path_follower(const std::string& owner_name,
                                              const item_path& path,
                                              item_type wanted_type,
@@ -375,6 +380,29 @@ void system::res_cnt::make_item(item_type type,
             }
             _verify_params(returns);
 
+            for (size_t i=0; i<examples.size(); i++) {
+                const example_definition& example = examples[i];
+
+                if (example.params.empty() || example.returns.empty())
+                    throw bad_definition("examples cannot contain null pointers, "
+                                         "use json::value_null instead where needed");
+
+                if (params.empty() && example.params.type() != json::VAL_NULL)
+                    throw wrong_type("invalid example " + std::to_string(i) + ", in params: "
+                                     "definition indicates no parameter, but non-null example given");
+                try {
+                    _param_type_check(example.params.value(), &params.back());
+                } catch (wrong_type& e) {
+                    throw wrong_type("invalid example " + std::to_string(i) + ", in params: " + e.what());
+                }
+
+                try {
+                    _param_type_check(example.returns.value(), &returns);
+                } catch (wrong_type& e) {
+                    throw wrong_type("invalid example " + std::to_string(i) + ", in returns: " + e.what());
+                }
+            }
+
             res_item_event_src* ptr_e = new res_item_event_src();
             ptr = ptr_e;
             if (params.size())
@@ -387,6 +415,26 @@ void system::res_cnt::make_item(item_type type,
         case ITEM_ACTION_SINK: {
             _verify_params(params);
             _verify_params(returns);
+
+            for (size_t i=0; i<examples.size(); i++) {
+                const example_definition& example = examples[i];
+
+                if (example.params.empty() || example.returns.empty())
+                    throw bad_definition("examples cannot contain null pointers, "
+                                         "use json::value_null instead where needed");
+
+                try {
+                    _param_type_check(example.params.value(), params);
+                } catch (wrong_type& e) {
+                    throw wrong_type("invalid example " + std::to_string(i) + ", in params: " + e.what());
+                }
+
+                try {
+                    _param_type_check(example.returns.value(), &returns);
+                } catch (wrong_type& e) {
+                    throw wrong_type("invalid example " + std::to_string(i) + ", in returns: " + e.what());
+                }
+            }
 
             res_item_action_sink* ptr_a = new res_item_action_sink();
             ptr = ptr_a;
@@ -1115,7 +1163,7 @@ std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
     return info_returned;
 }
 
-static void param_type_check(const json::value* param, const param_definition* def) {
+static void _param_type_check(const json::value* param, const param_definition* def) {
     if (!((param->type() == def->type) ||                           // type is correct
           (param->type() == json::VAL_NULL && !def->required) ||    // type is null when it's not required
           (def->type == json::VAL_UNDEFINED)))                      // required type not defined
@@ -1127,7 +1175,7 @@ static void param_type_check(const json::value* param, const param_definition* d
         const json::value_array* param_arr = json::cast_array(param);
         for (size_t i = 0; i < param_arr->size(); i++) {
             try {
-                param_type_check(&param_arr->at(i), def->array_definition);
+                _param_type_check(&param_arr->at(i), def->array_definition);
             } catch (wrong_type& e) {
                 throw wrong_type("at " + std::to_string(i) + ": " + e.what());
             }
@@ -1142,7 +1190,7 @@ static void param_type_check(const json::value* param, const param_definition* d
                 continue;
 
             try {
-                param_type_check(&param_obj->at(subdef->name), subdef);
+                _param_type_check(&param_obj->at(subdef->name), subdef);
             } catch (std::out_of_range&) {
                 if (subdef->required)
                     throw wrong_type("missing required key " + common::string_escape(subdef->name));
@@ -1153,7 +1201,7 @@ static void param_type_check(const json::value* param, const param_definition* d
     }
 }
 
-static void param_type_check(const json::value* param, const std::vector<param_definition>& defs) {
+static void _param_type_check(const json::value* param, const std::vector<param_definition>& defs) {
     if (param == nullptr)
         throw wrong_type("param cannot be nullptr");
     if (param->type() != json::VAL_OBJECT)
@@ -1166,7 +1214,7 @@ static void param_type_check(const json::value* param, const std::vector<param_d
             continue;
 
         try {
-            param_type_check(&param_obj->at(subdef.name), &subdef);
+            _param_type_check(&param_obj->at(subdef.name), &subdef);
         } catch (std::out_of_range&) {
             if (subdef.required)
                 throw wrong_type("missing required key " + subdef.name);
@@ -1190,7 +1238,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event == nullptr)
         throw wrong_type("event cannot be a nullptr");
     try {
-        param_type_check(event, &event_src->returns);
+        _param_type_check(event, &event_src->returns);
     } catch (wrong_type& e) {
         throw wrong_type(std::string("invalid event: ") + e.what());
     }
@@ -1213,7 +1261,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event == nullptr)
         throw wrong_type("event cannot be a nullptr");
     try {
-        param_type_check(event, &event_src->returns);
+        _param_type_check(event, &event_src->returns);
     } catch (wrong_type& e) {
         throw wrong_type(std::string("invalid event: ") + e.what());
     }
@@ -1240,7 +1288,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event == nullptr)
         throw wrong_type("event cannot be a nullptr");
     try {
-        param_type_check(event, &event_src->returns);
+        _param_type_check(event, &event_src->returns);
     } catch (wrong_type& e) {
         throw wrong_type(std::string("invalid event: ") + e.what());
     }
@@ -1270,7 +1318,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event == nullptr)
         throw wrong_type("event cannot be a nullptr");
     try {
-        param_type_check(event, &event_src->returns);
+        _param_type_check(event, &event_src->returns);
     } catch (wrong_type& e) {
         throw wrong_type(std::string("invalid event: ") + e.what());
     }
