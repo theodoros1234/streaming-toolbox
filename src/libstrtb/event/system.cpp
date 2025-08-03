@@ -608,6 +608,7 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
             throw internal_error("failed to claim a resource id for the new item", log_s);
         resource_created = true;
 
+        try {
         new_item.make_item(
             item.type,
             item.display_name,
@@ -617,6 +618,11 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
             item.returns,
             item.examples
         );
+        } catch (wrong_type& e) {
+            throw wrong_type("in item " + common::string_escape(name) + ": " + e.what());
+        } catch (bad_definition& e) {
+            throw wrong_type("in item " + common::string_escape(name) + ": " + e.what());
+        }
 
         // Forward any path followers to the new item
         auto path_fl_set_itr = location->waiting_path_followers.find(name);
