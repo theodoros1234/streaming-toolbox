@@ -7,7 +7,7 @@
 
 using namespace strtb::event;
 
-static strtb::logging::source log("Event Listener", false);
+static strtb::logging::source log_s("Event Listener", false);
 
 event_listener_base::event_listener_base(const std::string& name) : _name(name) {}
 
@@ -85,9 +85,9 @@ uint64_t event_listener_base::subscribe(const item_path& event_source, const jso
 
 event_listener_queued::~event_listener_queued() {
     if (_active)
-        log.warning({"Destroying queued listener ", common::string_escape(_name), " while it's still active"});
+        log_s.warning({"Destroying queued listener ", common::string_escape(_name), " while it's still active"});
 
-    shutdown();
+    stop();
 }
 
 event_listener_queued::event_listener_queued(const std::string& name) : event_listener_base(name) {}
@@ -99,11 +99,8 @@ uint64_t event_listener_queued::_subscribe(const item_path& event_source, const 
 
     try {
         std::lock_guard<std::mutex> guard(_lock);
-        if (_subs.insert(new_sub).second == false) {
-            log.put(logging::ERROR, {"Failed to subscribe to event source due to internal error: "
-                                     "duplicate subscription resource id in event listener"});
+        if (_subs.insert(new_sub).second == false)
             throw internal_error("duplicate subscription resource id in event listener");
-        }
     } catch (...) {
         _system_unsubscribe(new_sub);
         throw;
@@ -122,7 +119,7 @@ void event_listener_queued::unsubscribe(uint64_t subscription_id) {
     _system_unsubscribe(subscription_id);
 }
 
-void event_listener_queued::shutdown() {
+void event_listener_queued::stop() {
     std::set<uint64_t> old_subs;
 
     {
@@ -196,4 +193,47 @@ void event_listener_queued::push_event(uint64_t sub_id, const json::value* event
     };
     _queue.push_back(std::move(new_event));
     _cv.notify_one();
+}
+
+event_listener_qt_signal::event_listener_qt_signal(const std::string& name) : event_listener_base(name) {}
+
+event_listener_qt_signal::~event_listener_qt_signal() {
+    if (!_subs.empty()) {
+        log_s.warning({"Destroying Qt signal listener ", common::string_escape(_name), " while it still has active subscriptions"});
+        stop();
+    }
+}
+
+uint64_t event_listener_qt_signal::_subscribe(const item_path& event_source, const json::value* param) {
+    _post_first_sub = true;
+    uint64_t sub_rid = _system_subscribe(event_source, param);
+
+    try {
+        if (!_subs.insert(sub_rid).second)
+            throw internal_error("duplicate subscription resource id in event listener");
+    } catch (...) {
+        _system_unsubscribe(sub_rid);
+        throw;
+    }
+
+    return sub_rid;
+}
+
+void event_listener_qt_signal::unsubscribe(uint64_t subscription_id) {
+    if (_subs.erase(subscription_id) == 0)
+        throw not_found("subscription doesn't exist or doesn't belong to this event listener");
+    _system_unsubscribe(subscription_id);
+}
+
+void event_listener_qt_signal::stop() {
+    _system_unsubscribe(_subs);
+    _subs.clear();
+}
+
+void event_listener_qt_signal::push_event(uint64_t sub_id, const json::value* event) {
+    emitter.push_event(sub_id, event);
+}
+
+void event_listener_qt_signal_emitter::push_event(uint64_t sub_id, const json::value* event) {
+    emit event_received(sub_id, json::holder(event));
 }

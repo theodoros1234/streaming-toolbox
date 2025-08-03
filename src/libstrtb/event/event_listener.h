@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <set>
 #include <deque>
+#include <QObject>
 #include "item.h"
 #include "../json/holder.h"
 
@@ -65,7 +66,6 @@ private:
     std::deque<event_holder> _queue;
 
 protected:
-    friend system;
     virtual void push_event(uint64_t sub_id, const json::value* event);
     virtual uint64_t _subscribe(const item_path& event_source, const json::value* param);
 
@@ -74,7 +74,7 @@ public:
     event_listener_queued(const std::string& name);
     virtual ~event_listener_queued();
     void unsubscribe(uint64_t subscription_id);
-    void shutdown();
+    void stop();
     void start();
     event_holder listen();
     void listen(std::vector<event_holder>& destination);
@@ -85,6 +85,32 @@ public:
      *       handles these situations and internally keeps a resource id attached to the
      *       subscription only while the event source is ready.
      */
+};
+
+class event_listener_qt_signal;
+
+class event_listener_qt_signal_emitter : public QObject {
+    Q_OBJECT
+protected:
+    friend event_listener_qt_signal;
+    void push_event(uint64_t sub_id, const json::value* event);
+
+signals:
+    void event_received(uint64_t sub_id, json::holder event);
+};
+
+class event_listener_qt_signal : public event_listener_base {
+protected:
+    virtual void push_event(uint64_t sub_id, const json::value* event);
+    virtual uint64_t _subscribe(const item_path& event_source, const json::value* param);
+
+public:
+    event_listener_qt_signal_emitter emitter;
+    event_listener_qt_signal() = default;
+    event_listener_qt_signal(const std::string& name);
+    virtual ~event_listener_qt_signal();
+    void unsubscribe(uint64_t subscription_id);
+    void stop();
 };
 
 }

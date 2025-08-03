@@ -10,7 +10,7 @@ using namespace strtb;
 using namespace strtb::event;
 
 event::system* strtb::event::system_ptr = nullptr;
-static logging::source log("Event System", false);
+static logging::source log_s("Event System", false);
 
 system::res_path_follower::res_path_follower(const std::string& owner_name,
                                              const item_path& path,
@@ -69,7 +69,7 @@ void system::res_item_category::path_follower_attach(res_path_follower* path_fl,
                         }
                     }
                 } catch (std::out_of_range&) {
-                    throw internal_error("resource id " + std::to_string(itr->second) + " not found", log);
+                    throw internal_error("resource id " + std::to_string(itr->second) + " not found", log_s);
                 }
             }
         }
@@ -330,9 +330,9 @@ void system::res_cnt::make_item(item_type type,
                                 const std::string& description,
                                 uint64_t provider_id) {
     if (ptr != nullptr)
-        throw internal_error("resource container already holding an item", log);
+        throw internal_error("resource container already holding an item", log_s);
     if (type != ITEM_CATEGORY)
-        throw internal_error("wrong constructor called for requested item type", log);
+        throw internal_error("wrong constructor called for requested item type", log_s);
 
     ptr = new res_item_category();
     try {
@@ -355,7 +355,7 @@ void system::res_cnt::make_item(item_type type,
                                 const param_definition &returns,
                                 const std::vector<example_definition>& examples) {
     if (ptr != nullptr)
-        throw internal_error("resource container already holding an item", log);
+        throw internal_error("resource container already holding an item", log_s);
 
     try {
         switch (type) {
@@ -459,7 +459,7 @@ system::res_item_action_sink* system::res_cnt::as_action_sink() const {
 
 system::system() {
     if (system_ptr) {
-        log.put(logging::CRITICAL, {"Refusing to initialize the event system. Another event system object already exists, or something has tampered with the event::system_ptr pointer, which has a value of ", system_ptr, "."});
+        log_s.put(logging::CRITICAL, {"Refusing to initialize the event system. Another event system object already exists, or something has tampered with the event::system_ptr pointer, which has a value of ", system_ptr, "."});
         throw std::runtime_error("event system already initialized, or event::system_ptr has been tampered with");
     }
     system_ptr = this;
@@ -480,7 +480,7 @@ system::~system() {
 
 uint64_t system::_resid_new() {
     if (_resid_counter == UINT64_MAX) {
-        log.put(logging::CRITICAL, {"Internal error: Out of available resource IDs. It is likely that "
+        log_s.put(logging::CRITICAL, {"Internal error: Out of available resource IDs. It is likely that "
                                     "this is a bug or that your system is unstable, as it would normally "
                                     "take hundreds of years at minimum for this to happen."});
         throw internal_error("out of available resource ids");
@@ -506,7 +506,7 @@ uint64_t system::_follow_path(uint64_t start, const item_path& path) {
             if (current_pos == start)
                 throw not_found("resource id " + std::to_string(current_pos) + " not found");
             else // if a category holds an invalid ID, it's very likely our bug, thus throwing internal_error
-                throw internal_error("resource id " + std::to_string(current_pos) + " not found", log);
+                throw internal_error("resource id " + std::to_string(current_pos) + " not found", log_s);
         } catch (wrong_type&) {
             throw wrong_type(common::string_escape(next_piece) + " is not a category");
         }
@@ -528,7 +528,7 @@ std::pair<system::res_item_category*, uint64_t> system::_get_category(uint64_t s
         uint64_t rid = _follow_path(start, target_location);
         return std::make_pair(_items.at(rid).as_category(), rid);
     } catch (std::out_of_range& e) {
-        throw internal_error("category entry has an invalid resource id", log);
+        throw internal_error("category entry has an invalid resource id", log_s);
     }
 }
 
@@ -557,7 +557,7 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
     try {
         res_cnt& new_item = _items[new_res_id];
         if (new_item.ptr != nullptr)
-            throw internal_error("failed to claim a resource id for the new item", log);
+            throw internal_error("failed to claim a resource id for the new item", log_s);
         resource_created = true;
 
         new_item.make_item(
@@ -639,9 +639,9 @@ uint64_t system::provider_item_add(uint64_t provider_id,
     if (provider_id == 0) {
         // Registering new provider
         if (target_location != STRTB_EVENT_ROOT)
-            throw internal_error("tried to create a provider in a different location than root", log);
+            throw internal_error("tried to create a provider in a different location than root", log_s);
         if (item.type != ITEM_CATEGORY)
-            throw internal_error("tried to create provider with wrong item type", log);
+            throw internal_error("tried to create provider with wrong item type", log_s);
         provider_id = _resid_counter;
     } else if (provider_id != location->provider_id) {
         // Adding item for existing provider
@@ -658,12 +658,12 @@ uint64_t system::provider_item_add(uint64_t provider_id,
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log);
+        throw internal_error("provider id was not specified", log_s);
 
     auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
-        throw internal_error("category entry has a wrong provider id set", log);
+        throw internal_error("category entry has a wrong provider id set", log_s);
 
     return _provider_item_add(provider_id, location, name, item).first;
 }
@@ -717,7 +717,7 @@ void system::_provider_item_remove(uint64_t location_rid, res_item_category* loc
     auto item = _items.find(rid);
 
     if (item == _items.end()) {
-        log.put(logging::WARNING, {"Deleting entry ", common::string_escape(name),
+        log_s.put(logging::WARNING, {"Deleting entry ", common::string_escape(name),
                                    " that refers to an invalid resource ID of ", rid});
         return;
     }
@@ -735,7 +735,7 @@ void system::provider_item_remove(uint64_t provider_id, uint64_t target_location
     res_item_category* location = _get_category(target_location);
 
     if (provider_id == 0 && target_location != STRTB_EVENT_ROOT) // Unregistering provider
-        throw internal_error("tried to remove provider without targetting root", log);
+        throw internal_error("tried to remove provider without targetting root", log_s);
 
     if (provider_id != location->provider_id)
         throw out_of_scope("target location does not belong to this provider");
@@ -747,12 +747,12 @@ void system::provider_item_remove(uint64_t provider_id, const item_path& target_
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log);
+        throw internal_error("provider id was not specified", log_s);
 
     auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
-        throw internal_error("category entry has a wrong provider id set", log);
+        throw internal_error("category entry has a wrong provider id set", log_s);
 
     _provider_item_remove(location_rid, location, name);
 }
@@ -761,7 +761,7 @@ uint64_t system::provider_item_get_id(uint64_t provider_id, const item_path& tar
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log);
+        throw internal_error("provider id was not specified", log_s);
 
     return _follow_path(provider_id, target);
 }
@@ -773,7 +773,7 @@ void system::_provider_category_clear(uint64_t location_rid, res_item_category* 
 
         // Make sure the item actually exists
         if (item == _items.end()) {
-            log.put(logging::WARNING, {"Deleting entry ", common::string_escape(entry.first),
+            log_s.put(logging::WARNING, {"Deleting entry ", common::string_escape(entry.first),
                                        " that refers to an invalid resource ID of ", entry.second});
             continue;
         }
@@ -795,7 +795,7 @@ void system::provider_category_clear(uint64_t provider_id, uint64_t target_locat
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log);
+        throw internal_error("provider id was not specified", log_s);
 
     res_item_category* location = _get_category(target_location);
 
@@ -809,12 +809,12 @@ void system::provider_category_clear(uint64_t provider_id, const item_path& targ
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log);
+        throw internal_error("provider id was not specified", log_s);
 
     auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
-        throw internal_error("category entry has a wrong provider id set", log);
+        throw internal_error("category entry has a wrong provider id set", log_s);
 
     _provider_category_clear(location_rid, location);
 }
@@ -822,7 +822,7 @@ void system::provider_category_clear(uint64_t provider_id, const item_path& targ
 void system::_info(uint64_t resource_id, item_info& item) {
     const auto& ref = _items.at(resource_id);
     if (ref.type() == ITEM_UNDEFINED)
-        throw internal_error("resource container has undefined type", log);
+        throw internal_error("resource container has undefined type", log_s);
     item.provider_id = ref.ptr->provider_id;
     item.type = ref.ptr->type;
     item.display_name = ref.ptr->display_name;
@@ -875,7 +875,7 @@ item_listing system::info(const item_path& path) {
         _info(rid, item);
         return item;
     } catch (std::out_of_range&) {
-        throw internal_error("category entry has an invalid resource id", log);
+        throw internal_error("category entry has an invalid resource id", log_s);
     }
 }
 
@@ -966,12 +966,12 @@ void system::provider_import(uint64_t provider_id, const item_path& target_locat
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log);
+        throw internal_error("provider id was not specified", log_s);
 
     auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
-        throw internal_error("category entry has a wrong provider id set", log);
+        throw internal_error("category entry has a wrong provider id set", log_s);
 
     _provider_import(provider_id, location_rid, location, entries);
 }
