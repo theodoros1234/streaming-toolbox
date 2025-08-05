@@ -39,7 +39,7 @@ void event_viewer_monitor::show_with_item(const event::item_info& info, const ev
     // New item
     _path = path;
     ui->label_name->setText(QString::fromStdString(info.display_name));
-    ui->label_path->setText(QString::fromStdString(event::item_path_to_string(path)));
+    ui->label_path->setText(QString::fromStdString((path.to_string())));
     ui->param_group->setHidden(info.params.empty());
     if (info.params.empty()) {
         ui->label_param->setText("none");

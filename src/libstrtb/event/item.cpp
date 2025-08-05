@@ -415,51 +415,6 @@ item_info::item_info(const json::value_object* from) {
     }
 }
 
-bool strtb::event::item_path_validate_segment(const std::string& segment) {
-    if (segment.empty())
-        return false;
-    for (char c : segment)
-        if (!(('a' <= c && c <= 'z') ||
-              ('A' <= c && c <= 'Z') ||
-              ('0' <= c && c <= '9') ||
-              (c == '_') || (c == '-')))
-            return false;
-    return true;
-}
-
-ssize_t strtb::event::item_path_validate(const item_path& path) {
-    for (item_path::const_iterator segment = path.begin(); segment < path.end(); segment++)
-        if (!item_path_validate_segment(*segment))
-            return segment - path.begin();  // Returning position of problematic segment
-    return -1;  // Returning -1 means all segments are valid
-}
-
-std::string strtb::event::item_path_to_string(const item_path& path) {
-    if (path.empty())   // root path
-        return "/";
-
-    std::string str;
-    ssize_t path_validate = item_path_validate(path);
-    if (path_validate != -1)
-        throw invalid_path("path segment " + common::string_escape(path.at(path_validate)) + " is invalid", path_validate);
-
-    size_t length = 0;
-    for (const std::string& segment : path)
-        length += segment.length() + 1;
-    str.reserve(length);
-
-    for (const std::string& segment : path) {
-        str += "/";
-        str += segment;
-    }
-
-    return str;
-}
-
-item_path strtb::event::to_item_path(const std::string& path_str, size_t max_segment_length, size_t max_depth) {
-    return item_path(path_str, max_segment_length, max_depth);
-}
-
 item_path::item_path(const std::string& path, size_t max_segment_length, size_t max_depth) {
     std::string::size_type from = 0, to = 1, segment_length = 0;
     if (path.size() < 1 || path.at(0) != '/')
@@ -487,13 +442,13 @@ item_path::item_path(const std::string& path, size_t max_segment_length, size_t 
 
         std::string segment = path.substr(from, segment_length);
 
-        if (!item_path_validate_segment(segment))
+        if (!validate_segment(segment))
             throw parsing_error("path contains invalid characters");
 
         if (size() >= max_depth)
             throw parsing_error("path exceeds maximum depth");
 
-        if (item_path_validate_segment(segment))
+        if (validate_segment(segment))
             push_back(std::move(segment));
         else
             throw parsing_error("path segment " + common::string_escape(segment) + " is invalid");
@@ -504,3 +459,48 @@ item_path::item_path(const std::string& path, size_t max_segment_length, size_t 
 
 item_path::item_path(const char* path, size_t max_segment_length, size_t max_depth)
     : item_path(std::string(path), max_segment_length, max_depth) {}
+
+std::string item_path::to_string() const {
+    if (empty())   // root path
+        return "/";
+
+    std::string str;
+    ssize_t path_validate = validate();
+    if (path_validate != -1)
+        throw invalid_path("path segment " + common::string_escape(at(path_validate)) + " is invalid", path_validate);
+
+    size_t length = 0;
+    for (const std::string& segment : *this)
+        length += segment.length() + 1;
+    str.reserve(length);
+
+    for (const std::string& segment : *this) {
+        str += "/";
+        str += segment;
+    }
+
+    return str;
+}
+
+ssize_t item_path::validate() const {
+    for (item_path::const_iterator segment = begin(); segment < end(); segment++)
+        if (!validate_segment(*segment))
+            return segment - begin();   // Returning position of problematic segment
+    return -1;  // Returning -1 means all segments are valid
+}
+
+bool item_path::validate_segment(size_t pos) const {
+    return validate_segment(at(pos));
+}
+
+bool item_path::validate_segment(const std::string& segment) {
+    if (segment.empty())
+        return false;
+    for (char c : segment)
+        if (!(('a' <= c && c <= 'z') ||
+              ('A' <= c && c <= 'Z') ||
+              ('0' <= c && c <= '9') ||
+              (c == '_') || (c == '-')))
+            return false;
+    return true;
+}

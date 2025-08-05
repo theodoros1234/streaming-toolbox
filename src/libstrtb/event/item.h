@@ -101,12 +101,11 @@ class item_path : public std::vector<std::string> {
 public:
     item_path(const std::string& path, size_t max_segment_length = 256, size_t max_depth = 64);
     item_path(const char* path, size_t max_segment_length = 256, size_t max_depth = 64);
+    std::string to_string() const;
+    ssize_t validate() const;
+    bool validate_segment(size_t pos) const;
+    static bool validate_segment(const std::string& segment);
 };
-
-bool item_path_validate_segment(const std::string& segment);
-ssize_t item_path_validate(const item_path& path);
-std::string item_path_to_string(const item_path& path);
-item_path to_item_path(const std::string& path_str, size_t max_segment_length = 256, size_t max_depth = 64);
 
 struct item_ref {
     uint64_t resource_id = 0;

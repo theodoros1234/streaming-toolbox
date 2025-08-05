@@ -163,7 +163,7 @@ void event_viewer::on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTr
         event::item_path path;
         item->get_path(path);
         try {
-            ui->item_path->setText(QString::fromStdString(event::item_path_to_string(path)));
+            ui->item_path->setText(QString::fromStdString(path.to_string()));
             ui->item_path_copy->setEnabled(true);
         } catch (event::invalid_path& e) {
             ui->item_path->setText("invalid path: ");
@@ -230,7 +230,7 @@ void event_viewer::on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTr
                 text.append(")</b><br><b>Wants:</b> ");
                 text.append(item_type_to_str(path_fl.wanted_type));
                 text.append("<br><b>Path:</b> ");
-                text.append(QString::fromStdString(event::item_path_to_string(path_fl.path)));
+                text.append(QString::fromStdString(path_fl.path.to_string()));
                 text.append("<br><b>Status:</b> ");
 
                 switch (path_fl.status) {

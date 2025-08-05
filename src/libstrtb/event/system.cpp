@@ -538,7 +538,7 @@ uint64_t system::_resid_new() {
 
 uint64_t system::_follow_path(uint64_t start, const item_path& path) {
     uint64_t current_pos = start;
-    ssize_t path_validate = item_path_validate(path);
+    ssize_t path_validate = path.validate();
     if (path_validate != -1)
         throw invalid_path("path segment " + common::string_escape(path.at(path_validate)) + " is invalid", path_validate);
 
@@ -592,7 +592,7 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
                                     res_item_category* location,
                                     const std::string& name,
                                     const item_info& item) {
-    if (!item_path_validate_segment(name))
+    if (!item_path::validate_segment(name))
         throw invalid_path("name " + common::string_escape(name) + " is invalid", -1);
 
     uint64_t& new_entry = location->list[name];
@@ -757,7 +757,7 @@ void system::_provider_item_remove_path_followers(uint64_t location_rid,
 void system::_provider_item_remove(uint64_t location_rid, res_item_category* location, const std::string& name) {
     uint64_t rid = 0;
 
-    if (!item_path_validate_segment(name))
+    if (!item_path::validate_segment(name))
         throw invalid_path("name " + common::string_escape(name) + " is invalid", -1);
 
     // Delete entry in category
