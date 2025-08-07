@@ -23,6 +23,7 @@ already_exists::already_exists(const std::string& what) : event_exception(what) 
 parsing_error::parsing_error(const std::string& what) : event_exception(what) {}
 invalid_path::invalid_path(const std::string& what, ssize_t pos) : event_exception(what), pos(pos) {}
 bad_definition::bad_definition(const std::string& what) : event_exception(what) {}
+bad_state::bad_state(const std::string& what) : event_exception(what) {}
 
 param_definition::param_definition(const param_definition& from) :
     name(from.name),
@@ -503,4 +504,65 @@ bool item_path::validate_segment(const std::string& segment) {
               (c == '_') || (c == '-')))
             return false;
     return true;
+}
+
+void strtb::event::param_type_check(const json::value* param, const param_definition* def) {
+    if (!((param->type() == def->type) ||                           // type is correct
+          (param->type() == json::VAL_NULL && !def->required) ||    // type is null when it's not required
+          (def->type == json::VAL_UNDEFINED)))                      // required type not defined
+        throw wrong_type("type does not match the definition");
+
+    if (param->type() == json::VAL_ARRAY &&
+        def->array_definition != nullptr &&
+        def->array_definition->type != json::VAL_UNDEFINED) {
+        const json::value_array* param_arr = json::cast_array(param);
+        for (size_t i = 0; i < param_arr->size(); i++) {
+            try {
+                param_type_check(&param_arr->at(i), def->array_definition);
+            } catch (wrong_type& e) {
+                throw wrong_type("at " + std::to_string(i) + ": " + e.what());
+            }
+        }
+    }
+
+    if (param->type() == json::VAL_OBJECT) {
+        // NOTE: extra keys in param won't cause an error
+        const json::value_object* param_obj = json::cast_object(param);
+        for (const param_definition* subdef : def->object_definition) {
+            if (!subdef->required && subdef->type == json::VAL_UNDEFINED)
+                continue;
+
+            try {
+                param_type_check(&param_obj->at(subdef->name), subdef);
+            } catch (std::out_of_range&) {
+                if (subdef->required)
+                    throw wrong_type("missing required key " + common::string_escape(subdef->name));
+            } catch (wrong_type& e) {
+                throw wrong_type("at " + common::string_escape(subdef->name) + ": " + e.what());
+            }
+        }
+    }
+}
+
+void strtb::event::param_type_check(const json::value* param, const std::vector<param_definition>& defs) {
+    if (param == nullptr)
+        throw wrong_type("param cannot be nullptr");
+    if (param->type() != json::VAL_OBJECT)
+        throw wrong_type("must be an object");
+
+    // NOTE: extra keys in param won't cause an error
+    const json::value_object* param_obj = json::cast_object(param);
+    for (const param_definition& subdef : defs) {
+        if (!subdef.required && subdef.type == json::VAL_UNDEFINED)
+            continue;
+
+        try {
+            param_type_check(&param_obj->at(subdef.name), &subdef);
+        } catch (std::out_of_range&) {
+            if (subdef.required)
+                throw wrong_type("missing required key " + subdef.name);
+        } catch (wrong_type& e) {
+            throw wrong_type("at " + common::string_escape(subdef.name) + ": " + e.what());
+        }
+    }
 }

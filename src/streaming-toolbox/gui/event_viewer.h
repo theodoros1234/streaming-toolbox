@@ -1,5 +1,5 @@
-#ifndef EVENT_VIEWER_H
-#define EVENT_VIEWER_H
+#ifndef STRTB_GUI_EVENT_VIEWER_H
+#define STRTB_GUI_EVENT_VIEWER_H
 
 #include "event_viewer_monitor.h"
 #include "../libstrtb/event/item.h"
@@ -41,4 +41,4 @@ private slots:
 
 }
 
-#endif // EVENT_VIEWER_H
+#endif // STRTB_GUI_EVENT_VIEWER_H

@@ -2,18 +2,21 @@
 #define STRTB_EVENT_SYSTEM_H
 
 #include "item.h"
-#include "provider.h"
-#include "event_listener.h"
 
 #include <map>
 #include <vector>
 #include <mutex>
 #include <string>
 #include <memory>
+#include <set>
 
 #define STRTB_EVENT_ROOT 1
 
 namespace strtb::event {
+
+class provider;
+class event_listener_base;
+class action_handler;
 
 class system {
 private:
@@ -76,7 +79,7 @@ private:
         std::vector<param_definition> params;
         param_definition returns;
         std::vector<example_definition> examples;
-        // TODO: list of action handlers (listeners?)
+        action_handler* handler = nullptr;
     };
 
     struct res_cnt {
@@ -117,6 +120,7 @@ private:
     res_item_category* _get_category(uint64_t target_location);
     std::pair<res_item_category*, uint64_t> _get_category(uint64_t start, const item_path& target_location);
     res_item_event_src* _get_event_src(uint64_t target_location);
+    res_item_action_sink* _get_action_sink(uint64_t target_location);
     std::pair<uint64_t, res_cnt&> _provider_item_add(uint64_t provider_id,
                                                      res_item_category* location,
                                                      const std::string& name,
@@ -138,6 +142,7 @@ private:
 protected:
     friend provider;
     friend event_listener_base;
+    friend action_handler;
 
     uint64_t provider_item_add(uint64_t provider_id,
                                uint64_t target_location,
@@ -164,6 +169,10 @@ protected:
     uint64_t event_listener_subscribe(event_listener_base& listener, const item_path& event_source, const json::value* param);
     void event_listener_unsubscribe(uint64_t subscription_id);
     void event_listener_unsubscribe(const std::set<uint64_t>& subscription_ids);
+
+    void action_handler_add(uint64_t provider_id, uint64_t target, action_handler* handler);
+    void action_handler_remove(uint64_t provider_id, uint64_t target, action_handler* handler);
+    void action_handler_clear(uint64_t provider_id, const std::set<uint64_t>& targets, action_handler* handler);
 
 public:
     system();

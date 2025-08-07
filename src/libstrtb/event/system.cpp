@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cassert>
 #include "system.h"
+#include "event_listener.h"
 #include "../logging/logging.h"
 #include "../common/strescape.h"
 #include "../json/cast.h"
@@ -14,8 +15,6 @@ static logging::source log_s("Event System", false);
 
 static void _verify_params(const param_definition& param);
 static void _verify_params(const std::vector<param_definition>& params);
-static void _param_type_check(const json::value* param, const param_definition* def);
-static void _param_type_check(const json::value* param, const std::vector<param_definition>& defs);
 
 system::res_path_follower::res_path_follower(const std::string& owner_name,
                                              const item_path& path,
@@ -391,13 +390,13 @@ void system::res_cnt::make_item(item_type type,
                     throw wrong_type("invalid example " + std::to_string(i) + ", in params: "
                                      "definition indicates no parameter, but non-null example given");
                 try {
-                    _param_type_check(example.params.value(), &params.back());
+                    param_type_check(example.params.value(), &params.back());
                 } catch (wrong_type& e) {
                     throw wrong_type("invalid example " + std::to_string(i) + ", in params: " + e.what());
                 }
 
                 try {
-                    _param_type_check(example.returns.value(), &returns);
+                    param_type_check(example.returns.value(), &returns);
                 } catch (wrong_type& e) {
                     throw wrong_type("invalid example " + std::to_string(i) + ", in returns: " + e.what());
                 }
@@ -424,13 +423,13 @@ void system::res_cnt::make_item(item_type type,
                                          "use json::value_null instead where needed");
 
                 try {
-                    _param_type_check(example.params.value(), params);
+                    param_type_check(example.params.value(), params);
                 } catch (wrong_type& e) {
                     throw wrong_type("invalid example " + std::to_string(i) + ", in params: " + e.what());
                 }
 
                 try {
-                    _param_type_check(example.returns.value(), &returns);
+                    param_type_check(example.returns.value(), &returns);
                 } catch (wrong_type& e) {
                     throw wrong_type("invalid example " + std::to_string(i) + ", in returns: " + e.what());
                 }
@@ -583,6 +582,14 @@ std::pair<system::res_item_category*, uint64_t> system::_get_category(uint64_t s
 system::res_item_event_src* system::_get_event_src(uint64_t target_location) {
     try {
         return _items.at(target_location).as_event_src();
+    } catch (std::out_of_range&) {
+        throw not_found("target location not found");
+    }
+}
+
+system::res_item_action_sink* system::_get_action_sink(uint64_t target_location) {
+    try {
+        return _items.at(target_location).as_action_sink();
     } catch (std::out_of_range&) {
         throw not_found("target location not found");
     }
@@ -1169,67 +1176,6 @@ std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
     return info_returned;
 }
 
-static void _param_type_check(const json::value* param, const param_definition* def) {
-    if (!((param->type() == def->type) ||                           // type is correct
-          (param->type() == json::VAL_NULL && !def->required) ||    // type is null when it's not required
-          (def->type == json::VAL_UNDEFINED)))                      // required type not defined
-        throw wrong_type("type does not match the definition");
-
-    if (param->type() == json::VAL_ARRAY &&
-        def->array_definition != nullptr &&
-        def->array_definition->type != json::VAL_UNDEFINED) {
-        const json::value_array* param_arr = json::cast_array(param);
-        for (size_t i = 0; i < param_arr->size(); i++) {
-            try {
-                _param_type_check(&param_arr->at(i), def->array_definition);
-            } catch (wrong_type& e) {
-                throw wrong_type("at " + std::to_string(i) + ": " + e.what());
-            }
-        }
-    }
-
-    if (param->type() == json::VAL_OBJECT) {
-        // NOTE: extra keys in param won't cause an error
-        const json::value_object* param_obj = json::cast_object(param);
-        for (const param_definition* subdef : def->object_definition) {
-            if (!subdef->required && subdef->type == json::VAL_UNDEFINED)
-                continue;
-
-            try {
-                _param_type_check(&param_obj->at(subdef->name), subdef);
-            } catch (std::out_of_range&) {
-                if (subdef->required)
-                    throw wrong_type("missing required key " + common::string_escape(subdef->name));
-            } catch (wrong_type& e) {
-                throw wrong_type("at " + common::string_escape(subdef->name) + ": " + e.what());
-            }
-        }
-    }
-}
-
-static void _param_type_check(const json::value* param, const std::vector<param_definition>& defs) {
-    if (param == nullptr)
-        throw wrong_type("param cannot be nullptr");
-    if (param->type() != json::VAL_OBJECT)
-        throw wrong_type("must be an object");
-
-    // NOTE: extra keys in param won't cause an error
-    const json::value_object* param_obj = json::cast_object(param);
-    for (const param_definition& subdef : defs) {
-        if (!subdef.required && subdef.type == json::VAL_UNDEFINED)
-            continue;
-
-        try {
-            _param_type_check(&param_obj->at(subdef.name), &subdef);
-        } catch (std::out_of_range&) {
-            if (subdef.required)
-                throw wrong_type("missing required key " + subdef.name);
-        } catch (wrong_type& e) {
-            throw wrong_type("at " + common::string_escape(subdef.name) + ": " + e.what());
-        }
-    }
-}
-
 void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event) {
     std::lock_guard<std::mutex> guard(_lock);
     const res_item_event_src* event_src = _get_event_src(target);
@@ -1244,7 +1190,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event == nullptr)
         throw wrong_type("event cannot be a nullptr");
     try {
-        _param_type_check(event, &event_src->returns);
+        param_type_check(event, &event_src->returns);
     } catch (wrong_type& e) {
         throw wrong_type(std::string("invalid event: ") + e.what());
     }
@@ -1267,7 +1213,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event == nullptr)
         throw wrong_type("event cannot be a nullptr");
     try {
-        _param_type_check(event, &event_src->returns);
+        param_type_check(event, &event_src->returns);
     } catch (wrong_type& e) {
         throw wrong_type(std::string("invalid event: ") + e.what());
     }
@@ -1294,7 +1240,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event == nullptr)
         throw wrong_type("event cannot be a nullptr");
     try {
-        _param_type_check(event, &event_src->returns);
+        param_type_check(event, &event_src->returns);
     } catch (wrong_type& e) {
         throw wrong_type(std::string("invalid event: ") + e.what());
     }
@@ -1324,7 +1270,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     if (event == nullptr)
         throw wrong_type("event cannot be a nullptr");
     try {
-        _param_type_check(event, &event_src->returns);
+        param_type_check(event, &event_src->returns);
     } catch (wrong_type& e) {
         throw wrong_type(std::string("invalid event: ") + e.what());
     }
@@ -1360,5 +1306,54 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     default:
         throw wrong_type("event sources only take a parameter of type bool, int or string, "
                          "or null if its unspecified or optional");
+    }
+}
+
+void system::action_handler_add(uint64_t provider_id, uint64_t target, action_handler* handler) {
+    std::lock_guard<std::mutex> guard(_lock);
+    res_item_action_sink* action_sink = _get_action_sink(target);
+
+    if (action_sink->provider_id != provider_id)
+        throw out_of_scope("target does not belong to this provider");
+
+    if (action_sink->handler)
+        throw already_exists("target action already has a handler");
+
+    action_sink->handler = handler;
+}
+
+void system::action_handler_remove(uint64_t provider_id, uint64_t target, action_handler* handler) {
+    std::lock_guard<std::mutex> guard(_lock);
+    res_item_action_sink* action_sink = _get_action_sink(target);
+
+    if (action_sink->provider_id != provider_id)
+        throw out_of_scope("target does not belong to this provider");
+
+    if (action_sink->handler != handler) {
+        if (action_sink->handler)
+            throw not_found("another handler is attached to this action sink");
+        else
+            throw not_found("no handler is attached to this action sink");
+    }
+
+    action_sink->handler = nullptr;
+}
+
+void system::action_handler_clear(uint64_t provider_id, const std::set<uint64_t>& targets, action_handler* handler) {
+    std::lock_guard<std::mutex> guard(_lock);
+    for (uint64_t target : targets) {
+        res_item_action_sink* action_sink = _get_action_sink(target);
+
+        if (action_sink->provider_id != provider_id)
+            throw out_of_scope("target" + std::to_string(target) + " does not belong to this provider");
+
+        if (action_sink->handler != handler) {
+            if (action_sink->handler)
+                throw not_found("another handler is attached to the action sink with id " + std::to_string(target));
+            else
+                throw not_found("no handler is attached to the action sink with id " + std::to_string(target));
+        }
+
+        action_sink->handler = nullptr;
     }
 }

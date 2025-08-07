@@ -40,7 +40,7 @@ void provider::teardown() {
     _name.clear();
 }
 
-uint64_t provider::id() {
+uint64_t provider::id() const {
     return _id;
 }
 

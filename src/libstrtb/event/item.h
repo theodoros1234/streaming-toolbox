@@ -3,9 +3,11 @@
 
 #include <string>
 #include <vector>
+#include <mutex>
+#include <condition_variable>
+#include <stdint.h>
 #include "../json/value_object.h"
 #include "../logging/logging.h"
-#include <stdint.h>
 #include "../json/holder.h"
 
 namespace strtb::event {
@@ -58,6 +60,11 @@ public:
 class bad_definition : public event_exception {
 public:
     bad_definition(const std::string& what);
+};
+
+class bad_state : public event_exception {
+public:
+    bad_state(const std::string& what);
 };
 
 struct param_definition {
@@ -152,6 +159,26 @@ struct item_info_event_sub {
     uint64_t event_sub_rid = 0;
     json::holder param;
 };
+
+enum action_request_status {
+    ACTION_UNDEFINED,
+    ACTION_PENDING,
+    ACTION_ERROR,
+    ACTION_DONE
+};
+
+struct action_request {
+    action_request_status status = ACTION_UNDEFINED;
+    std::string diagnostic_info;    // for errors, to be displayed to the GUI or to be written to the log
+    json::holder params, returns;
+    uint64_t action_sink_id;
+    std::mutex lock;
+    std::condition_variable cv;
+    // pointer to requester
+};
+
+void param_type_check(const json::value* param, const param_definition* def);
+void param_type_check(const json::value* param, const std::vector<param_definition>& defs);
 
 }
 
