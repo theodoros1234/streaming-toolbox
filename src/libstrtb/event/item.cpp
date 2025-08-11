@@ -490,6 +490,12 @@ ssize_t item_path::validate() const {
     return -1;  // Returning -1 means all segments are valid
 }
 
+void item_path::validate_with_exception() const {
+    ssize_t path_validate = validate();
+    if (path_validate != -1)
+        throw invalid_path("path segment " + common::string_escape(at(path_validate)) + " is invalid", path_validate);
+}
+
 bool item_path::validate_segment(size_t pos) const {
     return validate_segment(at(pos));
 }

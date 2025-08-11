@@ -7,45 +7,48 @@
 #include <deque>
 #include <vector>
 #include <set>
-#include "item.h"
-#include "../json/value.h"
+#include "../json/holder.h"
 
 namespace strtb::event {
 
 class provider;
 class system;
+class action_request_internal;
 
 class action_handler {
 private:
     std::mutex _lock;
     std::condition_variable _cv;
-    std::deque< std::shared_ptr<action_request> > _queue;
+    std::deque< std::shared_ptr<action_request_internal> > _queue;
     std::set<uint64_t> _action_sinks;
     provider const& _pr;
     bool _active = false;
 
 protected:
     friend system;
-    bool push_request(const std::shared_ptr<action_request>& rq);
+    bool push_request(const std::shared_ptr<action_request_internal>& rq);
     void action_sink_removed(uint64_t rid);
 
 public:
     class request {
     private:
-        std::shared_ptr<action_request> _rq;
+        std::shared_ptr<action_request_internal> _rq;
         void _check() const;
 
     protected:
         friend action_handler;
-        request() = default;    // for empty returns when handler is stopped
-        request(std::shared_ptr<action_request>&& rq);
+        request(const std::shared_ptr<action_request_internal>& rq);
 
     public:
+        request() = default;    // for empty returns when handler is stopped
         request(request&) = delete;
         request(const request&) = delete;
         request(request&& from);
         ~request();
-        void return_success(const json::value* value);
+        request& operator=(request&& from);
+        const json::value_object& params() const;
+        json::holder& returns() const;
+        void return_success();
         void return_error(const char* diagnostic_info);
         void return_error(const std::string& diagnostic_info);
         uint64_t action_sink_id() const;

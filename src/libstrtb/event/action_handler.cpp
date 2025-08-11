@@ -1,10 +1,14 @@
 #include "action_handler.h"
+#include "action_requester.h"
 #include "system.h"
 #include "provider.h"
+#include "../logging/logging.h"
 
 using namespace strtb::event;
 
-action_handler::request::request(std::shared_ptr<action_request>&& rq) : _rq(rq) {}
+static strtb::logging::source log_s("Event System: Action Handler");
+
+action_handler::request::request(const std::shared_ptr<action_request_internal>& rq) : _rq(rq) {}
 
 action_handler::request::request(request&& from) : _rq(std::move(from._rq)) {}
 
@@ -18,25 +22,37 @@ action_handler::request::~request() {
     _rq->cv.notify_one();
 }
 
+action_handler::request& action_handler::request::operator=(request&& from) {
+    if (_rq.get())
+        throw bad_state("the previous request must be answered before move assigning");
+
+    _rq.swap(from._rq);
+    return *this;
+}
+
 void action_handler::request::_check() const {
     if (_rq.get() == nullptr)
         throw bad_state("request was already handled, or was moved to another request handler");
 }
 
-void action_handler::request::return_success(const json::value* value) {
+const strtb::json::value_object& action_handler::request::params() const {
+    _check();
+    // locking not needed, as the requester is not allowed to change this after sending the request
+    return _rq->params;
+}
+
+strtb::json::holder& action_handler::request::returns() const {
+    _check();
+    // locking not needed, as the requester will only access this after cv is notified
+    return _rq->returns;
+}
+
+void action_handler::request::return_success() {
     _check();
     std::lock_guard<std::mutex>guard(_rq->lock);
-    try {
-        _rq->status = ACTION_DONE;
-        _rq->returns = value;
-        _rq->cv.notify_one();
-    } catch (...) {
-        _rq->status = ACTION_ERROR;
-        _rq->cv.notify_one();
-        _rq->diagnostic_info = "Error while returning data from the action. "
-                               "The action may still have been processed silently.";
-        throw;
-    }
+    _rq->status = ACTION_DONE;
+    _rq->cv.notify_one();
+    _rq.reset();
 }
 
 void action_handler::request::return_error(const char* diagnostic_info) {
@@ -45,6 +61,7 @@ void action_handler::request::return_error(const char* diagnostic_info) {
     _rq->status = ACTION_ERROR;
     _rq->cv.notify_one();
     _rq->diagnostic_info = diagnostic_info;
+    _rq.reset();
 }
 
 void action_handler::request::return_error(const std::string& diagnostic_info) {
@@ -53,6 +70,7 @@ void action_handler::request::return_error(const std::string& diagnostic_info) {
     _rq->status = ACTION_ERROR;
     _rq->cv.notify_one();
     _rq->diagnostic_info = diagnostic_info;
+    _rq.reset();
 }
 
 uint64_t action_handler::request::action_sink_id() const {
@@ -67,7 +85,11 @@ bool action_handler::request::empty() const {
 action_handler::action_handler(provider& provider) : _pr(provider) {}
 
 action_handler::~action_handler() {
-    // TODO: Fill this in later. Should cancel any pending requests
+    if (_active) {
+        log_s.warning({"Destroying a handler while still active. Stopping, but this could cause a crash."});
+        stop();
+    }
+    clear();
 }
 
 // NOTE: add/remove functions should only be called from the same thread as provider item add/remove functions
@@ -103,13 +125,14 @@ void action_handler::start() {
 void action_handler::stop() {
     std::lock_guard<std::mutex> guard(_lock);
     _active = false;
-    _cv.notify_one();
+    _cv.notify_all();
     for (auto& r : _queue) {
         r->status = ACTION_ERROR;
         r->cv.notify_one();
         r->diagnostic_info = "Action is currently unavailable";
         r.reset();
     }
+    _queue.clear();
 }
 
 action_handler::request action_handler::listen() {
@@ -143,4 +166,18 @@ void action_handler::listen(std::vector<request>& destination) {
         destination.clear();
         throw;
     }
+}
+
+bool action_handler::push_request(const std::shared_ptr<action_request_internal>& rq) {
+    std::lock_guard<std::mutex> guard(_lock);
+    if (!_active)
+        return false;
+    _queue.emplace_back(rq);
+    _cv.notify_one();
+    return true;
+}
+
+void action_handler::action_sink_removed(uint64_t rid) {
+    if (_action_sinks.erase(rid) < 1)
+        throw internal_error("removing an action sink from an action handler that isn't handling it");
 }

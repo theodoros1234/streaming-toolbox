@@ -17,6 +17,8 @@ namespace strtb::event {
 class provider;
 class event_listener_base;
 class action_handler;
+class action_requester;
+struct action_request_internal;
 
 class system {
 private:
@@ -26,7 +28,7 @@ private:
         item_path path;
         size_t path_pos_found = -1; // position of path segment it's currently looking for, path.size() if found
         item_type wanted_type = ITEM_UNDEFINED;
-        uint64_t sub_rid = 0, target_rid = 0;
+        uint64_t follower_rid = 0, target_rid = 0;
         path_follower_status status = PATH_FL_WAITING;
         std::string diagnostic_info;
 
@@ -54,8 +56,8 @@ private:
         std::map<std::string, std::set<res_path_follower*> > waiting_path_followers;
 
         void path_follower_attach(res_path_follower* path_fl, uint64_t my_rid);
-        void path_follower_detach(res_path_follower* path_fl);
-        void path_follower_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid);
+        void path_follower_detach(res_path_follower* path_fl);  // detaches for unsubbing
+        void path_follower_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid);   // detaches for item removal (moves back)
         bool has_path_followers();
     };
 
@@ -70,8 +72,8 @@ private:
         std::map<std::string, std::set<res_event_sub*> > subs_string;
 
         bool sub_attach(res_path_follower& path_fl, uint64_t my_rid);
-        void sub_detach(res_event_sub* sub_ptr);
-        void sub_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid);
+        void sub_detach(res_event_sub* sub_ptr);    // detaches for unsubbing
+        void sub_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid); // detaches for item removal (moves back)
         bool has_subs();
     };
 
@@ -79,7 +81,14 @@ private:
         std::vector<param_definition> params;
         param_definition returns;
         std::vector<example_definition> examples;
+
         action_handler* handler = nullptr;
+        std::set<res_path_follower*> requesters;
+
+        void requester_attach(res_path_follower* path_fl, uint64_t my_rid);
+        void requester_detach(res_path_follower* path_fl);  // detaches for unsubbing
+        void requester_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid);   // detaches for item removal (moves back)
+        bool has_requesters();
     };
 
     struct res_cnt {
@@ -113,6 +122,7 @@ private:
     std::mutex _lock;
     std::map<uint64_t, res_cnt> _items;
     std::map<uint64_t, std::unique_ptr<res_event_sub> > _event_subs;
+    std::map<uint64_t, std::unique_ptr<res_path_follower> > _action_requesters;
     uint64_t _resid_counter = STRTB_EVENT_ROOT + 1;
 
     uint64_t _resid_new();
@@ -121,6 +131,10 @@ private:
     std::pair<res_item_category*, uint64_t> _get_category(uint64_t start, const item_path& target_location);
     res_item_event_src* _get_event_src(uint64_t target_location);
     res_item_action_sink* _get_action_sink(uint64_t target_location);
+    static void _path_follower_detached(res_path_follower* path_fl,
+                                      std::set<res_path_follower*> &move_into,
+                                      uint64_t cat_rid);
+    static void _path_follower_attached(res_path_follower* path_fl, uint64_t my_rid);
     std::pair<uint64_t, res_cnt&> _provider_item_add(uint64_t provider_id,
                                                      res_item_category* location,
                                                      const std::string& name,
@@ -136,6 +150,7 @@ private:
                           res_item_category* location,
                           const json::value_object* entries);
     void _event_listener_unsubscribe(uint64_t subscription_id);
+    void _action_requester_path_clear(uint64_t rid);
     void _info(uint64_t resource_id, item_info& item);
     std::vector<item_listing> _list(const res_item_category *location);
 
@@ -143,6 +158,7 @@ protected:
     friend provider;
     friend event_listener_base;
     friend action_handler;
+    friend action_requester;
 
     uint64_t provider_item_add(uint64_t provider_id,
                                uint64_t target_location,
@@ -173,6 +189,10 @@ protected:
     void action_handler_add(uint64_t provider_id, uint64_t target, action_handler* handler);
     void action_handler_remove(uint64_t provider_id, uint64_t target, action_handler* handler);
     void action_handler_clear(uint64_t provider_id, const std::set<uint64_t>& targets, action_handler* handler);
+
+    uint64_t action_requester_path_set(uint64_t old_rid, const item_path& path, const std::string& owner_name);
+    void action_requester_path_clear(uint64_t rid);
+    void action_requester_run(uint64_t path_fl_rid, const std::shared_ptr<action_request_internal>& request);
 
 public:
     system();

@@ -3,6 +3,8 @@
 #include <cassert>
 #include "system.h"
 #include "event_listener.h"
+#include "action_handler.h"
+#include "action_requester.h"
 #include "../logging/logging.h"
 #include "../common/strescape.h"
 #include "../json/cast.h"
@@ -20,7 +22,7 @@ system::res_path_follower::res_path_follower(const std::string& owner_name,
                                              const item_path& path,
                                              item_type wanted_type,
                                              uint64_t sub_rid) :
-    owner_name(owner_name), path(path), wanted_type(wanted_type), sub_rid(sub_rid) {}
+    owner_name(owner_name), path(path), wanted_type(wanted_type), follower_rid(sub_rid) {}
 
 system::res_event_sub::res_event_sub(const item_path&path,
                                      const json::value* param,
@@ -56,6 +58,10 @@ void system::res_item_category::path_follower_attach(res_path_follower* path_fl,
                             case ITEM_EVENT_SRC:
                                 if (res.as_event_src()->sub_attach(*path_fl, itr->second))
                                     return;
+                                break;
+
+                            case ITEM_ACTION_SINK:
+                                res.as_action_sink()->requester_attach(path_fl, itr->second);
                                 break;
 
                             default:
@@ -121,13 +127,29 @@ bool system::res_item_category::has_path_followers() {
     return !waiting_path_followers.empty();
 }
 
+void system::_path_follower_attached(res_path_follower* path_fl, uint64_t my_rid) {
+    path_fl->status = PATH_FL_READY;
+    path_fl->path_pos_found++;
+    path_fl->target_rid = my_rid;
+    assert(path_fl->path_pos_found == path_fl->path.size());
+}
+
+void system::_path_follower_detached(res_path_follower* path_fl,
+                                   std::set<res_path_follower*> &move_into,
+                                   uint64_t cat_rid) {
+    move_into.insert(path_fl);
+    path_fl->status = PATH_FL_WAITING;
+    path_fl->target_rid = cat_rid;
+    path_fl->path_pos_found--;
+}
+
 bool system::res_item_event_src::sub_attach(res_path_follower &path_fl, uint64_t my_rid) {
     res_event_sub* sub_ptr = nullptr;
     assert(path_fl.wanted_type == ITEM_EVENT_SRC);
 
     // Find event sub resource
     try {
-        sub_ptr = system_ptr->_event_subs.at(path_fl.sub_rid).get();
+        sub_ptr = system_ptr->_event_subs.at(path_fl.follower_rid).get();
     } catch (std::out_of_range&) {
         throw internal_error("couldn't find event subscription with this resource id");
     }
@@ -186,10 +208,7 @@ bool system::res_item_event_src::sub_attach(res_path_follower &path_fl, uint64_t
         throw internal_error("event source and subscription are holding an unsupported param type");
     }
 
-    path_fl.status = PATH_FL_READY;
-    path_fl.target_rid = my_rid;
-    path_fl.path_pos_found++;
-    assert(path_fl.path_pos_found == path_fl.path.size());
+    _path_follower_attached(&path_fl, my_rid);
     return true;
 }
 
@@ -242,32 +261,24 @@ void system::res_item_event_src::sub_detach(res_event_sub* sub_ptr) {
 }
 
 void system::res_item_event_src::sub_detach_all(std::set<res_path_follower*> &move_into, uint64_t cat_rid) {
-    // Using a lambda to avoid copy-pasting this code many times
-    static const auto detach = [](res_event_sub* sub, std::set<res_path_follower*>& move_into, uint64_t cat_rid) {
-        move_into.insert(&sub->path);
-        sub->path.status = PATH_FL_WAITING;
-        sub->path.target_rid = cat_rid;
-        sub->path.path_pos_found--;
-    };
-
     for (auto sub : subs_none)
-        detach(sub, move_into, cat_rid);
+        _path_follower_detached(&sub->path, move_into, cat_rid);
     subs_none.clear();
 
     for (size_t i=0; i<=1; i++) {
         for (auto sub : subs_bool[i])
-            detach(sub, move_into, cat_rid);
+            _path_follower_detached(&sub->path, move_into, cat_rid);
         subs_bool[i].clear();
     }
 
     for (auto& set : subs_int)
         for (auto sub : set.second)
-            detach(sub, move_into, cat_rid);
+            _path_follower_detached(&sub->path, move_into, cat_rid);
     subs_int.clear();
 
     for (auto& set : subs_string)
         for (auto sub : set.second)
-            detach(sub, move_into, cat_rid);
+            _path_follower_detached(&sub->path, move_into, cat_rid);
     subs_string.clear();
 }
 
@@ -277,6 +288,29 @@ bool system::res_item_event_src::has_subs() {
              subs_bool[1].empty() &&
              subs_int.empty() &&
              subs_string.empty());
+}
+
+void system::res_item_action_sink::requester_attach(res_path_follower* path_fl, uint64_t my_rid) {
+    if (!requesters.insert(path_fl).second)
+        throw internal_error("tried to attach a path follower to an action sink it was already attached to", log_s);
+
+    _path_follower_attached(path_fl, my_rid);
+}
+
+void system::res_item_action_sink::requester_detach(res_path_follower* path_fl) {
+    path_fl->target_rid = 0;
+    if (requesters.erase(path_fl) < 1)
+        throw internal_error("couldn't find path follower in action sink", log_s);
+}
+
+void system::res_item_action_sink::requester_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid) {
+    for (res_path_follower* path_fl : requesters)
+        _path_follower_detached(path_fl, move_into, cat_rid);
+    requesters.clear();
+}
+
+bool system::res_item_action_sink::has_requesters() {
+    return !requesters.empty();
 }
 
 static void _verify_params(const param_definition& param) {
@@ -537,9 +571,7 @@ uint64_t system::_resid_new() {
 
 uint64_t system::_follow_path(uint64_t start, const item_path& path) {
     uint64_t current_pos = start;
-    ssize_t path_validate = path.validate();
-    if (path_validate != -1)
-        throw invalid_path("path segment " + common::string_escape(path.at(path_validate)) + " is invalid", path_validate);
+    path.validate_with_exception();
 
     for (const std::string& next_piece : path) {
         try {
@@ -650,6 +682,10 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
                                     moved.push_back(path_fl);
                                 break;
 
+                            case ITEM_ACTION_SINK:
+                                new_item.as_action_sink()->requester_attach(path_fl, new_res_id);
+                                break;
+
                             default:
                                 throw internal_error("path follower is targetting an item type that isn't yet supported");
                             }
@@ -736,7 +772,8 @@ void system::_provider_item_remove_path_followers(uint64_t location_rid,
     // Make sure there's something to do first
     if (location->waiting_path_followers.count(name) ||
         (item.type() == ITEM_CATEGORY && item.as_category()->has_path_followers()) ||
-        (item.type() == ITEM_EVENT_SRC && item.as_event_src()->has_subs())) {
+        (item.type() == ITEM_EVENT_SRC && item.as_event_src()->has_subs()) ||
+        (item.type() == ITEM_ACTION_SINK && item.as_action_sink()->has_requesters())) {
         auto& path_fl_set = location->waiting_path_followers[name];
 
         // Clear error status of held back path followers
@@ -753,6 +790,10 @@ void system::_provider_item_remove_path_followers(uint64_t location_rid,
 
         case ITEM_EVENT_SRC:
             item.as_event_src()->sub_detach_all(path_fl_set, location_rid);
+            break;
+
+        case ITEM_ACTION_SINK:
+            item.as_action_sink()->requester_detach_all(path_fl_set, location_rid);
             break;
 
         default:    // just makes clangd shut up
@@ -786,6 +827,13 @@ void system::_provider_item_remove(uint64_t location_rid, res_item_category* loc
     // If item is a subcategory, clear it recursively
     if (item->second.type() == ITEM_CATEGORY)
         _provider_category_clear(location_rid, item->second.as_category());
+
+    // If item is an action sink, remove its handler
+    if (item->second.type() == ITEM_ACTION_SINK) {
+        res_item_action_sink* action_sink = item->second.as_action_sink();
+        if (action_sink->handler != nullptr)
+            action_sink->handler->action_sink_removed(item->first);
+    }
 
     _provider_item_remove_path_followers(location_rid, location, name, item->second);
     _items.erase(item);
@@ -842,6 +890,13 @@ void system::_provider_category_clear(uint64_t location_rid, res_item_category* 
         // If item is a subcategory, clear it recursively
         if (item->second.type() == ITEM_CATEGORY)
             _provider_category_clear(location_rid, item->second.as_category());
+
+        // If item is an action sink, remove its handler
+        if (item->second.type() == ITEM_ACTION_SINK) {
+            res_item_action_sink* action_sink = item->second.as_action_sink();
+            if (action_sink->handler != nullptr)
+                action_sink->handler->action_sink_removed(item->first);
+        }
 
         // Delete resource
         _provider_item_remove_path_followers(location_rid, location, entry.first, item->second);
@@ -1082,7 +1137,7 @@ void system::_event_listener_unsubscribe(uint64_t subscription_id) {
     uint64_t remove_from = sub->path.target_rid;
     if (remove_from == 0) {
         _event_subs.erase(sub_itr);
-        throw internal_error("event subscription was abandoned");   // maybe should just be a warning instead?
+        throw internal_error("event subscription was abandoned");   // TODO: maybe should just be a warning instead?
     }
 
     try {
@@ -1129,7 +1184,7 @@ std::vector<item_info_path_follower> system::info_path_followers(uint64_t resour
         for (const auto path_fl : set.second) {
             item_info_path_follower i = {
                 .owner_name = path_fl->owner_name,
-                .sub_rid = path_fl->sub_rid,
+                .sub_rid = path_fl->follower_rid,
                 .path = path_fl->path,
                 .wanted_type = path_fl->wanted_type,
                 .status = path_fl->status,
@@ -1152,7 +1207,7 @@ std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
     static const auto add = [](res_event_sub* event_sub, std::vector<item_info_event_sub>& info_returned) {
         item_info_event_sub i = {
             .listener_name = event_sub->listener._name,
-            .event_sub_rid = event_sub->path.sub_rid,
+            .event_sub_rid = event_sub->path.follower_rid,
             .param = event_sub->param
         };
         info_returned.push_back(std::move(i));
@@ -1196,7 +1251,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     }
 
     for (const auto sub : event_src->subs_none)
-        sub->listener.push_event(sub->path.sub_rid, event);
+        sub->listener.push_event(sub->path.follower_rid, event);
 }
 
 void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, bool filter) {
@@ -1219,11 +1274,11 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     }
 
     for (const auto sub : event_src->subs_bool[filter])
-        sub->listener.push_event(sub->path.sub_rid, event);
+        sub->listener.push_event(sub->path.follower_rid, event);
 
     if (!event_src->param.required)
         for (const auto sub : event_src->subs_none)
-            sub->listener.push_event(sub->path.sub_rid, event);
+            sub->listener.push_event(sub->path.follower_rid, event);
 }
 
 void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, long long filter) {
@@ -1249,11 +1304,11 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
 
     if (set_itr != event_src->subs_int.end())
         for (const auto sub : set_itr->second)
-            sub->listener.push_event(sub->path.sub_rid, event);
+            sub->listener.push_event(sub->path.follower_rid, event);
 
     if (!event_src->param.required)
         for (const auto sub : event_src->subs_none)
-            sub->listener.push_event(sub->path.sub_rid, event);
+            sub->listener.push_event(sub->path.follower_rid, event);
 }
 
 void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const std::string& filter) {
@@ -1279,11 +1334,11 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
 
     if (set_itr != event_src->subs_string.end())
         for (const auto sub : set_itr->second)
-            sub->listener.push_event(sub->path.sub_rid, event);
+            sub->listener.push_event(sub->path.follower_rid, event);
 
     if (!event_src->param.required)
         for (const auto sub : event_src->subs_none)
-            sub->listener.push_event(sub->path.sub_rid, event);
+            sub->listener.push_event(sub->path.follower_rid, event);
 }
 
 void system::provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const json::value* filter) {
@@ -1356,4 +1411,134 @@ void system::action_handler_clear(uint64_t provider_id, const std::set<uint64_t>
 
         action_sink->handler = nullptr;
     }
+}
+
+void system::_action_requester_path_clear(uint64_t rid) {
+    auto itr = _action_requesters.find(rid);
+    if (itr == _action_requesters.end())
+        throw internal_error("old action sink follower not found", log_s);
+    uint64_t remove_from = itr->second->target_rid;
+    if (remove_from == 0) {
+        _action_requesters.erase(itr);
+        throw internal_error("action requester's path follower was abandoned");   // TODO: maybe should just be a warning instead?
+    }
+
+    try {
+        res_cnt& target_item = _items.at(remove_from);
+        switch (target_item.type()) {
+        case ITEM_CATEGORY:
+            target_item.as_category()->path_follower_detach(itr->second.get());
+            _action_requesters.erase(itr);
+            break;
+
+        case ITEM_ACTION_SINK:
+            target_item.as_action_sink()->requester_detach(itr->second.get());
+            _action_requesters.erase(itr);
+            break;
+
+        default:
+            _action_requesters.erase(itr);
+            throw internal_error("action requester's path follower waas held by an unsupported item type", log_s);
+        }
+    } catch (std::out_of_range&) {
+        _action_requesters.erase(itr);
+        throw internal_error("action requester's path follower was held by an item that no longer exists", log_s);
+    }
+}
+
+uint64_t system::action_requester_path_set(uint64_t old_rid, const item_path& path, const std::string &owner_name) {
+    path.validate_with_exception();
+    std::lock_guard<std::mutex> guard(_lock);
+
+    // Remove the old one
+    if (old_rid != 0)
+        _action_requester_path_clear(old_rid);
+
+    // Add the new one
+    uint64_t new_path_fl_id = _resid_new();
+    std::unique_ptr<res_path_follower> new_path_fl(new res_path_follower(
+        owner_name, path, ITEM_ACTION_SINK, new_path_fl_id));
+    auto [new_set_entry, added] = _action_requesters.emplace(new_path_fl_id, std::move(new_path_fl));
+    if (!added)
+        throw internal_error("an action requester's path follower with the same resource id already exists", log_s);
+
+    try {
+        _items.at(STRTB_EVENT_ROOT).as_category()->path_follower_attach(
+            new_set_entry->second.get(), STRTB_EVENT_ROOT);
+    } catch (...) {
+        _action_requesters.erase(new_set_entry);
+        throw;
+    }
+
+    return new_path_fl_id;
+}
+
+void system::action_requester_path_clear(uint64_t rid) {
+    std::lock_guard<std::mutex> guard(_lock);
+    _action_requester_path_clear(rid);
+}
+
+void system::action_requester_run(uint64_t path_fl_rid, const std::shared_ptr<action_request_internal>& request) {
+    std::lock_guard<std::mutex> guard(_lock);
+    res_path_follower* path_fl;
+    try {
+        path_fl = _action_requesters.at(path_fl_rid).get();
+    } catch (std::out_of_range&) {
+        throw internal_error("action requester's path follower not found", log_s);
+    }
+
+    // Check path follower's state
+    switch (path_fl->status) {
+    case PATH_FL_READY:
+        break;
+
+    case PATH_FL_WAITING:
+        request->status = ACTION_ERROR;
+        request->diagnostic_info = "Target action sink not found";
+        return;
+
+    case PATH_FL_WRONG_TYPE:
+        request->status = ACTION_ERROR;
+        request->diagnostic_info = "Target is not an action sink";
+        return;
+
+    default:
+        throw internal_error("action requester's path follower has an invalid state of " +
+                                 std::to_string(path_fl->status), log_s);
+    }
+
+    // Get the action sink
+    res_item_action_sink* action_sink;
+    try {
+        action_sink = _items.at(path_fl->target_rid).as_action_sink();
+    } catch (std::out_of_range&) {
+        throw internal_error("action requester's path follower is holding an invalid item resource id", log_s);
+    } catch (wrong_type&) {
+        throw internal_error("action requester's path follower got attached to the wrong item type", log_s);
+    }
+
+    // Make sure there's an action handler attached
+    if (action_sink->handler == nullptr) {
+        request->status = ACTION_ERROR;
+        request->diagnostic_info = "Action is currently unavailable";
+        return;
+    }
+
+    // Param type check
+    try {
+        param_type_check(&request->params, action_sink->params);
+    } catch (wrong_type& e) {
+        request->status = ACTION_ERROR;
+        request->diagnostic_info = std::string("Invalid parameters: ") + e.what();
+        return;
+    }
+
+    // Send request to handler's queue
+    request->action_sink_id = path_fl->target_rid;
+    if (!action_sink->handler->push_request(request)) {
+        request->status = ACTION_ERROR;
+        request->diagnostic_info = "Action is currently unavailable";
+        return;
+    }
+    request->status = ACTION_PENDING;
 }

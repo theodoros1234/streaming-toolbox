@@ -110,6 +110,7 @@ public:
     item_path(const char* path, size_t max_segment_length = 256, size_t max_depth = 64);
     std::string to_string() const;
     ssize_t validate() const;
+    void validate_with_exception() const;
     bool validate_segment(size_t pos) const;
     static bool validate_segment(const std::string& segment);
 };
@@ -158,23 +159,6 @@ struct item_info_event_sub {
     std::string listener_name;
     uint64_t event_sub_rid = 0;
     json::holder param;
-};
-
-enum action_request_status {
-    ACTION_UNDEFINED,
-    ACTION_PENDING,
-    ACTION_ERROR,
-    ACTION_DONE
-};
-
-struct action_request {
-    action_request_status status = ACTION_UNDEFINED;
-    std::string diagnostic_info;    // for errors, to be displayed to the GUI or to be written to the log
-    json::holder params, returns;
-    uint64_t action_sink_id;
-    std::mutex lock;
-    std::condition_variable cv;
-    // pointer to requester
 };
 
 void param_type_check(const json::value* param, const param_definition* def);

@@ -20,6 +20,7 @@ SOURCES += \
     config/system.cpp \
     config/id_type.cpp \
     event/action_handler.cpp \
+    event/action_requester.cpp \
     event/event_listener.cpp \
     event/item.cpp \
     event/provider.cpp \
@@ -66,6 +67,7 @@ HEADERS += \
     config/id_type.h \
     config/system.h \
     event/action_handler.h \
+    event/action_requester.h \
     event/event_listener.h \
     event/item.h \
     event/provider.h \
