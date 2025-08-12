@@ -119,7 +119,6 @@ private:
         res_item_action_sink* as_action_sink() const;
     };
 
-    std::mutex _lock;
     std::map<uint64_t, res_cnt> _items;
     std::map<uint64_t, std::unique_ptr<res_event_sub> > _event_subs;
     std::map<uint64_t, std::unique_ptr<res_path_follower> > _action_requesters;
@@ -160,6 +159,8 @@ protected:
     friend action_handler;
     friend action_requester;
 
+    std::mutex _lock;
+
     uint64_t provider_item_add(uint64_t provider_id,
                                uint64_t target_location,
                                const std::string& name,
@@ -186,9 +187,11 @@ protected:
     void event_listener_unsubscribe(uint64_t subscription_id);
     void event_listener_unsubscribe(const std::set<uint64_t>& subscription_ids);
 
-    void action_handler_add(uint64_t provider_id, uint64_t target, action_handler* handler);
+    const param_definition* action_handler_add(uint64_t provider_id, uint64_t target, action_handler* handler);
     void action_handler_remove(uint64_t provider_id, uint64_t target, action_handler* handler);
-    void action_handler_clear(uint64_t provider_id, const std::set<uint64_t>& targets, action_handler* handler);
+    void action_handler_clear(uint64_t provider_id,
+                              const std::map<uint64_t, const param_definition*>& targets,
+                              action_handler* handler);
 
     uint64_t action_requester_path_set(uint64_t old_rid, const item_path& path, const std::string& owner_name);
     void action_requester_path_clear(uint64_t rid);

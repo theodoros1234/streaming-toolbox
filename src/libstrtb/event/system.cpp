@@ -1364,8 +1364,8 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
     }
 }
 
-void system::action_handler_add(uint64_t provider_id, uint64_t target, action_handler* handler) {
-    std::lock_guard<std::mutex> guard(_lock);
+const param_definition* system::action_handler_add(uint64_t provider_id, uint64_t target, action_handler* handler) {
+    // must be locked by caller
     res_item_action_sink* action_sink = _get_action_sink(target);
 
     if (action_sink->provider_id != provider_id)
@@ -1375,10 +1375,11 @@ void system::action_handler_add(uint64_t provider_id, uint64_t target, action_ha
         throw already_exists("target action already has a handler");
 
     action_sink->handler = handler;
+    return &action_sink->returns;
 }
 
 void system::action_handler_remove(uint64_t provider_id, uint64_t target, action_handler* handler) {
-    std::lock_guard<std::mutex> guard(_lock);
+    // must be locked by caller
     res_item_action_sink* action_sink = _get_action_sink(target);
 
     if (action_sink->provider_id != provider_id)
@@ -1394,9 +1395,9 @@ void system::action_handler_remove(uint64_t provider_id, uint64_t target, action
     action_sink->handler = nullptr;
 }
 
-void system::action_handler_clear(uint64_t provider_id, const std::set<uint64_t>& targets, action_handler* handler) {
-    std::lock_guard<std::mutex> guard(_lock);
-    for (uint64_t target : targets) {
+void system::action_handler_clear(uint64_t provider_id, const std::map<uint64_t, const param_definition *> &targets, action_handler* handler) {
+    // must be locked by caller
+    for (auto [target, ignored] : targets) {
         res_item_action_sink* action_sink = _get_action_sink(target);
 
         if (action_sink->provider_id != provider_id)

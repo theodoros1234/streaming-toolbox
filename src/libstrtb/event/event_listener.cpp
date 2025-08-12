@@ -127,6 +127,8 @@ void event_listener_queued::stop() {
         old_subs = std::move(_subs);
         _subs.clear();
 
+        _queue.clear();
+
         // Wake up listeners
         _active = false;
         _cv.notify_all();

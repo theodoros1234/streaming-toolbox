@@ -6,8 +6,9 @@
 #include <condition_variable>
 #include <deque>
 #include <vector>
-#include <set>
+#include <map>
 #include "../json/holder.h"
+#include "item.h"
 
 namespace strtb::event {
 
@@ -20,7 +21,7 @@ private:
     std::mutex _lock;
     std::condition_variable _cv;
     std::deque< std::shared_ptr<action_request_internal> > _queue;
-    std::set<uint64_t> _action_sinks;
+    std::map<uint64_t, const param_definition*> _action_sinks;
     provider const& _pr;
     bool _active = false;
 
@@ -33,17 +34,15 @@ public:
     class request {
     private:
         std::shared_ptr<action_request_internal> _rq;
+        action_handler* _parent = nullptr;
         void _check() const;
-
-    protected:
-        friend action_handler;
-        request(const std::shared_ptr<action_request_internal>& rq);
 
     public:
         request() = default;    // for empty returns when handler is stopped
         request(request&) = delete;
         request(const request&) = delete;
         request(request&& from);
+        request(std::shared_ptr<action_request_internal>&& rq, action_handler* parent);
         ~request();
         request& operator=(request&& from);
         const json::value_object& params() const;
@@ -61,7 +60,7 @@ public:
     void remove(uint64_t target);
     void clear();
     void start();
-    void stop();
+    void shutdown();
     request listen();
     void listen(std::vector<request>& destination);
 };
