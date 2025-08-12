@@ -45,6 +45,8 @@ void action_requester::shutdown() {
 }
 
 void action_requester::restart() {
+    // replacing _rq prevents a race condition if the handler is still handling the previous request
+    _rq.reset(new action_request_internal());
     _active = true;
 }
 
