@@ -215,7 +215,8 @@ action_handler::request action_handler::listen() {
         if (!_active)
             return request();
 
-        if (_queue.front().get() == nullptr) {  // skip requests for removed action sinks
+        // skip requests for removed action sinks
+        if (_queue.front().get() == nullptr || _queue.front()->abandoned) {
             _queue.pop_front();
             continue;
         }
@@ -230,19 +231,24 @@ void action_handler::listen(std::vector<request>& destination) {
     std::unique_lock<std::mutex> guard(_lock);
     destination.clear();
 
-    while (_active && _queue.empty())
-        _cv.wait(guard);
+    while (true) {
+        while (_active && _queue.empty())
+            _cv.wait(guard);
 
-    if (!_active)
-        return;
+        if (!_active)
+            return;
 
-    try {
-        for (auto& i : _queue)
-            if (i.get() != nullptr)
-                destination.emplace_back(std::move(i), this);
-    } catch (...) {
-        destination.clear();
-        throw;
+        try {
+            for (auto& i : _queue)
+                if (i.get() != nullptr && !i->abandoned)
+                    destination.emplace_back(std::move(i), this);
+        } catch (...) {
+            destination.clear();
+            throw;
+        }
+
+        if (!destination.empty())   // only return if we found unabandoned requests
+            return;
     }
 }
 

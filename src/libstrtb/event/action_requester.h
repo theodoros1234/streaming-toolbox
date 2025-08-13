@@ -25,6 +25,7 @@ struct action_request_internal {
     uint64_t action_sink_id;
     std::mutex lock;
     std::condition_variable cv;
+    bool abandoned = false;
 };
 
 struct action_response {

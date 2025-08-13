@@ -14,6 +14,7 @@ action_requester::action_requester(const std::string& name, const item_path& pat
 }
 
 action_requester::~action_requester() {
+    _rq->abandoned = true;
     path_clear();
 }
 
@@ -42,10 +43,12 @@ void action_requester::shutdown() {
     std::lock_guard<std::mutex> guard(_rq->lock);
     _active = false;
     _rq->cv.notify_one();
+    _rq->abandoned = true;
 }
 
 void action_requester::restart() {
     // replacing _rq prevents a race condition if the handler is still handling the previous request
+    _rq->abandoned = true;
     _rq.reset(new action_request_internal());
     _active = true;
 }
@@ -117,6 +120,6 @@ void action_requester_qt_signal::cancel() {
     if (_t.joinable()) {
         action_requester::shutdown();
         _t.join();
-        action_requester::restart();
+        action_requester::restart();    // NOTE: will also reset params
     }
 }
