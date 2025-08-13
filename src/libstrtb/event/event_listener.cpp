@@ -18,6 +18,8 @@ void event_listener_base::set_name(const std::string& name) {
     _name = name;
 }
 
+// NOTE: don't forget to lock the event system's mutex from inheriting classes (done from here to prevent deadlocks)
+
 uint64_t event_listener_base::_system_subscribe(const item_path& event_source, const json::value* param) {
     return system_ptr->event_listener_subscribe(*this, event_source, param);
 }
@@ -91,12 +93,13 @@ event_listener_queued::~event_listener_queued() {
 }
 
 uint64_t event_listener_queued::_subscribe(const item_path& event_source, const json::value *param) {
+    std::lock_guard<std::mutex> guard_system(system_ptr->_lock);
+    std::lock_guard<std::mutex> guard(_lock);
     _post_first_sub = true;
 
     uint64_t new_sub = _system_subscribe(event_source, param);
 
     try {
-        std::lock_guard<std::mutex> guard(_lock);
         if (_subs.insert(new_sub).second == false)
             throw internal_error("duplicate subscription resource id in event listener");
     } catch (...) {
@@ -108,34 +111,25 @@ uint64_t event_listener_queued::_subscribe(const item_path& event_source, const 
 }
 
 void event_listener_queued::unsubscribe(uint64_t subscription_id) {
-    {
-        std::lock_guard<std::mutex> guard(_lock);
-        if (_subs.erase(subscription_id) == 0)
-            throw not_found("subscription doesn't exist or doesn't belong to this event listener");
-    }
-
+    std::lock_guard<std::mutex> guard_system(system_ptr->_lock);
+    std::lock_guard<std::mutex> guard(_lock);
+    if (_subs.erase(subscription_id) == 0)
+        throw not_found("subscription doesn't exist or doesn't belong to this event listener");
     _system_unsubscribe(subscription_id);
 }
 
 void event_listener_queued::stop() {
-    std::set<uint64_t> old_subs;
-
-    {
-        std::lock_guard<std::mutex> guard(_lock);
-
-        // Get subs so we can cancel them
-        old_subs = std::move(_subs);
-        _subs.clear();
-
-        _queue.clear();
-
-        // Wake up listeners
-        _active = false;
-        _cv.notify_all();
-    }
+    std::lock_guard<std::mutex> guard_system(system_ptr->_lock);
+    std::lock_guard<std::mutex> guard(_lock);
 
     // Cancel old subs
-    _system_unsubscribe(old_subs);
+    _system_unsubscribe(_subs);
+    _subs.clear();
+    _queue.clear();
+
+    // Wake up listeners
+    _active = false;
+    _cv.notify_all();
 }
 
 void event_listener_queued::start() {
@@ -203,6 +197,7 @@ event_listener_qt_signal::~event_listener_qt_signal() {
 }
 
 uint64_t event_listener_qt_signal::_subscribe(const item_path& event_source, const json::value* param) {
+    std::lock_guard<std::mutex> guard_system(system_ptr->_lock);
     _post_first_sub = true;
     uint64_t sub_rid = _system_subscribe(event_source, param);
 
@@ -218,12 +213,14 @@ uint64_t event_listener_qt_signal::_subscribe(const item_path& event_source, con
 }
 
 void event_listener_qt_signal::unsubscribe(uint64_t subscription_id) {
+    std::lock_guard<std::mutex> guard_system(system_ptr->_lock);
     if (_subs.erase(subscription_id) == 0)
         throw not_found("subscription doesn't exist or doesn't belong to this event listener");
     _system_unsubscribe(subscription_id);
 }
 
 void event_listener_qt_signal::stop() {
+    std::lock_guard<std::mutex> guard_system(system_ptr->_lock);
     _system_unsubscribe(_subs);
     _subs.clear();
 }

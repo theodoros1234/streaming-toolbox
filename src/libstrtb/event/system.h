@@ -16,6 +16,8 @@ namespace strtb::event {
 
 class provider;
 class event_listener_base;
+class event_listener_queued;
+class event_listener_qt_signal;
 class action_handler;
 class action_requester;
 struct action_request_internal;
@@ -156,6 +158,8 @@ private:
 protected:
     friend provider;
     friend event_listener_base;
+    friend event_listener_queued;
+    friend event_listener_qt_signal;
     friend action_handler;
     friend action_requester;
 

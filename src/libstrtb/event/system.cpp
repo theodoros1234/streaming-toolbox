@@ -1095,7 +1095,7 @@ void system::provider_import(uint64_t provider_id, const item_path& target_locat
 uint64_t system::event_listener_subscribe(event_listener_base& listener,
                                           const item_path& event_source,
                                           const json::value* param) {
-    std::lock_guard<std::mutex> guard(_lock);
+    // must be locked by caller
 
     if (event_source.empty())
         throw out_of_scope("cannot subscribe to root category");
@@ -1164,12 +1164,13 @@ void system::_event_listener_unsubscribe(uint64_t subscription_id) {
 }
 
 void system::event_listener_unsubscribe(uint64_t subscription_id) {
-    std::lock_guard<std::mutex> guard(_lock);
+    // must be locked by caller
+    // TODO: private version can just be moved into here now
     _event_listener_unsubscribe(subscription_id);
 }
 
 void system::event_listener_unsubscribe(const std::set<uint64_t>& subscription_ids) {
-    std::lock_guard<std::mutex> guard(_lock);
+    // must be locked by caller
     for (auto sub_id : subscription_ids)
         _event_listener_unsubscribe(sub_id);
 }
