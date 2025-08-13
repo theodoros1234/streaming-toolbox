@@ -18,6 +18,7 @@ SOURCES += \
     gui/chat_tab.cpp \
     gui/event_viewer.cpp \
     gui/event_viewer_monitor.cpp \
+    gui/event_viewer_runner.cpp \
     gui/main_window.cpp \
     gui/plugin_tab.cpp \
     main.cpp \
@@ -29,6 +30,7 @@ HEADERS += \
     gui/chat_tab.h \
     gui/event_viewer.h \
     gui/event_viewer_monitor.h \
+    gui/event_viewer_runner.h \
     gui/main_window.h \
     gui/plugin_tab.h \
     plugins/plugin.h \
@@ -39,6 +41,7 @@ FORMS += \
     gui/chat_tab.ui \
     gui/event_viewer.ui \
     gui/event_viewer_monitor.ui \
+    gui/event_viewer_runner.ui \
     gui/main_window.ui \
     gui/plugin_tab.ui
 

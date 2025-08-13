@@ -2,6 +2,7 @@
 #define STRTB_GUI_EVENT_VIEWER_H
 
 #include "event_viewer_monitor.h"
+#include "event_viewer_runner.h"
 #include "../libstrtb/event/item.h"
 #include <QWidget>
 #include <QTreeWidget>
@@ -31,11 +32,12 @@ private:
 
     Ui::event_viewer *ui;
     event_viewer_monitor _event_monitor_ui;
+    event_viewer_runner _action_runner_ui;
 
 private slots:
     void populate();
     void on_item_path_copy_clicked();
-    void launch_event_monitor(QTreeWidgetItem* tree_widget_item, int column);
+    void launch_item_handler(QTreeWidgetItem* tree_widget_item, int column);
     void on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTreeWidgetItem* previous);
 };
 

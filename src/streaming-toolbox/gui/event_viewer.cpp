@@ -11,7 +11,7 @@ event_viewer::event_viewer(QWidget *parent)
     , ui(new Ui::event_viewer) {
     ui->setupUi(this);
     QObject::connect(ui->button_refresh, &QPushButton::clicked, this, &event_viewer::populate);
-    QObject::connect(ui->item_tree, &QTreeWidget::itemActivated, this, &event_viewer::launch_event_monitor);
+    QObject::connect(ui->item_tree, &QTreeWidget::itemActivated, this, &event_viewer::launch_item_handler);
     populate();
     ui->item_tree->sortByColumn(0, Qt::AscendingOrder);
 }
@@ -143,14 +143,24 @@ void event_viewer::on_item_path_copy_clicked() {
     QGuiApplication::clipboard()->setText(ui->item_path->text());
 }
 
-void event_viewer::launch_event_monitor(QTreeWidgetItem* tree_widget_item, int) {
+void event_viewer::launch_item_handler(QTreeWidgetItem* tree_widget_item, int) {
     tree_item* item = (tree_item*) tree_widget_item;
-    if (item->event_item_info.type != event::ITEM_EVENT_SRC)
-        return;
-
     event::item_path path;
-    item->get_path(path);
-    _event_monitor_ui.show_with_item(item->event_item_info, path);
+
+    switch (item->event_item_info.type) {
+    case event::ITEM_EVENT_SRC:
+        item->get_path(path);
+        _event_monitor_ui.show_with_item(item->event_item_info, path);
+        break;
+
+    case event::ITEM_ACTION_SINK:
+        item->get_path(path);
+        _action_runner_ui.show_with_item(item->event_item_info, path);
+        break;
+
+    default:
+        break;
+    }
 }
 
 
