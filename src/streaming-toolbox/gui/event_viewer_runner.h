@@ -5,6 +5,7 @@
 #include "../../libstrtb/event/item.h"
 #include <QWidget>
 #include <QKeyEvent>
+#include <QGridLayout>
 #include <vector>
 
 namespace Ui {
@@ -22,12 +23,18 @@ public:
     void show_with_item(const event::item_info& info, const event::item_path& path);
 
 protected:
+    virtual void closeEvent(QCloseEvent* event);
     virtual void keyPressEvent(QKeyEvent* event);
 
 private:
     Ui::event_viewer_runner *ui;
     event::action_requester_qt_signal _requester;
     std::vector<event::param_definition> _param_definition;
+    QGridLayout* _param_grid = nullptr;
+
+private slots:
+    void run_or_cancel();
+    void received_response(event::action_response response);
 };
 
 }

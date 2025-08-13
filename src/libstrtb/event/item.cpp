@@ -516,7 +516,8 @@ void strtb::event::param_type_check(const json::value* param, const param_defini
     if (!((param->type() == def->type) ||                           // type is correct
           (param->type() == json::VAL_NULL && !def->required) ||    // type is null when it's not required
           (def->type == json::VAL_UNDEFINED)))                      // required type not defined
-        throw wrong_type("type does not match the definition");
+        throw wrong_type("type (" + json::type_to_string(param->type()) +
+                         ") does not match the definition (" + json::type_to_string(def->type) + ")");
 
     if (param->type() == json::VAL_ARRAY &&
         def->array_definition != nullptr &&

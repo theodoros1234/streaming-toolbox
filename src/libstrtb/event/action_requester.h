@@ -86,6 +86,7 @@ public:
     void restart() = delete;
     void get_response() = delete;
     void run();
+    bool running() const;
     void cancel();
 };
 

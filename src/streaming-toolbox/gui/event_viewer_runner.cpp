@@ -1,5 +1,6 @@
 #include "event_viewer_runner.h"
 #include "ui_event_viewer_runner.h"
+#include "../../libstrtb/json/parser.h"
 #include <QGridLayout>
 #include <QCheckBox>
 #include <QLabel>
@@ -9,6 +10,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QSpacerItem>
+#include <QFontDatabase>
 #include <climits>
 
 using namespace strtb::gui;
@@ -86,7 +88,8 @@ static void make_param_row(QGridLayout* layout, int row, const strtb::event::par
     }
 }
 
-static void make_params_grid_object(QWidget* parent, const std::vector<strtb::event::param_definition>& params) {
+static QGridLayout* make_params_grid_object(QWidget* parent,
+                                            const std::vector<strtb::event::param_definition>& params) {
     QGridLayout* grid = new QGridLayout(parent);
     QLabel* label = nullptr;  // for deletion if there's an exception
 
@@ -121,6 +124,8 @@ static void make_params_grid_object(QWidget* parent, const std::vector<strtb::ev
             delete label;
         throw;
     }
+
+    return grid;
 }
 
 event_viewer_runner::event_viewer_runner(QWidget *parent)
@@ -128,6 +133,13 @@ event_viewer_runner::event_viewer_runner(QWidget *parent)
     , ui(new Ui::event_viewer_runner)
     , _requester("GUI: Action Runner") {
     ui->setupUi(this);
+    ui->group_response->setHidden(true);
+
+    ui->response_view->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+
+    QObject::connect(ui->button_run, &QPushButton::clicked, this, &event_viewer_runner::run_or_cancel);
+    QObject::connect(&_requester.emitter, &event::action_requester_qt_signal_emitter::response_received,
+                     this, &event_viewer_runner::received_response, Qt::QueuedConnection);
 }
 
 event_viewer_runner::~event_viewer_runner() {
@@ -135,13 +147,9 @@ event_viewer_runner::~event_viewer_runner() {
 }
 
 void event_viewer_runner::show_with_item(const event::item_info& info, const event::item_path& path) {
-    // TODO: Cancel old action and clear UI
-    _requester.cancel();
-    // TODO: response receiver should ignore the response if action isn't running,
-    //       to prevent a race condition with the previous cancelled action
-    ui->response_view->clear();
-    ui->group_response->setHidden(true);
-    ui->group_params->setVisible(true);
+    if (_requester.running())
+        run_or_cancel();    // will cancel
+    _requester.path_set(path);
 
     // Info
     ui->label_name->setText(QString::fromStdString(info.display_name));
@@ -160,6 +168,7 @@ void event_viewer_runner::show_with_item(const event::item_info& info, const eve
         }
         delete params_old_layout;
     }
+    _param_grid = nullptr;
 
     if (_param_definition.empty()) {
         QVBoxLayout* param_layout = new QVBoxLayout(ui->params_scroll->widget());
@@ -167,7 +176,7 @@ void event_viewer_runner::show_with_item(const event::item_info& info, const eve
         param_layout->addWidget(label);
         param_layout->addStretch();
     } else {
-        make_params_grid_object(ui->params_scroll->widget(), _param_definition);
+        _param_grid = make_params_grid_object(ui->params_scroll->widget(), _param_definition);
     }
 
     show();
@@ -175,7 +184,109 @@ void event_viewer_runner::show_with_item(const event::item_info& info, const eve
     raise();
 }
 
+void event_viewer_runner::run_or_cancel() {
+    bool running = _requester.running();
+    if (running) {  // Cancel
+        _requester.cancel();
+        ui->button_run->setText("Run");
+        ui->response_view->clear();
+    } else {        // Run
+        // Get params from UI
+        _requester.params().clear();
+        if (_param_grid) {
+            for (size_t i=0; i<_param_definition.size(); i++) {
+                event::param_definition& def = _param_definition[i];
+                QLayoutItem* included = _param_grid->itemAtPosition(i+1, 0);
+                if (included == nullptr)
+                    break;
+
+                if (((QCheckBox*) included->widget())->isChecked()) {
+                    QLayoutItem* value = _param_grid->itemAtPosition(i+1, 3);
+                    if (value == nullptr)
+                        break;
+
+                    switch (def.type) {
+                    case json::VAL_BOOL:
+                        _requester.params().set(def.name, ((QCheckBox*) value->widget())->isChecked());
+                        break;
+
+                    case json::VAL_INT:
+                        _requester.params().set(def.name, ((QSpinBox*) value->widget())->value());
+                        break;
+
+                    case json::VAL_FLOAT:
+                        _requester.params().set(def.name, ((QDoubleSpinBox*) value->widget())->value());
+                        break;
+
+                    case json::VAL_STRING:
+                        _requester.params().set(def.name, ((QLineEdit*) value->widget())->text().toStdString());
+                        break;
+
+                    case json::VAL_ARRAY:
+                    case json::VAL_OBJECT:
+                    case json::VAL_UNDEFINED: {
+                        QLineEdit* textbox = (QLineEdit*) value->widget();
+                        textbox->setStyleSheet("");
+                        try {
+                            _requester.params().set_move(
+                                def.name,
+                                json::parser::from_string(textbox->text().toStdString()));
+                        } catch (json::parser::invalid_json&) {
+                            textbox->setStyleSheet("border-color: red;");
+                            return;
+                        }
+                    }
+                    break;
+
+                    default:
+                        break;
+                    }
+                }
+            }
+        }
+
+        _requester.run();
+        ui->button_run->setText("Cancel");
+        ui->response_view->setPlainText("Running action...");
+    }
+
+    ui->group_params->setVisible(running);
+    ui->group_response->setHidden(running);
+}
+
+void event_viewer_runner::received_response(event::action_response response) {
+    if (!_requester.running())
+        return;
+
+    switch (response.status) {
+    case event::ACTION_DONE:
+        if (response.returns.empty()) {
+            ui->response_view->setPlainText("Responded with a null pointer. "
+                                            "This may be a bug in Streaming Toolbox.");
+        } else {
+            ui->response_view->setPlainText("Response: " +
+                                            QString::fromStdString(response.returns.value()->write_to_string(4)));
+        }
+        break;
+
+    case event::ACTION_ERROR:
+        ui->response_view->setPlainText("Error: " + QString::fromStdString(response.diagnostic_info));
+        break;
+
+    default:
+        ui->response_view->setPlainText("Response has invalid status code of " +
+                                        QString::number(response.status));
+    }
+
+    ui->button_run->setText("Reset");
+}
+
 void event_viewer_runner::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Escape)
         close();
+}
+
+void event_viewer_runner::closeEvent(QCloseEvent*) {
+    if (_requester.running())
+        run_or_cancel();    // will cancel the current action
 }

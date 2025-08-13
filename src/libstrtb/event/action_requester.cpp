@@ -94,7 +94,8 @@ action_response action_requester::get_response() {
 
 void action_requester_qt_signal_emitter::thread_code(action_requester_qt_signal* parent) {
     action_response r = ((action_requester*) parent)->get_response();
-    emit response_received(r);
+    if (r.status != ACTION_SHUTDOWN)
+        emit response_received(r);
 }
 
 action_requester_qt_signal::~action_requester_qt_signal() {
@@ -102,16 +103,20 @@ action_requester_qt_signal::~action_requester_qt_signal() {
 }
 
 void action_requester_qt_signal::run() {
-    cancel();
-    action_requester::restart();
+    if (_t.joinable())
+        throw bad_state("must cancel before running another request (even if the response was received)");
     action_requester::run();
-    // TODO: start thread
     _t = std::thread(&action_requester_qt_signal_emitter::thread_code, &emitter, this);
+}
+
+bool action_requester_qt_signal::running() const {
+    return _t.joinable();
 }
 
 void action_requester_qt_signal::cancel() {
     if (_t.joinable()) {
         action_requester::shutdown();
         _t.join();
+        action_requester::restart();
     }
 }

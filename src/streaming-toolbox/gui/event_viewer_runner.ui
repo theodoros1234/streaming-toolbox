@@ -101,9 +101,6 @@
      <layout class="QVBoxLayout" name="verticalLayout_4">
       <item>
        <widget class="QScrollArea" name="params_scroll">
-        <property name="sizeAdjustPolicy">
-         <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustToContents</enum>
-        </property>
         <property name="widgetResizable">
          <bool>true</bool>
         </property>
