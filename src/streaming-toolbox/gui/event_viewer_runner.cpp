@@ -188,7 +188,7 @@ void event_viewer_runner::run_or_cancel() {
     bool running = _requester.running();
     if (running) {  // Cancel
         _requester.cancel();
-        ui->button_run->setText("Run");
+        ui->button_run->setText("&Run");
         ui->response_view->clear();
     } else {        // Run
         // Get params from UI
@@ -246,7 +246,7 @@ void event_viewer_runner::run_or_cancel() {
         }
 
         _requester.run();
-        ui->button_run->setText("Cancel");
+        ui->button_run->setText("&Reset");
         ui->response_view->setPlainText("Running action...");
     }
 
@@ -277,8 +277,6 @@ void event_viewer_runner::received_response(event::action_response response) {
         ui->response_view->setPlainText("Response has invalid status code of " +
                                         QString::number(response.status));
     }
-
-    ui->button_run->setText("Reset");
 }
 
 void event_viewer_runner::keyPressEvent(QKeyEvent* event) {
