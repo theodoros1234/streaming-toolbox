@@ -70,7 +70,7 @@ void action_requester::run() {
     system_ptr->action_requester_run(_path_follower_id, _rq);
 }
 
-action_response action_requester::get_result() {
+action_response action_requester::get_response() {
     std::unique_lock<std::mutex> guard(_rq->lock);
     if (!_active)
         return action_response();
@@ -90,4 +90,28 @@ action_response action_requester::get_result() {
     _rq->returns.clear();
     _rq->action_sink_id = 0;
     return returns;
+}
+
+void action_requester_qt_signal_emitter::thread_code(action_requester_qt_signal* parent) {
+    action_response r = ((action_requester*) parent)->get_response();
+    emit response_received(r);
+}
+
+action_requester_qt_signal::~action_requester_qt_signal() {
+    cancel();
+}
+
+void action_requester_qt_signal::run() {
+    cancel();
+    action_requester::restart();
+    action_requester::run();
+    // TODO: start thread
+    _t = std::thread(&action_requester_qt_signal_emitter::thread_code, &emitter, this);
+}
+
+void action_requester_qt_signal::cancel() {
+    if (_t.joinable()) {
+        action_requester::shutdown();
+        _t.join();
+    }
 }

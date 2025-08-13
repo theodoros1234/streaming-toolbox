@@ -3,6 +3,8 @@
 
 #include "item.h"
 #include <memory>
+#include <thread>
+#include <QObject>
 
 namespace strtb::event {
 
@@ -47,7 +49,7 @@ public:
     action_requester(action_requester&) = delete;
     action_requester(const action_requester&&) = delete;
     action_requester(action_requester&&) = delete;
-    ~action_requester();
+    virtual ~action_requester();
     const std::string& name() const;
     void name_set(const std::string& new_name);
     void path_set(const item_path& path);
@@ -56,7 +58,35 @@ public:
     void restart();
     json::value_object& params() const;
     void run();
-    action_response get_result();
+    action_response get_response();
+};
+
+class action_requester_qt_signal;
+
+class action_requester_qt_signal_emitter : public QObject {
+    Q_OBJECT
+protected:
+    friend action_requester_qt_signal;
+    void thread_code(action_requester_qt_signal* parent);
+
+signals:
+    void response_received(action_response response);
+};
+
+class action_requester_qt_signal : public action_requester {
+private:
+    std::thread _t;
+
+public:
+    action_requester_qt_signal_emitter emitter;
+
+    using action_requester::action_requester;
+    virtual ~action_requester_qt_signal();
+    void shutdown() = delete;
+    void restart() = delete;
+    void get_response() = delete;
+    void run();
+    void cancel();
 };
 
 }
