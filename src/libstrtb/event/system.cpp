@@ -516,7 +516,7 @@ item_type system::res_cnt::type() const {
 
 system::res_item_category* system::res_cnt::as_category() const {
     if (!ptr)
-        throw not_found("holding a null pointer");
+        throw internal_error("resource container holding a null pointer", log_s);
     if (ptr->type != ITEM_CATEGORY)
         throw wrong_type("resource is not a category");
     return (res_item_category*) ptr;
@@ -524,7 +524,7 @@ system::res_item_category* system::res_cnt::as_category() const {
 
 system::res_item_event_src* system::res_cnt::as_event_src() const {
     if (!ptr)
-        throw not_found("holding a null pointer");
+        throw internal_error("resource container holding a null pointer", log_s);
     if (ptr->type != ITEM_EVENT_SRC)
         throw wrong_type("resource is not an event source");
     return (res_item_event_src*) ptr;
@@ -532,7 +532,7 @@ system::res_item_event_src* system::res_cnt::as_event_src() const {
 
 system::res_item_action_sink* system::res_cnt::as_action_sink() const {
     if (!ptr)
-        throw not_found("holding a null pointer");
+        throw internal_error("resource container holding a null pointer", log_s);
     if (ptr->type != ITEM_ACTION_SINK)
         throw wrong_type("resource is not an action sink");
     return (res_item_action_sink*) ptr;
