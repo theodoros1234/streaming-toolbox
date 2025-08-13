@@ -1099,6 +1099,7 @@ uint64_t system::event_listener_subscribe(event_listener_base& listener,
 
     if (event_source.empty())
         throw out_of_scope("cannot subscribe to root category");
+    event_source.validate_with_exception();
 
     if (param &&
         param->type() != json::VAL_NULL &&

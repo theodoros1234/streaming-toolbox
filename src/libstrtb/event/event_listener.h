@@ -36,6 +36,10 @@ protected:
 public:
     event_listener_base() = default;
     event_listener_base(const std::string& name);
+    event_listener_base(event_listener_base&) = delete;
+    event_listener_base(const event_listener_base&) = delete;
+    event_listener_base(event_listener_base&&) = delete;
+    event_listener_base(const event_listener_base&&) = delete;
     virtual ~event_listener_base() = default;
     void set_name(const std::string& name);
     uint64_t subscribe(const item_path& event_source);
