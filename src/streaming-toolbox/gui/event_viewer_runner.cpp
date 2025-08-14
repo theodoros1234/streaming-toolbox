@@ -1,6 +1,7 @@
 #include "event_viewer_runner.h"
 #include "ui_event_viewer_runner.h"
 #include "../../libstrtb/json/parser.h"
+#include "../../libstrtb/common/strescape.h"
 #include <QGridLayout>
 #include <QCheckBox>
 #include <QLabel>
@@ -49,15 +50,7 @@ static void make_param_row(QGridLayout* layout, int row, const strtb::event::par
             break;
 
         case strtb::json::VAL_ARRAY:
-            value = new QLineEdit();
-            ((QLineEdit*) value)->setPlaceholderText("Not implemented, type some JSON here instead.");
-            break;
-
         case strtb::json::VAL_OBJECT:
-            value = new QLineEdit();
-            ((QLineEdit*) value)->setPlaceholderText("Not implemented, type some JSON here instead.");
-            break;
-
         case strtb::json::VAL_UNDEFINED:
             value = new QLineEdit();
             ((QLineEdit*) value)->setPlaceholderText("Not implemented, type some JSON here instead.");
@@ -136,6 +129,8 @@ event_viewer_runner::event_viewer_runner(QWidget *parent)
     ui->group_response->setHidden(true);
 
     ui->response_view->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    _error.setWindowTitle("Action Runner");
+    _error.setIcon(QMessageBox::Critical);
 
     QObject::connect(ui->button_run, &QPushButton::clicked, this, &event_viewer_runner::run_or_cancel);
     QObject::connect(&_requester.emitter, &event::action_requester_qt_signal_emitter::response_received,
@@ -226,13 +221,15 @@ void event_viewer_runner::run_or_cancel() {
                     case json::VAL_OBJECT:
                     case json::VAL_UNDEFINED: {
                         QLineEdit* textbox = (QLineEdit*) value->widget();
-                        textbox->setStyleSheet("");
                         try {
                             _requester.params().set_move(
                                 def.name,
                                 json::parser::from_string(textbox->text().toStdString()));
-                        } catch (json::parser::invalid_json&) {
-                            textbox->setStyleSheet("border-color: red;");
+                        } catch (json::parser::invalid_json& e) {
+                            _error.setText("Parameter " +
+                                           QString::fromStdString(common::string_escape(def.name)) +
+                                           ": " + e.what());
+                            _error.exec();
                             return;
                         }
                     }

@@ -6,6 +6,7 @@
 #include <QWidget>
 #include <QKeyEvent>
 #include <QGridLayout>
+#include <QMessageBox>
 #include <vector>
 
 namespace Ui {
@@ -31,6 +32,7 @@ private:
     event::action_requester_qt_signal _requester;
     std::vector<event::param_definition> _param_definition;
     QGridLayout* _param_grid = nullptr;
+    QMessageBox _error;     // only used when failing to parse custom JSON params
 
 private slots:
     void run_or_cancel();
