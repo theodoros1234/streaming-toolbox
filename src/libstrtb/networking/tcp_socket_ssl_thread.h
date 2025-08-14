@@ -29,6 +29,8 @@ protected:
 public:
     tcp_socket_ssl_thread();
     ~tcp_socket_ssl_thread();
+    tcp_socket_ssl_thread(const tcp_socket_ssl_thread&) = delete;
+    tcp_socket_ssl_thread(tcp_socket_ssl_thread&&) = delete;
     void start(int sock, SSL* ssl);
     void stop();
     size_t recv(char* buffer, size_t length);

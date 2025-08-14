@@ -17,6 +17,8 @@ private:
     sigset_t sigpipe_set;
 public:
     sigpipe_suppressor();
+    sigpipe_suppressor(const sigpipe_suppressor&) = delete;
+    sigpipe_suppressor(sigpipe_suppressor&&) = delete;
     ~sigpipe_suppressor();
 #endif
 };

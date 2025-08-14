@@ -27,6 +27,8 @@ public:
     const char* buffer;
     tcp_socket();
     tcp_socket(size_t recv_buffer_size);
+    tcp_socket(const tcp_socket&) = delete;
+    tcp_socket(tcp_socket&&) = delete;
     virtual ~tcp_socket();
     ssize_t recv();
     virtual ssize_t recv(size_t max_len);

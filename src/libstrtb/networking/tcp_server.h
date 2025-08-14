@@ -40,6 +40,8 @@ protected:
 public:
     tcp_server();
     tcp_server(size_t recv_buffer_size);
+    tcp_server(const tcp_server&) = delete;
+    tcp_server(tcp_server&&) = delete;
     virtual ~tcp_server();
     size_t max_active();
     void max_active(size_t value);
