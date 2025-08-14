@@ -1186,7 +1186,7 @@ std::vector<item_info_path_follower> system::info_path_followers(uint64_t resour
         for (const auto path_fl : set.second) {
             item_info_path_follower i = {
                 .owner_name = path_fl->owner_name,
-                .sub_rid = path_fl->follower_rid,
+                .follower_rid = path_fl->follower_rid,
                 .path = path_fl->path,
                 .wanted_type = path_fl->wanted_type,
                 .status = path_fl->status,
@@ -1229,6 +1229,24 @@ std::vector<item_info_event_sub> system::info_event_subs(uint64_t resource_id) {
     for (const auto& set : event_src->subs_string)
         for (const auto event_sub : set.second)
             add(event_sub, info_returned);
+
+    return info_returned;
+}
+
+item_info_action_sink system::info_action_sink(uint64_t resource_id) {
+    std::lock_guard<std::mutex> guard(_lock);
+    const res_item_action_sink* action_sink = _get_action_sink(resource_id);
+
+    item_info_action_sink info_returned;
+    info_returned.handler_attached = action_sink->handler != nullptr;
+
+    for (const auto path_fl : action_sink->requesters) {
+        item_info_action_requester i = {
+            .owner_name = path_fl->owner_name,
+            .follower_rid = path_fl->follower_rid,
+        };
+        info_returned.requesters.push_back(std::move(i));
+    }
 
     return info_returned;
 }

@@ -205,6 +205,9 @@ void event_viewer::on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTr
         if (info.type == event::ITEM_EVENT_SRC)
             text.append("<p><i>Tip: Double click on the event source to monitor for events.</i></p>");
 
+        if (info.type == event::ITEM_ACTION_SINK)
+            text.append("<p><i>Tip: Double click on the action sink to test and run actions.</i></p>");
+
         if (info.type == event::ITEM_EVENT_SRC || info.type == event::ITEM_ACTION_SINK) {
             text.append("<h2>Parameters</h2>");
             list_params(text, info.params);
@@ -232,67 +235,111 @@ void event_viewer::on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTr
 
         if (info.type == event::ITEM_CATEGORY) {
             text.append("<h2>Waiting Path Followers</h2><ul>");
-            for (const auto& path_fl : event::system_ptr->info_path_followers(info.resource_id)) {
-                text.append("<li><b>");
-                text.append(QString::fromStdString(path_fl.owner_name));
-                text.append(" (rid=");
-                text.append(QString::number(path_fl.sub_rid));
-                text.append(")</b><br><b>Wants:</b> ");
-                text.append(item_type_to_str(path_fl.wanted_type));
-                text.append("<br><b>Path:</b> ");
-                text.append(QString::fromStdString(path_fl.path.to_string()));
-                text.append("<br><b>Status:</b> ");
+            try {
+                for (const auto& path_fl : event::system_ptr->info_path_followers(info.resource_id)) {
+                    text.append("<li><b>");
+                    text.append(QString::fromStdString(path_fl.owner_name));
+                    text.append(" (rid=");
+                    text.append(QString::number(path_fl.follower_rid));
+                    text.append(")</b><br><b>Wants:</b> ");
+                    text.append(item_type_to_str(path_fl.wanted_type));
+                    text.append("<br><b>Path:</b> ");
+                    text.append(QString::fromStdString(path_fl.path.to_string()));
+                    text.append("<br><b>Status:</b> ");
 
-                switch (path_fl.status) {
-                case event::PATH_FL_UNDEFINED:
-                    text.append("Undefined");
-                    break;
-                case event::PATH_FL_READY:
-                    text.append("Ready");
-                    break;
-                case event::PATH_FL_WAITING:
-                    text.append("Waiting");
-                    break;
-                case event::PATH_FL_WRONG_TYPE:
-                    text.append("Wrong Type");
-                    break;
-                case event::PATH_FL_BAD_PARAM:
-                    text.append("Bad Parameter");
-                    break;
-                default:
-                    text.append("Invalid Status");
-                }
-                if (!path_fl.diagnostic_info.empty()) {
-                    text.append("<br><b>Diagnostic Info:</b> ");
-                    text.append(QString::fromStdString(path_fl.diagnostic_info));
-                }
+                    switch (path_fl.status) {
+                    case event::PATH_FL_UNDEFINED:
+                        text.append("Undefined");
+                        break;
+                    case event::PATH_FL_READY:
+                        text.append("Ready");
+                        break;
+                    case event::PATH_FL_WAITING:
+                        text.append("Waiting");
+                        break;
+                    case event::PATH_FL_WRONG_TYPE:
+                        text.append("Wrong Type");
+                        break;
+                    case event::PATH_FL_BAD_PARAM:
+                        text.append("Bad Parameter");
+                        break;
+                    default:
+                        text.append("Invalid Status");
+                    }
+                    if (!path_fl.diagnostic_info.empty()) {
+                        text.append("<br><b>Diagnostic Info:</b> ");
+                        text.append(QString::fromStdString(path_fl.diagnostic_info));
+                    }
 
-                text.append("</li>");
+                    text.append("</li>");
+                }
+            } catch (event::not_found&) {
+                text.append("Error: The item has changed while retrieving additional information.");
+            } catch (event::wrong_type&) {
+                text.append("Error: The item has changed while retrieving additional information.");
             }
+
             text.append("</ul>");
         }
 
         if (info.type == event::ITEM_EVENT_SRC) {
             text.append("<h2>Event Subscriptions</h2><ul>");
-            for (const auto& event_sub : event::system_ptr->info_event_subs(info.resource_id)) {
-                text.append("<li><b>");
-                if (event_sub.listener_name.empty())
-                    text.append("(untitled event listener)");
-                else
-                    text.append(QString::fromStdString(event_sub.listener_name));
-                text.append(" (rid=");
-                text.append(QString::number(event_sub.event_sub_rid));
-                text.append("):</b> ");
+            try {
+                for (const auto& event_sub : event::system_ptr->info_event_subs(info.resource_id)) {
+                    text.append("<li><b>");
+                    if (event_sub.listener_name.empty())
+                        text.append("(untitled event listener)");
+                    else
+                        text.append(QString::fromStdString(event_sub.listener_name));
+                    text.append(" (rid=");
+                    text.append(QString::number(event_sub.event_sub_rid));
+                    text.append("):</b> ");
 
-                if (event_sub.param.empty()) {
-                    text.append("param not set</li>");
-                } else {
-                    text.append("param=");
-                    text.append(QString::fromStdString(event_sub.param.value()->write_to_string()).toHtmlEscaped());
-                    text.append("</li>");
+                    if (event_sub.param.empty()) {
+                        text.append("param not set</li>");
+                    } else {
+                        text.append("param=");
+                        text.append(QString::fromStdString(event_sub.param.value()->write_to_string()).toHtmlEscaped());
+                        text.append("</li>");
+                    }
                 }
+            } catch (event::not_found&) {
+                text.append("Error: The item has changed while retrieving additional information.");
+            } catch (event::wrong_type&) {
+                text.append("Error: The item has changed while retrieving additional information.");
             }
             text.append("</ul>");
+        }
+
+        if (info.type == event::ITEM_ACTION_SINK) {
+            text.append("<h2>Attached Handler And Requesters</h2>");
+
+            event::item_info_action_sink extra_info;
+            try {
+                extra_info = event::system_ptr->info_action_sink(info.resource_id);
+
+                if (extra_info.handler_attached)
+                    text.append("<p>An action handler is attached.</p>");
+                else
+                    text.append("<p>No action handler is attached!</p>");
+
+                text.append("<ul>");
+                for (const auto& rq : extra_info.requesters) {
+                    text.append("<li>");
+                    if (rq.owner_name.empty())
+                        text.append("(untitled action requester)");
+                    else
+                        text.append(QString::fromStdString(rq.owner_name));
+                    text.append(" (rid=");
+                    text.append(QString::number(rq.follower_rid));
+                    text.append(")</li>");
+                }
+                text.append("</ul>");
+            } catch (event::not_found&) {
+                text.append("Error: The item has changed while retrieving additional information.");
+            } catch (event::wrong_type&) {
+                text.append("Error: The item has changed while retrieving additional information.");
+            }
         }
 
         ui->item_info->setHtml(text);

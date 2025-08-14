@@ -210,6 +210,7 @@ public:
     std::vector<item_listing> list(const item_path& path);
     std::vector<item_info_path_follower> info_path_followers(uint64_t resource_id);
     std::vector<item_info_event_sub> info_event_subs(uint64_t resource_id);
+    item_info_action_sink info_action_sink(uint64_t resource_id);
 };
 
 extern system* system_ptr;

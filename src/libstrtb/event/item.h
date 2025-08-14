@@ -148,7 +148,7 @@ enum path_follower_status {
 
 struct item_info_path_follower {
     std::string owner_name;
-    uint64_t sub_rid = 0;
+    uint64_t follower_rid = 0;
     item_path path;
     item_type wanted_type = ITEM_UNDEFINED;
     path_follower_status status = PATH_FL_UNDEFINED;
@@ -159,6 +159,16 @@ struct item_info_event_sub {
     std::string listener_name;
     uint64_t event_sub_rid = 0;
     json::holder param;
+};
+
+struct item_info_action_requester {
+    std::string owner_name;
+    uint64_t follower_rid = 0;
+};
+
+struct item_info_action_sink {
+    std::vector<item_info_action_requester> requesters;
+    bool handler_attached = false;
 };
 
 void param_type_check(const json::value* param, const param_definition* def);
