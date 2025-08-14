@@ -103,6 +103,8 @@ struct example_definition {
 
 enum item_type {ITEM_UNDEFINED, ITEM_CATEGORY, ITEM_EVENT_SRC, ITEM_ACTION_SINK};
 
+const char* item_type_to_string(item_type type);
+
 class item_path : public std::vector<std::string> {
     using std::vector<std::string>::vector;
 public:

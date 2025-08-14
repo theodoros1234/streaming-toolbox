@@ -573,3 +573,19 @@ void strtb::event::param_type_check(const json::value* param, const std::vector<
         }
     }
 }
+
+const char* strtb::event::item_type_to_string(strtb::event::item_type type) {
+    switch (type) {
+    case strtb::event::ITEM_UNDEFINED:
+        return "Undefined";
+    case strtb::event::ITEM_CATEGORY:
+        return "Category";
+    case strtb::event::ITEM_EVENT_SRC:
+        return "Event Source";
+    case strtb::event::ITEM_ACTION_SINK:
+        return "Action Sink";
+    default:
+        return "Invalid Type";
+    }
+}
+

@@ -20,25 +20,6 @@ event_viewer::~event_viewer() {
     delete ui;
 }
 
-static const char* item_type_to_str(strtb::event::item_type type) {
-    switch (type) {
-    case strtb::event::ITEM_UNDEFINED:
-        return "Undefined";
-        break;
-    case strtb::event::ITEM_CATEGORY:
-        return "Category";
-        break;
-    case strtb::event::ITEM_EVENT_SRC:
-        return "Event Source";
-        break;
-    case strtb::event::ITEM_ACTION_SINK:
-        return "Action Sink";
-        break;
-    default:
-        return "Invalid Type";
-    }
-}
-
 void event_viewer::populate() {
     // Save path so we can try and find the item again after refresh
     event::item_path old_path;
@@ -57,7 +38,7 @@ void event_viewer::populate() {
     item->event_item_info.description = info.description;
     item->event_item_info.provider_id = info.provider_id;
     item->setText(0, QString::fromStdString(info.display_name));
-    item->setText(1, item_type_to_str(item->event_item_info.type));
+    item->setText(1, event::item_type_to_string(item->event_item_info.type));
     item->populate();
     ui->item_tree->expandItem(item);
 
@@ -73,7 +54,7 @@ void event_viewer::tree_item::populate() {
         this->addChild(item);
         item->event_item_info = i;
         item->setText(0, QString::fromStdString(i.display_name));
-        item->setText(1, item_type_to_str(i.type));
+        item->setText(1, event::item_type_to_string(i.type));
         if (i.type == event::ITEM_CATEGORY)
             item->populate();
     }
@@ -199,7 +180,7 @@ void event_viewer::on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTr
         text.append(QString::fromStdString(info.description));
         text.append("</p>");
         text.append("<p><b>Type:</b> ");
-        text.append(item_type_to_str(info.type));
+        text.append(event::item_type_to_string(info.type));
         text.append("</p>");
 
         if (info.type == event::ITEM_EVENT_SRC)
@@ -242,7 +223,7 @@ void event_viewer::on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTr
                     text.append(" (rid=");
                     text.append(QString::number(path_fl.follower_rid));
                     text.append(")</b><br><b>Wants:</b> ");
-                    text.append(item_type_to_str(path_fl.wanted_type));
+                    text.append(event::item_type_to_string(path_fl.wanted_type));
                     text.append("<br><b>Path:</b> ");
                     text.append(QString::fromStdString(path_fl.path.to_string()));
                     text.append("<br><b>Status:</b> ");

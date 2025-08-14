@@ -150,7 +150,6 @@ private:
                           uint64_t location_rid,
                           res_item_category* location,
                           const json::value_object* entries);
-    void _event_listener_unsubscribe(uint64_t subscription_id);
     void _action_requester_path_clear(uint64_t rid);
     void _info(uint64_t resource_id, item_info& item);
     std::vector<item_listing> _list(const res_item_category *location);

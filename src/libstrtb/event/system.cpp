@@ -555,8 +555,29 @@ system::system() {
 
 system::~system() {
     system_ptr = nullptr;   // Prevents use-after-free
-    // TODO: delete everything in here if necessary (may get deleted by res_holder automatically)
-    // maybe just warn about undeleted stuff
+
+    // Warn about abandoned things
+
+    // Providers
+    for (const auto& provider : _items.at(STRTB_EVENT_ROOT).as_category()->list)
+        log_s.warning({"Abandoned provider: ", common::string_escape(provider.first), ", rid=", provider.second});
+
+    // Items
+    for (const auto& item : _items)
+        if (item.first != STRTB_EVENT_ROOT)
+            log_s.warning({"Abandoned item: rid=", item.first,
+                           ", type=", common::string_escape(item_type_to_string(item.second.type()))});
+
+    // Event subs
+    for (const auto& sub : _event_subs)
+        log_s.warning({"Abandoned even sub: ", common::string_escape(sub.second->path.owner_name),
+                       ", sub_rid=", sub.first, ", target_rid=", sub.second->path.target_rid});
+
+    // Action requesters
+    for (const auto& rq : _action_requesters)
+        log_s.warning({"Abandoned action requester's path follower: ",
+                       common::string_escape(rq.second->owner_name), ", follower_rid=", rq.first,
+                       ", target_rid=", rq.second->target_rid});
 }
 
 uint64_t system::_resid_new() {
@@ -1130,7 +1151,8 @@ uint64_t system::event_listener_subscribe(event_listener_base& listener,
     return new_sub_id;
 }
 
-void system::_event_listener_unsubscribe(uint64_t subscription_id) {
+void system::event_listener_unsubscribe(uint64_t subscription_id) {
+    // must be locked by caller
     auto sub_itr = _event_subs.find(subscription_id);
     if (sub_itr == _event_subs.end())
         throw internal_error("event subscription not found");
@@ -1139,7 +1161,7 @@ void system::_event_listener_unsubscribe(uint64_t subscription_id) {
     uint64_t remove_from = sub->path.target_rid;
     if (remove_from == 0) {
         _event_subs.erase(sub_itr);
-        throw internal_error("event subscription was abandoned");   // TODO: maybe should just be a warning instead?
+        throw internal_error("event subscription was abandoned");
     }
 
     try {
@@ -1165,16 +1187,10 @@ void system::_event_listener_unsubscribe(uint64_t subscription_id) {
     }
 }
 
-void system::event_listener_unsubscribe(uint64_t subscription_id) {
-    // must be locked by caller
-    // TODO: private version can just be moved into here now
-    _event_listener_unsubscribe(subscription_id);
-}
-
 void system::event_listener_unsubscribe(const std::set<uint64_t>& subscription_ids) {
     // must be locked by caller
     for (auto sub_id : subscription_ids)
-        _event_listener_unsubscribe(sub_id);
+        event_listener_unsubscribe(sub_id);
 }
 
 std::vector<item_info_path_follower> system::info_path_followers(uint64_t resource_id) {
@@ -1442,7 +1458,7 @@ void system::_action_requester_path_clear(uint64_t rid) {
     uint64_t remove_from = itr->second->target_rid;
     if (remove_from == 0) {
         _action_requesters.erase(itr);
-        throw internal_error("action requester's path follower was abandoned");   // TODO: maybe should just be a warning instead?
+        throw internal_error("action requester's path follower was abandoned");
     }
 
     try {
