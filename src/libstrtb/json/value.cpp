@@ -284,7 +284,7 @@ val_type type_from_string(const std::string& str) {
         return VAL_UNDEFINED;
 }
 
-std::string type_to_string(val_type type) {
+const char* type_to_string(val_type type) {
     switch (type) {
     case VAL_NULL:
         return "null";

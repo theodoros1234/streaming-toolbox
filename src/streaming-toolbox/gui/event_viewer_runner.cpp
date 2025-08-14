@@ -27,7 +27,7 @@ static void make_param_row(QGridLayout* layout, int row, const strtb::event::par
         included->setDisabled(def->required);
 
         name = new QLabel(QString::fromStdString(def->name));
-        type = new QLabel(QString::fromStdString(strtb::json::type_to_string(def->type)));
+        type = new QLabel(strtb::json::type_to_string(def->type));
 
         switch (def->type) {
         case strtb::json::VAL_BOOL:

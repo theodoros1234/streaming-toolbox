@@ -100,7 +100,7 @@ static void list_param(QString& text, const strtb::event::param_definition& p) {
     text.append(QString::fromStdString(p.name));
     text.append(":</b> ");
 
-    text.append(QString::fromStdString(strtb::json::type_to_string(p.type)));
+    text.append(strtb::json::type_to_string(p.type));
 
     if (p.required)
         text.append(", required");

@@ -177,7 +177,7 @@ bool system::res_item_event_src::sub_attach(res_path_follower &path_fl, uint64_t
         sub_param_type != json::VAL_UNDEFINED &&
         param.type != sub_param_type) {                             // params given but of wrong type
         path_fl.status = PATH_FL_BAD_PARAM;
-        path_fl.diagnostic_info = "parameter of type " + json::type_to_string(param.type) + " needed, " +
+        path_fl.diagnostic_info = std::string("parameter of type ") + json::type_to_string(param.type) + " needed, " +
                                   json::type_to_string(sub_param_type) + " given";
         return false;
     }
@@ -1283,7 +1283,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
         throw out_of_scope("target does not belong to this provider");
 
     if (event_src->param.type != json::VAL_BOOL)
-        throw wrong_type("target takes a " + json::type_to_string(event_src->param.type) +
+        throw wrong_type(std::string("target takes a ") + json::type_to_string(event_src->param.type) +
                          " parameter by subscribers, but a bool filter was given");
 
     if (event == nullptr)
@@ -1310,7 +1310,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
         throw out_of_scope("target does not belong to this provider");
 
     if (event_src->param.type != json::VAL_INT)
-        throw wrong_type("target takes a " + json::type_to_string(event_src->param.type) +
+        throw wrong_type(std::string("target takes a ") + json::type_to_string(event_src->param.type) +
                          " parameter by subscribers, but an int filter was given");
 
     if (event == nullptr)
@@ -1340,7 +1340,7 @@ void system::provider_push_event(uint64_t provider_id, uint64_t target, const js
         throw out_of_scope("target does not belong to this provider");
 
     if (event_src->param.type != json::VAL_STRING)
-        throw wrong_type("target takes a " + json::type_to_string(event_src->param.type) +
+        throw wrong_type(std::string("target takes a ") + json::type_to_string(event_src->param.type) +
                          " parameter by subscribers, but a string filter was given");
 
     if (event == nullptr)

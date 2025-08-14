@@ -4,7 +4,7 @@ using namespace strtb::json;
 
 wrong_type::wrong_type(val_type expected, val_type got)
     : expected(expected), got(got),
-    _what("expected type " + type_to_string(expected) + " but got " + type_to_string(got)) {}
+    _what(std::string("expected type ") + type_to_string(expected) + " but got " + type_to_string(got)) {}
 
 const char* wrong_type::what() const noexcept {return _what.c_str();}
 

@@ -45,7 +45,7 @@ void event_viewer_monitor::show_with_item(const event::item_info& info, const ev
         ui->label_param->setText("none");
     } else {
         _param = info.params.back();
-        QString p_str(QString::fromStdString(json::type_to_string(_param.type)));
+        QString p_str(json::type_to_string(_param.type));
         if (_param.required)
             p_str.append(", required");
         else
