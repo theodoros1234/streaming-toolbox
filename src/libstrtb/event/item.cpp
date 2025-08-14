@@ -126,7 +126,7 @@ param_definition::param_definition(const json::value_object* from) {
         if (type == json::VAL_OBJECT) {
             try {
                 const json::value_array* v = json::cast_array(&from->at("object_definition"));
-                for (auto i : *v) {
+                for (const auto i : *v) {
                     param_definition* ptr = nullptr;
 
                     try {
@@ -367,7 +367,7 @@ item_info::item_info(const json::value_object* from) {
         // params
         try {
             const json::value_array* param_list = json::cast_array(&from->at("params"));
-            for (json::value* i : *param_list) {    // TODO: make i const after adding const JSON cast functions
+            for (const json::value* i : *param_list) {
                 // Parse all parameters
                 try {
                     params.emplace_back(json::cast_object(i));
@@ -395,7 +395,7 @@ item_info::item_info(const json::value_object* from) {
         // examples
         try {
             const json::value_array* example_list = json::cast_array(&from->at("examples"));
-            for (json::value* i : *example_list) {  // TODO: make i const after adding const JSON cast functions
+            for (const json::value* i : *example_list) {
                 const json::value *i_params = nullptr, *i_returns = nullptr;
 
                 try {

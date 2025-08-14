@@ -156,7 +156,7 @@ tcp_server_connection* tcp_server::accept() {
         return nullptr;
 
     // Loop until there's a new connection, a shutdown or an error
-    while (true) {  // TODO: Is this while loop unnecessary?
+    while (true) {
         std::vector<struct pollfd> p(_socks.size() + 1);
         // Poll listening sockets
         for (size_t i=0; i<_socks.size(); i++) {

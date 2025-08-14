@@ -26,7 +26,7 @@ event_viewer_monitor::~event_viewer_monitor() {
 }
 
 void event_viewer_monitor::show_with_item(const event::item_info& info, const event::item_path& path) {
-    // TODO: unsub from previous event and clear stuff
+    // Unsub from previous event and clear stuff
     if (_sub_id)
         subscribe();    // will unsub
     ui->event_log->clear();

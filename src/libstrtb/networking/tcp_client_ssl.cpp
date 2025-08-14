@@ -68,8 +68,6 @@ void tcp_client_ssl::connect(const std::string& address, uint16_t port, bool all
 }
 
 void tcp_client_ssl::connect(const char* address, uint16_t port, bool allow_abrupt_shutdown, bool verify_certificate, SSL_CTX* ssl_context, time_t timeout) {
-    // TODO: think about locking the socket _lock cause it will prevent shutdown from being run, but also think about setting _sock to -1
-
     tcp_client::connect(address, port, timeout);
 
     if (!ssl_context) {
