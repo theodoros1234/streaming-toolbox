@@ -287,4 +287,5 @@ void event_viewer_runner::keyPressEvent(QKeyEvent* event) {
 void event_viewer_runner::closeEvent(QCloseEvent*) {
     if (_requester.running())
         run_or_cancel();    // will cancel the current action
+    _requester.path_clear();
 }

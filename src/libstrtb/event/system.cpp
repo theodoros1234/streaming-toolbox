@@ -62,7 +62,7 @@ void system::res_item_category::path_follower_attach(res_path_follower* path_fl,
 
                             case ITEM_ACTION_SINK:
                                 res.as_action_sink()->requester_attach(path_fl, itr->second);
-                                break;
+                                return;
 
                             default:
                                 throw internal_error("path follower is targetting an item type that isn't yet supported");
@@ -684,6 +684,7 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
 
                             case ITEM_ACTION_SINK:
                                 new_item.as_action_sink()->requester_attach(path_fl, new_res_id);
+                                moved.push_back(path_fl);
                                 break;
 
                             default:
