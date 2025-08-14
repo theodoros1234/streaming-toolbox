@@ -65,7 +65,7 @@ void system::res_item_category::path_follower_attach(res_path_follower* path_fl,
                                 return;
 
                             default:
-                                throw internal_error("path follower is targetting an item type that isn't yet supported");
+                                throw internal_error("path follower is targetting an item type that isn't yet supported", log_s, __FILE__, __LINE__, __func__);
                             }
                         }
                     } else {
@@ -79,7 +79,7 @@ void system::res_item_category::path_follower_attach(res_path_follower* path_fl,
                         }
                     }
                 } catch (std::out_of_range&) {
-                    throw internal_error("resource id " + std::to_string(itr->second) + " not found", log_s);
+                    throw internal_error("resource id " + std::to_string(itr->second) + " not found", log_s, __FILE__, __LINE__, __func__);
                 }
             }
         }
@@ -89,7 +89,7 @@ void system::res_item_category::path_follower_attach(res_path_follower* path_fl,
     } catch (std::out_of_range&) {
         path_fl->path_pos_found--;
         path_fl->target_rid = old_target_rid;
-        throw internal_error("path follower's position went out of bounds");
+        throw internal_error("path follower's position went out of bounds", log_s, __FILE__, __LINE__, __func__);
     } catch (...) {
         path_fl->path_pos_found--;
         path_fl->target_rid = old_target_rid;
@@ -102,10 +102,10 @@ void system::res_item_category::path_follower_detach(res_path_follower* path_fl)
     auto itr = waiting_path_followers.find(path_fl->path[path_fl->path_pos_found]);
 
     if (itr == waiting_path_followers.end())
-        throw internal_error("key not found for current path follower's position");
+        throw internal_error("key not found for current path follower's position", log_s, __FILE__, __LINE__, __func__);
 
     if (itr->second.erase(path_fl) < 1)
-        throw internal_error("couldn't find path follower");
+        throw internal_error("couldn't find path follower", log_s, __FILE__, __LINE__, __func__);
 
     if (itr->second.empty())
         waiting_path_followers.erase(itr);
@@ -151,11 +151,11 @@ bool system::res_item_event_src::sub_attach(res_path_follower &path_fl, uint64_t
     try {
         sub_ptr = system_ptr->_event_subs.at(path_fl.follower_rid).get();
     } catch (std::out_of_range&) {
-        throw internal_error("couldn't find event subscription with this resource id");
+        throw internal_error("couldn't find event subscription with this resource id", log_s, __FILE__, __LINE__, __func__);
     }
 
     if (sub_ptr == nullptr)
-        throw internal_error("resource id points to null event subscription");
+        throw internal_error("resource id points to null event subscription", log_s, __FILE__, __LINE__, __func__);
 
     // Type checking
     json::val_type sub_param_type = sub_ptr->param.type();
@@ -186,26 +186,26 @@ bool system::res_item_event_src::sub_attach(res_path_follower &path_fl, uint64_t
     switch (sub_param_type) {
     case json::VAL_UNDEFINED:
         if (!subs_none.insert(sub_ptr).second)
-            throw internal_error("event subscription is already attached");
+            throw internal_error("event subscription is already attached", log_s, __FILE__, __LINE__, __func__);
         break;
 
     case json::VAL_BOOL:
         if (!subs_bool[sub_ptr->param.as_bool().value()].insert(sub_ptr).second)
-            throw internal_error("event subscription appears to be already attached");
+            throw internal_error("event subscription appears to be already attached", log_s, __FILE__, __LINE__, __func__);
         break;
 
     case json::VAL_INT:
         if (!subs_int[sub_ptr->param.as_int().value()].insert(sub_ptr).second)
-            throw internal_error("event subscription appears to be already attached");
+            throw internal_error("event subscription appears to be already attached", log_s, __FILE__, __LINE__, __func__);
         break;
 
     case json::VAL_STRING:
         if (!subs_string[sub_ptr->param.as_string().value()].insert(sub_ptr).second)
-            throw internal_error("event subscription appears to be already attached");
+            throw internal_error("event subscription appears to be already attached", log_s, __FILE__, __LINE__, __func__);
         break;
 
     default:
-        throw internal_error("event source and subscription are holding an unsupported param type");
+        throw internal_error("event source and subscription are holding an unsupported param type", log_s, __FILE__, __LINE__, __func__);
     }
 
     _path_follower_attached(&path_fl, my_rid);
@@ -217,13 +217,13 @@ void system::res_item_event_src::sub_detach(res_event_sub* sub_ptr) {
     switch (sub_ptr->param.type()) {
     case json::VAL_UNDEFINED: {
         if (subs_none.erase(sub_ptr) < 1)
-            throw internal_error("couldn't find event subscription");
+            throw internal_error("couldn't find event subscription", log_s, __FILE__, __LINE__, __func__);
     }
     break;
 
     case json::VAL_BOOL: {
         if (subs_bool[sub_ptr->param.as_bool().value()].erase(sub_ptr) < 1)
-            throw internal_error("couldn't find event subscription");
+            throw internal_error("couldn't find event subscription", log_s, __FILE__, __LINE__, __func__);
     }
     break;
 
@@ -231,10 +231,10 @@ void system::res_item_event_src::sub_detach(res_event_sub* sub_ptr) {
         auto itr = subs_int.find(sub_ptr->param.as_int().value());
 
         if (itr == subs_int.end())
-            throw internal_error("couldn't find required key in event source");
+            throw internal_error("couldn't find required key in event source", log_s, __FILE__, __LINE__, __func__);
 
         if (itr->second.erase(sub_ptr) < 1)
-            throw internal_error("couldn't find event subscription");
+            throw internal_error("couldn't find event subscription", log_s, __FILE__, __LINE__, __func__);
 
         if (itr->second.empty())    // remove map entry if its set is empty
             subs_int.erase(itr);
@@ -245,10 +245,10 @@ void system::res_item_event_src::sub_detach(res_event_sub* sub_ptr) {
         auto itr = subs_string.find(sub_ptr->param.as_string().value());
 
         if (itr == subs_string.end())
-            throw internal_error("couldn't find required key in event source");
+            throw internal_error("couldn't find required key in event source", log_s, __FILE__, __LINE__, __func__);
 
         if (itr->second.erase(sub_ptr) < 1)
-            throw internal_error("couldn't find event subscription");
+            throw internal_error("couldn't find event subscription", log_s, __FILE__, __LINE__, __func__);
 
         if (itr->second.empty())    // remove map entry if its set is empty
             subs_string.erase(itr);
@@ -256,7 +256,7 @@ void system::res_item_event_src::sub_detach(res_event_sub* sub_ptr) {
     break;
 
     default:
-        throw internal_error("event subscription has an invalid parameter type");
+        throw internal_error("event subscription has an invalid parameter type", log_s, __FILE__, __LINE__, __func__);
     }
 }
 
@@ -292,7 +292,7 @@ bool system::res_item_event_src::has_subs() {
 
 void system::res_item_action_sink::requester_attach(res_path_follower* path_fl, uint64_t my_rid) {
     if (!requesters.insert(path_fl).second)
-        throw internal_error("tried to attach a path follower to an action sink it was already attached to", log_s);
+        throw internal_error("tried to attach a path follower to an action sink it was already attached to", log_s, __FILE__, __LINE__, __func__);
 
     _path_follower_attached(path_fl, my_rid);
 }
@@ -300,7 +300,7 @@ void system::res_item_action_sink::requester_attach(res_path_follower* path_fl, 
 void system::res_item_action_sink::requester_detach(res_path_follower* path_fl) {
     path_fl->target_rid = 0;
     if (requesters.erase(path_fl) < 1)
-        throw internal_error("couldn't find path follower in action sink", log_s);
+        throw internal_error("couldn't find path follower in action sink", log_s, __FILE__, __LINE__, __func__);
 }
 
 void system::res_item_action_sink::requester_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid) {
@@ -368,9 +368,9 @@ void system::res_cnt::make_item(item_type type,
                                 const std::string& description,
                                 uint64_t provider_id) {
     if (ptr != nullptr)
-        throw internal_error("resource container already holding an item", log_s);
+        throw internal_error("resource container already holding an item", log_s, __FILE__, __LINE__, __func__);
     if (type != ITEM_CATEGORY)
-        throw internal_error("wrong constructor called for requested item type", log_s);
+        throw internal_error("wrong constructor called for requested item type", log_s, __FILE__, __LINE__, __func__);
 
     ptr = new res_item_category();
     try {
@@ -393,7 +393,7 @@ void system::res_cnt::make_item(item_type type,
                                 const param_definition &returns,
                                 const std::vector<example_definition>& examples) {
     if (ptr != nullptr)
-        throw internal_error("resource container already holding an item", log_s);
+        throw internal_error("resource container already holding an item", log_s, __FILE__, __LINE__, __func__);
 
     try {
         switch (type) {
@@ -516,7 +516,7 @@ item_type system::res_cnt::type() const {
 
 system::res_item_category* system::res_cnt::as_category() const {
     if (!ptr)
-        throw internal_error("resource container holding a null pointer", log_s);
+        throw internal_error("resource container holding a null pointer", log_s, __FILE__, __LINE__, __func__);
     if (ptr->type != ITEM_CATEGORY)
         throw wrong_type("resource is not a category");
     return (res_item_category*) ptr;
@@ -524,7 +524,7 @@ system::res_item_category* system::res_cnt::as_category() const {
 
 system::res_item_event_src* system::res_cnt::as_event_src() const {
     if (!ptr)
-        throw internal_error("resource container holding a null pointer", log_s);
+        throw internal_error("resource container holding a null pointer", log_s, __FILE__, __LINE__, __func__);
     if (ptr->type != ITEM_EVENT_SRC)
         throw wrong_type("resource is not an event source");
     return (res_item_event_src*) ptr;
@@ -532,7 +532,7 @@ system::res_item_event_src* system::res_cnt::as_event_src() const {
 
 system::res_item_action_sink* system::res_cnt::as_action_sink() const {
     if (!ptr)
-        throw internal_error("resource container holding a null pointer", log_s);
+        throw internal_error("resource container holding a null pointer", log_s, __FILE__, __LINE__, __func__);
     if (ptr->type != ITEM_ACTION_SINK)
         throw wrong_type("resource is not an action sink");
     return (res_item_action_sink*) ptr;
@@ -606,7 +606,7 @@ uint64_t system::_follow_path(uint64_t start, const item_path& path) {
             if (current_pos == start)
                 throw not_found("resource id " + std::to_string(current_pos) + " not found");
             else // if a category holds an invalid ID, it's very likely our bug, thus throwing internal_error
-                throw internal_error("resource id " + std::to_string(current_pos) + " not found", log_s);
+                throw internal_error("resource id " + std::to_string(current_pos) + " not found", log_s, __FILE__, __LINE__, __func__);
         } catch (wrong_type&) {
             throw wrong_type(common::string_escape(next_piece) + " is not a category");
         }
@@ -628,7 +628,7 @@ std::pair<system::res_item_category*, uint64_t> system::_get_category(uint64_t s
         uint64_t rid = _follow_path(start, target_location);
         return std::make_pair(_items.at(rid).as_category(), rid);
     } catch (std::out_of_range& e) {
-        throw internal_error("category entry has an invalid resource id", log_s);
+        throw internal_error("category entry has an invalid resource id", log_s, __FILE__, __LINE__, __func__);
     }
 }
 
@@ -665,7 +665,7 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
     try {
         res_cnt& new_item = _items[new_res_id];
         if (new_item.ptr != nullptr)
-            throw internal_error("failed to claim a resource id for the new item", log_s);
+            throw internal_error("failed to claim a resource id for the new item", log_s, __FILE__, __LINE__, __func__);
         resource_created = true;
 
         try {
@@ -709,7 +709,7 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
                                 break;
 
                             default:
-                                throw internal_error("path follower is targetting an item type that isn't yet supported");
+                                throw internal_error("path follower is targetting an item type that isn't yet supported", log_s, __FILE__, __LINE__, __func__);
                             }
                         }
                     } else {
@@ -758,9 +758,9 @@ uint64_t system::provider_item_add(uint64_t provider_id,
     if (provider_id == 0) {
         // Registering new provider
         if (target_location != STRTB_EVENT_ROOT)
-            throw internal_error("tried to create a provider in a different location than root", log_s);
+            throw internal_error("tried to create a provider in a different location than root", log_s, __FILE__, __LINE__, __func__);
         if (item.type != ITEM_CATEGORY)
-            throw internal_error("tried to create provider with wrong item type", log_s);
+            throw internal_error("tried to create provider with wrong item type", log_s, __FILE__, __LINE__, __func__);
         provider_id = _resid_counter;
     } else if (provider_id != location->provider_id) {
         // Adding item for existing provider
@@ -777,12 +777,12 @@ uint64_t system::provider_item_add(uint64_t provider_id,
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log_s);
+        throw internal_error("provider id was not specified", log_s, __FILE__, __LINE__, __func__);
 
     auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
-        throw internal_error("category entry has a wrong provider id set", log_s);
+        throw internal_error("category entry has a wrong provider id set", log_s, __FILE__, __LINE__, __func__);
 
     return _provider_item_add(provider_id, location, name, item).first;
 }
@@ -866,7 +866,7 @@ void system::provider_item_remove(uint64_t provider_id, uint64_t target_location
     res_item_category* location = _get_category(target_location);
 
     if (provider_id == 0 && target_location != STRTB_EVENT_ROOT) // Unregistering provider
-        throw internal_error("tried to remove provider without targetting root", log_s);
+        throw internal_error("tried to remove provider without targetting root", log_s, __FILE__, __LINE__, __func__);
 
     if (provider_id != location->provider_id)
         throw out_of_scope("target location does not belong to this provider");
@@ -878,12 +878,12 @@ void system::provider_item_remove(uint64_t provider_id, const item_path& target_
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log_s);
+        throw internal_error("provider id was not specified", log_s, __FILE__, __LINE__, __func__);
 
     auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
-        throw internal_error("category entry has a wrong provider id set", log_s);
+        throw internal_error("category entry has a wrong provider id set", log_s, __FILE__, __LINE__, __func__);
 
     _provider_item_remove(location_rid, location, name);
 }
@@ -892,7 +892,7 @@ uint64_t system::provider_item_get_id(uint64_t provider_id, const item_path& tar
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log_s);
+        throw internal_error("provider id was not specified", log_s, __FILE__, __LINE__, __func__);
 
     return _follow_path(provider_id, target);
 }
@@ -933,7 +933,7 @@ void system::provider_category_clear(uint64_t provider_id, uint64_t target_locat
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log_s);
+        throw internal_error("provider id was not specified", log_s, __FILE__, __LINE__, __func__);
 
     res_item_category* location = _get_category(target_location);
 
@@ -947,12 +947,12 @@ void system::provider_category_clear(uint64_t provider_id, const item_path& targ
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log_s);
+        throw internal_error("provider id was not specified", log_s, __FILE__, __LINE__, __func__);
 
     auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
-        throw internal_error("category entry has a wrong provider id set", log_s);
+        throw internal_error("category entry has a wrong provider id set", log_s, __FILE__, __LINE__, __func__);
 
     _provider_category_clear(location_rid, location);
 }
@@ -960,7 +960,7 @@ void system::provider_category_clear(uint64_t provider_id, const item_path& targ
 void system::_info(uint64_t resource_id, item_info& item) {
     const auto& ref = _items.at(resource_id);
     if (ref.type() == ITEM_UNDEFINED)
-        throw internal_error("resource container has undefined type", log_s);
+        throw internal_error("resource container has undefined type", log_s, __FILE__, __LINE__, __func__);
     item.provider_id = ref.ptr->provider_id;
     item.type = ref.ptr->type;
     item.display_name = ref.ptr->display_name;
@@ -1013,7 +1013,7 @@ item_listing system::info(const item_path& path) {
         _info(rid, item);
         return item;
     } catch (std::out_of_range&) {
-        throw internal_error("category entry has an invalid resource id", log_s);
+        throw internal_error("category entry has an invalid resource id", log_s, __FILE__, __LINE__, __func__);
     }
 }
 
@@ -1104,12 +1104,12 @@ void system::provider_import(uint64_t provider_id, const item_path& target_locat
     std::lock_guard<std::mutex> guard(_lock);
 
     if (provider_id == 0)
-        throw internal_error("provider id was not specified", log_s);
+        throw internal_error("provider id was not specified", log_s, __FILE__, __LINE__, __func__);
 
     auto [location, location_rid] = _get_category(provider_id, target_location);
 
     if (provider_id != location->provider_id)
-        throw internal_error("category entry has a wrong provider id set", log_s);
+        throw internal_error("category entry has a wrong provider id set", log_s, __FILE__, __LINE__, __func__);
 
     _provider_import(provider_id, location_rid, location, entries);
 }
@@ -1139,7 +1139,7 @@ uint64_t system::event_listener_subscribe(event_listener_base& listener,
     auto [new_sub_entry, added] = _event_subs.emplace(new_sub_id, std::move(new_sub));
 
     if (!added)
-        throw internal_error("duplicate resource id found for event subscription");
+        throw internal_error("duplicate resource id found for event subscription", log_s, __FILE__, __LINE__, __func__);
 
     try {
         _items.at(STRTB_EVENT_ROOT).as_category()->path_follower_attach(path_fl, STRTB_EVENT_ROOT);
@@ -1155,13 +1155,13 @@ void system::event_listener_unsubscribe(uint64_t subscription_id) {
     // must be locked by caller
     auto sub_itr = _event_subs.find(subscription_id);
     if (sub_itr == _event_subs.end())
-        throw internal_error("event subscription not found");
+        throw internal_error("event subscription not found", log_s, __FILE__, __LINE__, __func__);
 
     res_event_sub* sub = sub_itr->second.get();
     uint64_t remove_from = sub->path.target_rid;
     if (remove_from == 0) {
         _event_subs.erase(sub_itr);
-        throw internal_error("event subscription was abandoned");
+        throw internal_error("event subscription was abandoned", log_s, __FILE__, __LINE__, __func__);
     }
 
     try {
@@ -1179,11 +1179,11 @@ void system::event_listener_unsubscribe(uint64_t subscription_id) {
 
         default:
             _event_subs.erase(sub_itr);
-            throw internal_error("event subscription was held by an item of unsupported type");
+            throw internal_error("event subscription was held by an item of unsupported type", log_s, __FILE__, __LINE__, __func__);
         }
     } catch (std::out_of_range&) {
         _event_subs.erase(sub_itr);
-        throw internal_error("event subscription was held by an item that no longer exists");
+        throw internal_error("event subscription was held by an item that no longer exists", log_s, __FILE__, __LINE__, __func__);
     }
 }
 
@@ -1454,11 +1454,11 @@ void system::action_handler_clear(uint64_t provider_id, const std::map<uint64_t,
 void system::_action_requester_path_clear(uint64_t rid) {
     auto itr = _action_requesters.find(rid);
     if (itr == _action_requesters.end())
-        throw internal_error("old action sink follower not found", log_s);
+        throw internal_error("old action sink follower not found", log_s, __FILE__, __LINE__, __func__);
     uint64_t remove_from = itr->second->target_rid;
     if (remove_from == 0) {
         _action_requesters.erase(itr);
-        throw internal_error("action requester's path follower was abandoned");
+        throw internal_error("action requester's path follower was abandoned", log_s, __FILE__, __LINE__, __func__);
     }
 
     try {
@@ -1476,11 +1476,11 @@ void system::_action_requester_path_clear(uint64_t rid) {
 
         default:
             _action_requesters.erase(itr);
-            throw internal_error("action requester's path follower waas held by an unsupported item type", log_s);
+            throw internal_error("action requester's path follower waas held by an unsupported item type", log_s, __FILE__, __LINE__, __func__);
         }
     } catch (std::out_of_range&) {
         _action_requesters.erase(itr);
-        throw internal_error("action requester's path follower was held by an item that no longer exists", log_s);
+        throw internal_error("action requester's path follower was held by an item that no longer exists", log_s, __FILE__, __LINE__, __func__);
     }
 }
 
@@ -1498,7 +1498,7 @@ uint64_t system::action_requester_path_set(uint64_t old_rid, const item_path& pa
         owner_name, path, ITEM_ACTION_SINK, new_path_fl_id));
     auto [new_set_entry, added] = _action_requesters.emplace(new_path_fl_id, std::move(new_path_fl));
     if (!added)
-        throw internal_error("an action requester's path follower with the same resource id already exists", log_s);
+        throw internal_error("an action requester's path follower with the same resource id already exists", log_s, __FILE__, __LINE__, __func__);
 
     try {
         _items.at(STRTB_EVENT_ROOT).as_category()->path_follower_attach(
@@ -1522,7 +1522,7 @@ void system::action_requester_run(uint64_t path_fl_rid, const std::shared_ptr<ac
     try {
         path_fl = _action_requesters.at(path_fl_rid).get();
     } catch (std::out_of_range&) {
-        throw internal_error("action requester's path follower not found", log_s);
+        throw internal_error("action requester's path follower not found", log_s, __FILE__, __LINE__, __func__);
     }
 
     // Check path follower's state
@@ -1542,7 +1542,7 @@ void system::action_requester_run(uint64_t path_fl_rid, const std::shared_ptr<ac
 
     default:
         throw internal_error("action requester's path follower has an invalid state of " +
-                                 std::to_string(path_fl->status), log_s);
+                                 std::to_string(path_fl->status), log_s, __FILE__, __LINE__, __func__);
     }
 
     // Get the action sink
@@ -1550,9 +1550,9 @@ void system::action_requester_run(uint64_t path_fl_rid, const std::shared_ptr<ac
     try {
         action_sink = _items.at(path_fl->target_rid).as_action_sink();
     } catch (std::out_of_range&) {
-        throw internal_error("action requester's path follower is holding an invalid item resource id", log_s);
+        throw internal_error("action requester's path follower is holding an invalid item resource id", log_s, __FILE__, __LINE__, __func__);
     } catch (wrong_type&) {
-        throw internal_error("action requester's path follower got attached to the wrong item type", log_s);
+        throw internal_error("action requester's path follower got attached to the wrong item type", log_s, __FILE__, __LINE__, __func__);
     }
 
     // Make sure there's an action handler attached

@@ -23,7 +23,7 @@ public:
 class internal_error : public event_exception {
 public:
     internal_error(const std::string& what);
-    internal_error(const std::string& what, logging::source& log_to);
+    internal_error(const std::string& what, logging::source& log_to, const char* file, int line, const char* func);
 };
 
 class not_found : public event_exception {

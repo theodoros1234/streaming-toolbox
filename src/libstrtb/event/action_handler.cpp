@@ -264,7 +264,7 @@ bool action_handler::push_request(const std::shared_ptr<action_request_internal>
 void action_handler::action_sink_removed(uint64_t rid) {
     std::lock_guard<std::mutex> guard(_lock);
     if (_action_sinks.erase(rid) < 1)
-        throw internal_error("removing an action sink from an action handler that isn't handling it");
+        throw internal_error("removing an action sink from an action handler that isn't handling it", log_s, __FILE__, __LINE__, __func__);
 
     // Cancel all pending requests for this action
     for (auto& i : _queue)

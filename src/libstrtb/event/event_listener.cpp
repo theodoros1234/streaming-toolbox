@@ -101,7 +101,7 @@ uint64_t event_listener_queued::_subscribe(const item_path& event_source, const 
 
     try {
         if (_subs.insert(new_sub).second == false)
-            throw internal_error("duplicate subscription resource id in event listener");
+            throw internal_error("duplicate subscription resource id in event listener", log_s, __FILE__, __LINE__, __func__);
     } catch (...) {
         _system_unsubscribe(new_sub);
         throw;
@@ -203,7 +203,7 @@ uint64_t event_listener_qt_signal::_subscribe(const item_path& event_source, con
 
     try {
         if (!_subs.insert(sub_rid).second)
-            throw internal_error("duplicate subscription resource id in event listener");
+            throw internal_error("duplicate subscription resource id in event listener", log_s, __FILE__, __LINE__, __func__);
     } catch (...) {
         _system_unsubscribe(sub_rid);
         throw;

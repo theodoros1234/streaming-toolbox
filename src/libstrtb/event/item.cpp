@@ -12,8 +12,8 @@ const char* event_exception::what() const noexcept {
 
 internal_error::internal_error(const std::string& what) : event_exception(what) {}
 
-internal_error::internal_error(const std::string& what, logging::source& log_to) : event_exception(what) {
-    log_to.put(logging::ERROR, {"Internal error: ", what});
+internal_error::internal_error(const std::string& what, logging::source& log_to, const char *file, int line, const char *func) : event_exception(what) {
+    log_to.put(logging::ERROR, {"Internal error at ", file, ":", line, ":", func, ": ", what});
 }
 
 not_found::not_found(const std::string& what) : event_exception(what) {}
