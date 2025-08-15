@@ -1,24 +1,9 @@
 #ifndef STRTB_JSON_CAST_H
 #define STRTB_JSON_CAST_H
 
-#include <string>
 #include "all_value_types.h"
 
 namespace strtb::json {
-
-class wrong_type : public json_error {
-public:
-    const val_type expected, got;
-    wrong_type(val_type expected, val_type got);
-    const char* what() const noexcept;
-private:
-    std::string _what;
-};
-
-class nullptr_exception : public json_error {
-public:
-    const char* what() const noexcept;
-};
 
 value_null* cast_null(value* val);
 value_bool* cast_bool(value* val);

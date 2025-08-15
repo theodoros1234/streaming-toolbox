@@ -190,17 +190,17 @@ bool system::res_item_event_src::sub_attach(res_path_follower &path_fl, uint64_t
         break;
 
     case json::VAL_BOOL:
-        if (!subs_bool[sub_ptr->param.as_bool().value()].insert(sub_ptr).second)
+        if (!subs_bool[sub_ptr->param.as_bool()->value()].insert(sub_ptr).second)
             throw internal_error("event subscription appears to be already attached", log_s, __FILE__, __LINE__, __func__);
         break;
 
     case json::VAL_INT:
-        if (!subs_int[sub_ptr->param.as_int().value()].insert(sub_ptr).second)
+        if (!subs_int[sub_ptr->param.as_int()->value()].insert(sub_ptr).second)
             throw internal_error("event subscription appears to be already attached", log_s, __FILE__, __LINE__, __func__);
         break;
 
     case json::VAL_STRING:
-        if (!subs_string[sub_ptr->param.as_string().value()].insert(sub_ptr).second)
+        if (!subs_string[sub_ptr->param.as_string()->value()].insert(sub_ptr).second)
             throw internal_error("event subscription appears to be already attached", log_s, __FILE__, __LINE__, __func__);
         break;
 
@@ -222,13 +222,13 @@ void system::res_item_event_src::sub_detach(res_event_sub* sub_ptr) {
     break;
 
     case json::VAL_BOOL: {
-        if (subs_bool[sub_ptr->param.as_bool().value()].erase(sub_ptr) < 1)
+        if (subs_bool[sub_ptr->param.as_bool()->value()].erase(sub_ptr) < 1)
             throw internal_error("couldn't find event subscription", log_s, __FILE__, __LINE__, __func__);
     }
     break;
 
     case json::VAL_INT: {
-        auto itr = subs_int.find(sub_ptr->param.as_int().value());
+        auto itr = subs_int.find(sub_ptr->param.as_int()->value());
 
         if (itr == subs_int.end())
             throw internal_error("couldn't find required key in event source", log_s, __FILE__, __LINE__, __func__);
@@ -242,7 +242,7 @@ void system::res_item_event_src::sub_detach(res_event_sub* sub_ptr) {
     break;
 
     case json::VAL_STRING: {
-        auto itr = subs_string.find(sub_ptr->param.as_string().value());
+        auto itr = subs_string.find(sub_ptr->param.as_string()->value());
 
         if (itr == subs_string.end())
             throw internal_error("couldn't find required key in event source", log_s, __FILE__, __LINE__, __func__);

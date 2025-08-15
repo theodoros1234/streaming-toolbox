@@ -1,4 +1,5 @@
 #include "holder.h"
+#include "cast.h"
 
 using namespace strtb::json;
 
@@ -118,67 +119,32 @@ const strtb::json::value* holder::value(bool ignore_undefined) const {
     return _v;
 }
 
-const value_null& holder::as_null() const {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_NULL)
-        throw invalid_type();
-
-    return *((const value_null*) _v);
+const value_null* holder::as_null() const {
+    return cast_null(_v);
 }
 
-const value_bool& holder::as_bool() const {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_BOOL)
-        throw invalid_type();
-
-    return *((const value_bool*) _v);
+const value_bool* holder::as_bool() const {
+    return cast_bool(_v);
 }
 
-const value_int& holder::as_int() const {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_INT)
-        throw invalid_type();
-
-    return *((const value_int*) _v);
+const value_int* holder::as_int() const {
+    return cast_int(_v);
 }
 
-const value_float& holder::as_float() const {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_FLOAT)
-        throw invalid_type();
-
-    return *((const value_float*) _v);
+const value_float* holder::as_float() const {
+    return cast_float(_v);
 }
 
-const value_string& holder::as_string() const {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_STRING)
-        throw invalid_type();
-
-    return *((const value_string*) _v);
+const value_string* holder::as_string() const {
+    return cast_string(_v);
 }
 
-const value_array& holder::as_array() const {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_ARRAY)
-        throw invalid_type();
-
-    return *((const value_array*) _v);
+const value_array* holder::as_array() const {
+    return cast_array(_v);
 }
 
-const value_object& holder::as_object() const {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_OBJECT)
-        throw invalid_type();
-
-    return *((const value_object*) _v);
+const value_object* holder::as_object() const {
+    return cast_object(_v);
 }
 
 strtb::json::value* holder::value(bool ignore_undefined) {
@@ -188,65 +154,30 @@ strtb::json::value* holder::value(bool ignore_undefined) {
     return _v;
 }
 
-value_null& holder::as_null() {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_NULL)
-        throw invalid_type();
-
-    return *((value_null*) _v);
+value_null* holder::as_null() {
+    return cast_null(_v);
 }
 
-value_bool& holder::as_bool() {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_BOOL)
-        throw invalid_type();
-
-    return *((value_bool*) _v);
+value_bool* holder::as_bool() {
+    return cast_bool(_v);
 }
 
-value_int& holder::as_int() {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_INT)
-        throw invalid_type();
-
-    return *((value_int*) _v);
+value_int* holder::as_int() {
+    return cast_int(_v);
 }
 
-value_float& holder::as_float() {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_FLOAT)
-        throw invalid_type();
-
-    return *((value_float*) _v);
+value_float* holder::as_float() {
+    return cast_float(_v);
 }
 
-value_string& holder::as_string() {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_STRING)
-        throw invalid_type();
-
-    return *((value_string*) _v);
+value_string* holder::as_string() {
+    return cast_string(_v);
 }
 
-value_array& holder::as_array() {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_ARRAY)
-        throw invalid_type();
-
-    return *((value_array*) _v);
+value_array* holder::as_array() {
+    return cast_array(_v);
 }
 
-value_object& holder::as_object() {
-    if (!_v)
-        throw undefined_exception();
-    if (_v->type() != VAL_OBJECT)
-        throw invalid_type();
-
-    return *((value_object*) _v);
+value_object* holder::as_object() {
+    return cast_object(_v);
 }

@@ -46,11 +46,11 @@ main_window::main_window(plugins::list *plugin_list, QWidget *parent)
             json::holder width, height;
             width = config::main->get_value(conf_cat, {"window_width"});
             height = config::main->get_value(conf_cat, {"window_height"});
-            this->resize(width.as_int().value(), height.as_int().value());
+            this->resize(width.as_int()->value(), height.as_int()->value());
         }
         if (config::main->get_type(conf_cat, {"window_is_maximized"}) == json::VAL_BOOL) {
             json::holder maximized = config::main->get_value(conf_cat, {"window_is_maximized"});
-            if (maximized.as_bool().value())
+            if (maximized.as_bool()->value())
                 this->setWindowState(Qt::WindowMaximized);
         }
         is_config_loaded = true;

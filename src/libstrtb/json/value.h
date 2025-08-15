@@ -18,6 +18,15 @@ public:
     const char* what() const noexcept;
 };
 
+class wrong_type : public json_error {
+public:
+    const val_type expected, got;
+    wrong_type(val_type expected, val_type got);
+    const char* what() const noexcept;
+private:
+    std::string _what;
+};
+
 class undefined_exception : public json_error {
 public:
     const char* what() const noexcept;

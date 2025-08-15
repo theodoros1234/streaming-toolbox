@@ -13,7 +13,13 @@ namespace strtb::json {
 
 const char* invalid_type::what() const noexcept {return "invalid or unwanted json value type";}
 
-const char* undefined_exception::what() const noexcept {return "tried to access an undefined value";}
+wrong_type::wrong_type(val_type expected, val_type got)
+    : expected(expected), got(got),
+    _what(std::string("expected type ") + type_to_string(expected) + " but got " + type_to_string(got)) {}
+
+const char* wrong_type::what() const noexcept {return _what.c_str();}
+
+const char* undefined_exception::what() const noexcept {return "undefined value";}
 
 value::value(val_type type) : _type(type) {}
 
