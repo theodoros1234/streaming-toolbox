@@ -50,7 +50,7 @@ void add_output_file(std::string path, level log_level, endline_type endline_typ
 }
 
 message_part::message_part(const std::string& value) {
-    v_str = value;
+    v.str = &value;
     type = STR;
 }
 
@@ -99,15 +99,15 @@ message_part::message_part(const void *value) {
     type = PTR;
 }
 
-message_part::message_part(std::filesystem::path value) {
-    v_path = value;
+message_part::message_part(const std::filesystem::path& value) {
+    v.path = &value;
     type = PATH;
 }
 
 void message_part::put_into_stream(std::ostream *stream) const {
     switch (type) {
     case STR:
-        *stream << v_str;
+        *stream << *v.str;
         break;
     case C_STR:
         *stream << v.c_str;
@@ -137,7 +137,7 @@ void message_part::put_into_stream(std::ostream *stream) const {
         *stream << v.ptr;
         break;
     case PATH:
-        *stream << v_path;
+        *stream << *v.path;
         break;
     }
 }
@@ -176,8 +176,44 @@ void source::put(level type, const std::vector<message_part>& message) {
                 break;
             }
             // Print actual message
-            for (auto &part : message)
+            for (const auto &part : message)
                 part.put_into_stream(output.stream);
+            // Endline and force flush if needed
+            *output.stream << output.endline;
+            if (output.force_flush)
+                output.stream->flush();
+        }
+    }
+}
+
+void source::put_one(level type, const message_part& message) {
+    // Skip if no outputs accept this level
+    if (type < min_level)
+        return;
+
+    std::lock_guard<std::mutex> guard(lock);
+
+    // Get timestamp
+    time_t current_time = time(NULL);
+    tm current_time_split;
+    localtime_r(&current_time, &current_time_split);
+    char timestamp_buffer[32];
+    strftime(timestamp_buffer, 32, "%Y-%m-%d %H:%M:%S", &current_time_split);
+
+    // Find output streams with appropriate log level and no errors
+    for (auto &output : output_streams) {
+        if (output.log_level <= type && output.stream->good()) {
+            // Color and format message appropriately: print timestamp, log level and object name
+            switch (output.formatting) {
+            case NONE:
+                *output.stream << "[" << timestamp_buffer << "] [" << level_name[type] << "] [" << _name << "] ";
+                break;
+            case ANSI_ESCAPE_CODES:
+                *output.stream << "\e[90m[\e[1m" << timestamp_buffer << "\e[0m\e[90m] [\e[0m\e[1m" << level_ansi_color[type] << level_name[type] << "\e[0m\e[90m] [\e[0m\e[1m" << this->_name << "\e[0m\e[90m]\e[0m ";
+                break;
+            }
+            // Print actual message
+            message.put_into_stream(output.stream);
             // Endline and force flush if needed
             *output.stream << output.endline;
             if (output.force_flush)
@@ -191,5 +227,11 @@ void source::info(const std::vector<message_part>& message) {put(INFO, message);
 void source::warning(const std::vector<message_part>& message) {put(WARNING, message);}
 void source::error(const std::vector<message_part>& message) {put(ERROR, message);}
 void source::critical(const std::vector<message_part>& message) {put(CRITICAL, message);}
+
+void source::debug_one(const message_part& message) {put_one(DEBUG, message);}
+void source::info_one(const message_part& message) {put_one(INFO, message);}
+void source::warning_one(const message_part& message) {put_one(WARNING, message);}
+void source::error_one(const message_part& message) {put_one(ERROR, message);}
+void source::critical_one(const message_part& message) {put_one(CRITICAL, message);}
 
 }
