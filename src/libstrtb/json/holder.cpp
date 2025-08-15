@@ -3,7 +3,6 @@
 
 using namespace strtb::json;
 
-
 holder::holder() : _v(nullptr) {}
 
 holder::holder(const holder& o) {

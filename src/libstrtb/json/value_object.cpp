@@ -165,7 +165,9 @@ void value_object::write_to_stream(std::ostream &stream, int pretty_print, int p
             // Key
             stream << common::string_escape(val.first);
             // Colon separator
-            stream << ": ";
+            stream << ':';
+            if (pretty_print)
+                stream << ' ';
             // Value
             val.second->write_to_stream(stream, pretty_print, pretty_print_level + pretty_print, newline);
         }
