@@ -30,7 +30,8 @@ public:
     size_t size() const;
     std::vector<std::string> keys() const;
     bool exists(const std::string &key) const;
-    value& at(const std::string &key) const;
+    value* at(const std::string &key);
+    const value* at(const std::string &key) const;
     value* get(const std::string &key) const;
     void set(const std::string &key, val_type type);
     void set(const std::string &key, const value_auto &value);

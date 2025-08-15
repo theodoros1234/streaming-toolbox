@@ -45,9 +45,11 @@ value* value_array::copy() const {return new value_array(*this);}
 
 size_t value_array::size() const {return _contents.size();}
 
-value& value_array::at(const size_t pos) const {return *_contents.at(pos);}
+value* value_array::at(const size_t pos) {return _contents.at(pos);}
 
-value* value_array::get(const size_t pos) const {return at(pos).copy();}
+const value* value_array::at(const size_t pos) const {return _contents.at(pos);}
+
+value* value_array::get(const size_t pos) const {return at(pos)->copy();}
 
 void value_array::set(const size_t pos, val_type type) {
     change_default(&_contents.at(pos), type);
@@ -79,13 +81,19 @@ void value_array::set_move(iterator pos, value* new_val) {
     *pos = new_val;
 }
 
-value& value_array::at_back() {
+value* value_array::at_back() {
     if (_contents.empty())
         throw std::out_of_range("Array is empty");
-    return *_contents.back();
+    return _contents.back();
 }
 
-value* value_array::back() {return at_back().copy();}
+const value* value_array::at_back() const {
+    if (_contents.empty())
+        throw std::out_of_range("Array is empty");
+    return _contents.back();
+}
+
+value* value_array::get_back() const {return at_back()->copy();}
 
 void value_array::push_back(val_type type) {
     value* new_obj = new_default(type);

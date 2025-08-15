@@ -1062,7 +1062,7 @@ void system::_provider_import(uint64_t provider_id,
                         if (item.type == ITEM_CATEGORY) {
                             // Recursively add all category entries, if specified
                             try {
-                                const json::value_object* sub_entries = json::cast_object(&item_def->at("entries"));
+                                const json::value_object* sub_entries = json::cast_object(item_def->at("entries"));
                                 _provider_import(provider_id, location_rid, new_res.second.as_category(), sub_entries);
                             } catch (std::out_of_range&) {  // ignored, it's okay to not specify sub-items
                             } catch (json::wrong_type&) {

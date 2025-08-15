@@ -78,7 +78,7 @@ param_definition::param_definition(const json::value_object* from) {
     try {
         // Name
         try {
-            name = json::cast_string(&from->at("name"))->value();
+            name = json::cast_string(from->at("name"))->value();
         } catch (std::out_of_range&) {
         } catch (json::wrong_type&) {
             throw parsing_error("\"name\" is not a string");
@@ -86,7 +86,7 @@ param_definition::param_definition(const json::value_object* from) {
 
         // Description
         try {
-            description = json::cast_string(&from->at("description"))->value();
+            description = json::cast_string(from->at("description"))->value();
         } catch (std::out_of_range&) {
         } catch (json::wrong_type&) {
             throw parsing_error("\"description\" is not a string");
@@ -94,7 +94,7 @@ param_definition::param_definition(const json::value_object* from) {
 
         // Type
         try {
-            std::string type_str = json::cast_string(&from->at("type"))->value();
+            std::string type_str = json::cast_string(from->at("type"))->value();
             type = json::type_from_string(type_str);
             // DON'T remove the following check. If the type is unspecified, it can just be ommited.
             if (type == json::VAL_UNDEFINED || type == json::VAL_NULL)
@@ -106,7 +106,7 @@ param_definition::param_definition(const json::value_object* from) {
 
         // Required
         try {
-            required = json::cast_bool(&from->at("required"))->value();
+            required = json::cast_bool(from->at("required"))->value();
         } catch (std::out_of_range&) {
         } catch (json::wrong_type&) {
             throw parsing_error("\"required\" is not a bool");
@@ -115,7 +115,7 @@ param_definition::param_definition(const json::value_object* from) {
         // Array definition
         if (type == json::VAL_ARRAY) {
             try {
-                array_definition = new param_definition(json::cast_object(&from->at("array_definition")));
+                array_definition = new param_definition(json::cast_object(from->at("array_definition")));
             } catch (std::out_of_range&) {
             } catch (json::wrong_type&) {
                 throw parsing_error("\"array_definition\" is not an object");
@@ -125,7 +125,7 @@ param_definition::param_definition(const json::value_object* from) {
         // Object definition
         if (type == json::VAL_OBJECT) {
             try {
-                const json::value_array* v = json::cast_array(&from->at("object_definition"));
+                const json::value_array* v = json::cast_array(from->at("object_definition"));
                 for (const auto i : *v) {
                     param_definition* ptr = nullptr;
 
@@ -320,7 +320,7 @@ item_info::item_info(item_type type, const std::string& display_name, const std:
 
 item_info::item_info(const json::value_object* from) {
     try {
-        std::string type_str = json::cast_string(&from->at("type"))->value();
+        std::string type_str = json::cast_string(from->at("type"))->value();
         if (type_str == "event_src")
             type = ITEM_EVENT_SRC;
         else if (type_str == "action_sink")
@@ -336,7 +336,7 @@ item_info::item_info(const json::value_object* from) {
     }
 
     try {
-        display_name = json::cast_string(&from->at("display_name"))->value();
+        display_name = json::cast_string(from->at("display_name"))->value();
     } catch (std::out_of_range&) {
         throw parsing_error("\"display_name\" is missing");
     } catch (json::wrong_type&) {
@@ -344,7 +344,7 @@ item_info::item_info(const json::value_object* from) {
     }
 
     try {
-        description = json::cast_string(&from->at("description"))->value();
+        description = json::cast_string(from->at("description"))->value();
     } catch (std::out_of_range&) {
         throw parsing_error("\"description\" is missing");
     } catch (json::wrong_type&) {
@@ -355,7 +355,7 @@ item_info::item_info(const json::value_object* from) {
     if (type == ITEM_EVENT_SRC) {
         // single param
         try {
-            params.emplace_back(json::cast_object(&from->at("param")));
+            params.emplace_back(json::cast_object(from->at("param")));
         } catch (std::out_of_range&) {  // ignored, maybe it doesn't take a parameter
         } catch (json::wrong_type&) {
             throw parsing_error("\"param\" must be an object, or must be ommited"
@@ -366,7 +366,7 @@ item_info::item_info(const json::value_object* from) {
     } else if (type == ITEM_ACTION_SINK) {
         // params
         try {
-            const json::value_array* param_list = json::cast_array(&from->at("params"));
+            const json::value_array* param_list = json::cast_array(from->at("params"));
             for (const json::value* i : *param_list) {
                 // Parse all parameters
                 try {
@@ -386,7 +386,7 @@ item_info::item_info(const json::value_object* from) {
     if (type == ITEM_EVENT_SRC || type == ITEM_ACTION_SINK) {
         // returns
         try {
-            returns = json::cast_object(&from->at("returns"));
+            returns = json::cast_object(from->at("returns"));
         } catch (std::out_of_range&) {  // ignored, maybe it doesn't return anything
         } catch (json::wrong_type&) {
             throw parsing_error("\"returns\" must be an array");
@@ -394,13 +394,13 @@ item_info::item_info(const json::value_object* from) {
 
         // examples
         try {
-            const json::value_array* example_list = json::cast_array(&from->at("examples"));
+            const json::value_array* example_list = json::cast_array(from->at("examples"));
             for (const json::value* i : *example_list) {
                 const json::value *i_params = nullptr, *i_returns = nullptr;
 
                 try {
-                    i_params = &json::cast_object(i)->at("params");
-                    i_returns = &json::cast_object(i)->at("returns");
+                    i_params = json::cast_object(i)->at("params");
+                    i_returns = json::cast_object(i)->at("returns");
                 } catch (json::wrong_type&) {
                     throw parsing_error("invalid example: must be an object");
                 } catch (std::out_of_range&) {
@@ -525,7 +525,7 @@ void strtb::event::param_type_check(const json::value* param, const param_defini
         const json::value_array* param_arr = json::cast_array(param);
         for (size_t i = 0; i < param_arr->size(); i++) {
             try {
-                param_type_check(&param_arr->at(i), def->array_definition);
+                param_type_check(param_arr->at(i), def->array_definition);
             } catch (wrong_type& e) {
                 throw wrong_type("at " + std::to_string(i) + ": " + e.what());
             }
@@ -540,7 +540,7 @@ void strtb::event::param_type_check(const json::value* param, const param_defini
                 continue;
 
             try {
-                param_type_check(&param_obj->at(subdef->name), subdef);
+                param_type_check(param_obj->at(subdef->name), subdef);
             } catch (std::out_of_range&) {
                 if (subdef->required)
                     throw wrong_type("missing required key " + common::string_escape(subdef->name));
@@ -564,7 +564,7 @@ void strtb::event::param_type_check(const json::value* param, const std::vector<
             continue;
 
         try {
-            param_type_check(&param_obj->at(subdef.name), &subdef);
+            param_type_check(param_obj->at(subdef.name), &subdef);
         } catch (std::out_of_range&) {
             if (subdef.required)
                 throw wrong_type("missing required key " + subdef.name);

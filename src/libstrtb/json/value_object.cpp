@@ -68,11 +68,13 @@ std::vector<std::string> value_object::keys() const {
 
 size_t value_object::size() const {return _contents.size();}
 
-value& value_object::at(const std::string &key) const {return *_contents.at(key);}
+value* value_object::at(const std::string &key) {return _contents.at(key);}
+
+const value* value_object::at(const std::string &key) const {return _contents.at(key);}
 
 bool value_object::exists(const std::string &key) const {return _contents.find(key) != _contents.end();}
 
-value* value_object::get(const std::string &key) const {return at(key).copy();}
+value* value_object::get(const std::string &key) const {return at(key)->copy();}
 
 void value_object::set(const std::string &key, val_type type) {
     auto itr = _contents.find(key);

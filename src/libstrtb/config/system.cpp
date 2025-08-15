@@ -163,11 +163,11 @@ json::value* system::find_next_item(json::value* current, const id_type &go_to) 
         // Should be converted to config::broken_path exception upstream.
 
     case json::VAL_ARRAY:
-        return &((json::value_array*) current)->at(go_to.pos());
+        return ((json::value_array*) current)->at(go_to.pos());
         break;
 
     case json::VAL_OBJECT:
-        return &((json::value_object*) current)->at(go_to.key());
+        return ((json::value_object*) current)->at(go_to.key());
         break;
 
     default: // This is here to suppress compiler warnings, and to error out on any unexpected situations that are normally impossible.
@@ -606,7 +606,7 @@ json::value* system::array_get_back(const std::string &category_name, const path
     json::value* current = follow_path(category_name, path);
 
     if (current->type() == json::VAL_ARRAY)
-        return ((json::value_array*) current)->back();
+        return ((json::value_array*) current)->get_back();
     else
         throw invalid_target(__func__, current->type());
 }
@@ -664,7 +664,7 @@ json::value* system::array_pop_and_get_back(const std::string &category_name, co
     json::value* current = follow_path(category_name, path);
 
     if (current->type() == json::VAL_ARRAY) {
-        json::value* back = ((json::value_array*) current)->back();
+        json::value* back = ((json::value_array*) current)->get_back();
         ((json::value_array*) current)->pop_back();
         find_category(category_name).changed = true;
         return back;

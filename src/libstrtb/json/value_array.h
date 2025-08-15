@@ -23,7 +23,8 @@ public:
     void set_contents(const std::vector<value*> &contents);
     void clear();
     size_t size() const;
-    value& at(const size_t pos) const;
+    value* at(const size_t pos);
+    const value* at(const size_t pos) const;
     value* get(const size_t pos) const;
     void set(const size_t pos, val_type type);
     void set(const size_t pos, const value_auto &new_val);
@@ -31,8 +32,9 @@ public:
     void set(iterator pos, val_type type);
     void set(iterator pos, const value_auto &new_val);
     void set_move(iterator pos, value* new_val);
-    value& at_back();
-    value* back();
+    value* at_back();
+    const value* at_back() const;
+    value* get_back() const;
     void push_back(val_type type);
     void push_back(const value_auto &new_val);
     void push_back_move(value* new_val);
