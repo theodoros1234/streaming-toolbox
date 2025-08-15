@@ -44,6 +44,10 @@ uint64_t provider::id() const {
     return _id;
 }
 
+const std::string& provider::name() const {
+    return _name;
+}
+
 uint64_t provider::item_add(uint64_t target_location, const std::string &name, const item_info &item) {
     _setup_check();
     if (target_location == 0)
@@ -90,6 +94,8 @@ void provider::category_clear_root() {
 
 void provider::import(uint64_t target_location, const json::value_object* entries) {
     _setup_check();
+    if (target_location == 0)
+        target_location = _id;
     system_ptr->provider_import(_id, target_location, entries);
 }
 

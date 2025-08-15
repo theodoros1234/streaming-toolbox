@@ -279,6 +279,34 @@ void param_definition::object_clear_definitions() {
     object_definition.clear();
 }
 
+strtb::json::value_object* param_definition::to_json() const {
+    json::holder def_holder = json::VAL_OBJECT;
+    json::value_object* def = def_holder.as_object();
+
+    if (!name.empty())
+        def->set("name", name);
+
+    if (!description.empty())
+        def->set("description", description);
+
+    if (type != json::VAL_UNDEFINED)
+        def->set("type", json::type_to_string(type));
+    def->set("required", required);
+
+    if (type == json::VAL_ARRAY && array_definition != nullptr)
+        def->set_move("array_definition", array_definition->to_json());
+
+    if (type == json::VAL_OBJECT && !object_definition.empty()) {
+        json::holder obj_def_holder = json::VAL_ARRAY;
+        json::value_array* obj_def = obj_def_holder.as_array();
+        for (const param_definition* subdef : object_definition)
+            obj_def->push_back_move(subdef->to_json());
+        def->set_move("object_definition", obj_def_holder.detach());
+    }
+
+    return json::cast_object(def_holder.detach());
+}
+
 example_definition::example_definition(const example_definition& other) {
     params = other.params;
     returns = other.returns;
@@ -315,20 +343,21 @@ example_definition& example_definition::operator=(example_definition&& other) {
     return *this;
 }
 
+strtb::json::value_object* example_definition::to_json() const {
+    json::holder def_holder = json::VAL_OBJECT;
+    json::value_object* def = def_holder.as_object();
+    def->set("params", params.value());
+    def->set("returns", returns.value());
+    return json::cast_object(def_holder.detach());
+}
+
 item_info::item_info(item_type type, const std::string& display_name, const std::string& description) :
     type(type), display_name(display_name), description(description) {}
 
 item_info::item_info(const json::value_object* from) {
     try {
         std::string type_str = json::cast_string(from->at("type"))->value();
-        if (type_str == "event_src")
-            type = ITEM_EVENT_SRC;
-        else if (type_str == "action_sink")
-            type = ITEM_ACTION_SINK;
-        else if (type_str == "category")
-            type = ITEM_CATEGORY;
-        else
-            throw parsing_error(common::string_escape(type_str) + " is not a valid item type");
+        type = item_type_from_string(type_str);
     } catch (std::out_of_range&) {
         throw parsing_error("\"type\" is missing");
     } catch (json::wrong_type&) {
@@ -414,6 +443,53 @@ item_info::item_info(const json::value_object* from) {
             throw parsing_error("\"examples\" must be an array");
         }
     }
+}
+
+strtb::json::value_object* item_info::to_json() const {
+    json::holder def_holder = json::VAL_OBJECT;
+    json::value_object* def = def_holder.as_object();
+    def->set("type", item_type_to_string(type));
+    def->set("display_name", display_name);
+    def->set("description", description);
+
+    // param for event src
+    if (type == ITEM_EVENT_SRC) {
+        if (params.size() == 1) {
+            // NOTE: this can still be wrong if an unsupported param type is used, error will happen on import
+            def->set("param", params.back().to_json());
+        } else if (params.size() > 1) {
+            throw bad_definition("event source can take at most one parameter");
+        }
+    }
+
+    // params for action sink
+    if (type == ITEM_ACTION_SINK && !params.empty()) {
+        json::holder params_def_holder = json::VAL_ARRAY;
+        json::value_array* params_def = params_def_holder.as_array();
+
+        for (const param_definition& p : params)
+            params_def->push_back_move(p.to_json());
+
+        def->set_move("params", params_def_holder.detach());
+    }
+
+    if (type == ITEM_EVENT_SRC || type == ITEM_ACTION_SINK) {
+        // returns
+        def->set("returns", returns.to_json());
+
+        // examples
+        if (!examples.empty()) {
+            json::holder examples_def_holder = json::VAL_ARRAY;
+            json::value_array* examples_def = examples_def_holder.as_array();
+
+            for (const example_definition& e : examples)
+                examples_def->push_back(e.to_json());
+
+            def->set_move("examples", examples_def_holder.detach());
+        }
+    }
+
+    return json::cast_object(def_holder.detach());
 }
 
 item_path::item_path(const std::string& path, size_t max_segment_length, size_t max_depth) {
@@ -574,7 +650,7 @@ void strtb::event::param_type_check(const json::value* param, const std::vector<
     }
 }
 
-const char* strtb::event::item_type_to_string(strtb::event::item_type type) {
+const char* strtb::event::item_type_to_string_display(strtb::event::item_type type) {
     switch (type) {
     case strtb::event::ITEM_UNDEFINED:
         return "Undefined";
@@ -589,3 +665,26 @@ const char* strtb::event::item_type_to_string(strtb::event::item_type type) {
     }
 }
 
+const char* strtb::event::item_type_to_string(strtb::event::item_type type) {
+    switch (type) {
+    case strtb::event::ITEM_CATEGORY:
+        return "category";
+    case strtb::event::ITEM_EVENT_SRC:
+        return "event_src";
+    case strtb::event::ITEM_ACTION_SINK:
+        return "action_sink";
+    default:
+        throw wrong_type("invalid item type");
+    }
+}
+
+item_type strtb::event::item_type_from_string(const std::string& type_str) {
+    if (type_str == "event_src")
+        return ITEM_EVENT_SRC;
+    else if (type_str == "action_sink")
+        return ITEM_ACTION_SINK;
+    else if (type_str == "category")
+        return ITEM_CATEGORY;
+    else
+        throw parsing_error(common::string_escape(type_str) + " is not a valid item type");
+}

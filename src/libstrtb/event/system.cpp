@@ -566,7 +566,7 @@ system::~system() {
     for (const auto& item : _items)
         if (item.first != STRTB_EVENT_ROOT)
             log_s.warning({"Abandoned item: rid=", item.first,
-                           ", type=", common::string_escape(item_type_to_string(item.second.type()))});
+                           ", type=", common::string_escape(item_type_to_string_display(item.second.type()))});
 
     // Event subs
     for (const auto& sub : _event_subs)
@@ -1579,4 +1579,173 @@ void system::action_requester_run(uint64_t path_fl_rid, const std::shared_ptr<ac
         return;
     }
     request->status = ACTION_PENDING;
+}
+
+void system::_export_item(json::value_object* parent_entries, const std::string& name, uint64_t rid) {
+    json::holder def_holder = json::VAL_OBJECT;
+    json::value_object* def = def_holder.as_object();
+    res_cnt* item_cnt = nullptr;
+    res_item* item = nullptr;
+
+    try {
+        item_cnt = &_items.at(rid);
+        item = item_cnt->ptr;
+    } catch (std::out_of_range&) {
+        throw internal_error("category entry has an invalid resource id", log_s, __FILE__, __LINE__, __func__);
+    }
+
+    def->set("type", item_type_to_string(item->type));
+    def->set("display_name", item->display_name);
+    def->set("description", item->description);
+
+    switch (item->type) {
+    case ITEM_CATEGORY: {
+        const res_item_category* category = item_cnt->as_category();
+
+        // category entries
+        if (!category->list.empty()) {
+            json::holder entries_holder = json::VAL_OBJECT;
+            json::value_object* entries = entries_holder.as_object();
+
+            for (const auto& entry : category->list)
+                _export_item(entries, entry.first, entry.second);
+
+            def->set_move("entries", entries_holder.detach());
+        }
+    }
+    break;
+
+    case ITEM_EVENT_SRC: {
+        const res_item_event_src* event_src = item_cnt->as_event_src();
+
+        // param
+        if (event_src->param.type != json::VAL_UNDEFINED)
+            def->set("param", event_src->param.to_json());
+
+        // returns
+        def->set("returns", event_src->returns.to_json());
+
+        // examples
+        if (!event_src->examples.empty()) {
+            json::holder examples_def_holder = json::VAL_ARRAY;
+            json::value_array* examples_def = examples_def_holder.as_array();
+
+            for (const example_definition& e : event_src->examples)
+                examples_def->push_back(e.to_json());
+
+            def->set_move("examples", examples_def_holder.detach());
+        }
+    }
+    break;
+
+    case ITEM_ACTION_SINK: {
+        const res_item_action_sink* action_sink = item_cnt->as_action_sink();
+
+        // params
+        const std::vector<param_definition>& params = action_sink->params;
+        if (!params.empty()) {
+            json::holder params_def_holder = json::VAL_ARRAY;
+            json::value_array* params_def = params_def_holder.as_array();
+
+            for (const param_definition& p : params)
+                params_def->push_back_move(p.to_json());
+
+            def->set_move("params", params_def_holder.detach());
+        }
+
+        // returns
+        def->set("returns", action_sink->returns.to_json());
+
+        // examples
+        if (!action_sink->examples.empty()) {
+            json::holder examples_def_holder = json::VAL_ARRAY;
+            json::value_array* examples_def = examples_def_holder.as_array();
+
+            for (const example_definition& e : action_sink->examples)
+                examples_def->push_back(e.to_json());
+
+            def->set_move("examples", examples_def_holder.detach());
+        }
+    }
+    break;
+
+    default:
+        throw internal_error("item has an invalid type", log_s, __FILE__, __LINE__, __func__);
+    }
+
+    parent_entries->set(name, def_holder.detach());
+}
+
+json::value_object* system::export_item(uint64_t target_location, const std::string& entry) {
+    std::lock_guard<std::mutex> guard(_lock);
+    res_item_category* location = _get_category(target_location);
+    if (!item_path::validate_segment(entry))
+        throw invalid_path("entry name is invalid", -1);
+    json::holder def_holder = json::VAL_OBJECT;
+    json::value_object* def = def_holder.as_object();
+
+    const auto itr = location->list.find(entry);
+    if (itr == location->list.end())
+        throw not_found("entry not found");
+
+    _export_item(def, itr->first, itr->second);
+
+    return json::cast_object(def_holder.detach());
+}
+
+json::value_object* system::export_item(const item_path& target_location, const std::string& entry) {
+    std::lock_guard<std::mutex> guard(_lock);
+    res_item_category* location = _get_category(STRTB_EVENT_ROOT, target_location).first;
+    if (!item_path::validate_segment(entry))
+        throw invalid_path("entry name is invalid", -1);
+    json::holder def_holder = json::VAL_OBJECT;
+    json::value_object* def = def_holder.as_object();
+
+    const auto itr = location->list.find(entry);
+    if (itr == location->list.end())
+        throw not_found("entry not found");
+
+    _export_item(def, itr->first, itr->second);
+
+    return json::cast_object(def_holder.detach());
+}
+
+json::value_object* system::export_items(uint64_t target_location, const std::vector<std::string>& entries) {
+    std::lock_guard<std::mutex> guard(_lock);
+    res_item_category* location = _get_category(target_location);
+    json::holder def_holder = json::VAL_OBJECT;
+    json::value_object* def = def_holder.as_object();
+
+    for (const std::string& entry : entries) {
+        if (!item_path::validate_segment(entry))
+            throw invalid_path("entry name " + common::string_escape(entry) + " is invalid", -1);
+
+        const auto itr = location->list.find(entry);
+        if (itr == location->list.end())
+            throw not_found("entry " + common::string_escape(entry) + " not found");
+
+        _export_item(def, itr->first, itr->second);
+    }
+
+    return json::cast_object(def_holder.detach());
+}
+
+json::value_object* system::export_items(const item_path& target_location, const std::vector<std::string>& entries) {
+    std::lock_guard<std::mutex> guard(_lock);
+    res_item_category* location = _get_category(STRTB_EVENT_ROOT, target_location).first;
+    json::holder def_holder = json::VAL_OBJECT;
+    json::value_object* def = def_holder.as_object();
+
+    for (const std::string& entry : entries) {
+        if (!item_path::validate_segment(entry))
+            throw invalid_path("entry name " + common::string_escape(entry) + " is invalid", -1);
+
+        const auto itr = location->list.find(entry);
+        if (itr == location->list.end())
+            throw not_found("entry " + common::string_escape(entry) + " not found");
+
+        _export_item(def, itr->first, itr->second);
+    }
+
+    return json::cast_object(def_holder.detach());
 }

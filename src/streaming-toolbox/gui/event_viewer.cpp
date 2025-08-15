@@ -38,7 +38,7 @@ void event_viewer::populate() {
     item->event_item_info.description = info.description;
     item->event_item_info.provider_id = info.provider_id;
     item->setText(0, QString::fromStdString(info.display_name));
-    item->setText(1, event::item_type_to_string(item->event_item_info.type));
+    item->setText(1, event::item_type_to_string_display(item->event_item_info.type));
     item->populate();
     ui->item_tree->expandItem(item);
 
@@ -54,7 +54,7 @@ void event_viewer::tree_item::populate() {
         this->addChild(item);
         item->event_item_info = i;
         item->setText(0, QString::fromStdString(i.display_name));
-        item->setText(1, event::item_type_to_string(i.type));
+        item->setText(1, event::item_type_to_string_display(i.type));
         if (i.type == event::ITEM_CATEGORY)
             item->populate();
     }
@@ -180,7 +180,7 @@ void event_viewer::on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTr
         text.append(QString::fromStdString(info.description));
         text.append("</p>");
         text.append("<p><b>Type:</b> ");
-        text.append(event::item_type_to_string(info.type));
+        text.append(event::item_type_to_string_display(info.type));
         text.append("</p>");
 
         if (info.type == event::ITEM_EVENT_SRC)
@@ -223,7 +223,7 @@ void event_viewer::on_item_tree_currentItemChanged(QTreeWidgetItem* current, QTr
                     text.append(" (rid=");
                     text.append(QString::number(path_fl.follower_rid));
                     text.append(")</b><br><b>Wants:</b> ");
-                    text.append(event::item_type_to_string(path_fl.wanted_type));
+                    text.append(event::item_type_to_string_display(path_fl.wanted_type));
                     text.append("<br><b>Path:</b> ");
                     text.append(QString::fromStdString(path_fl.path.to_string()));
                     text.append("<br><b>Status:</b> ");

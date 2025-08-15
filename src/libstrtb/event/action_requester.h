@@ -2,6 +2,8 @@
 #define STRTB_EVENT_ACTION_REQUESTER_H
 
 #include "item.h"
+#include <mutex>
+#include <condition_variable>
 #include <memory>
 #include <thread>
 #include <QObject>

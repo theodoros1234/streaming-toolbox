@@ -3,8 +3,6 @@
 
 #include <string>
 #include <vector>
-#include <mutex>
-#include <condition_variable>
 #include <stdint.h>
 #include "../json/value_object.h"
 #include "../logging/logging.h"
@@ -88,6 +86,7 @@ struct param_definition {
     void array_clear_definition();
     void object_add_definition(const std::string& name, const std::string& description, json::val_type type, bool required);
     void object_clear_definitions();
+    json::value_object* to_json() const;
 };
 
 struct example_definition {
@@ -99,11 +98,14 @@ struct example_definition {
     example_definition(const json::value* params, const json::value* returns);
     example_definition& operator=(const example_definition& other);
     example_definition& operator=(example_definition&& other);
+    json::value_object* to_json() const;
 };
 
 enum item_type {ITEM_UNDEFINED, ITEM_CATEGORY, ITEM_EVENT_SRC, ITEM_ACTION_SINK};
 
+const char* item_type_to_string_display(item_type type);
 const char* item_type_to_string(item_type type);
+item_type item_type_from_string(const std::string& type_str);
 
 class item_path : public std::vector<std::string> {
     using std::vector<std::string>::vector;
@@ -133,6 +135,7 @@ struct item_info {
     item_info() = default;
     item_info(item_type type, const std::string& display_name, const std::string& description);
     item_info(const json::value_object* from);
+    json::value_object* to_json() const;
 };
 
 struct item_listing : public item_info {

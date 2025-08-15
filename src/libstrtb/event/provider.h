@@ -20,6 +20,7 @@ public:
     bool setup_finished();
     void teardown();
     uint64_t id() const;
+    const std::string& name() const;
 
     uint64_t item_add(uint64_t target_location, const std::string& name, const item_info& item);
     uint64_t item_add(const item_path& target_location, const std::string& name, const item_info& item);

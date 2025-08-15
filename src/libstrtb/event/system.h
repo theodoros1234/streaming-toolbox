@@ -153,6 +153,7 @@ private:
     void _action_requester_path_clear(uint64_t rid);
     void _info(uint64_t resource_id, item_info& item);
     std::vector<item_listing> _list(const res_item_category *location);
+    void _export_item(json::value_object* parent_entries, const std::string& name, uint64_t rid);
 
 protected:
     friend provider;
@@ -210,6 +211,10 @@ public:
     std::vector<item_info_path_follower> info_path_followers(uint64_t resource_id);
     std::vector<item_info_event_sub> info_event_subs(uint64_t resource_id);
     item_info_action_sink info_action_sink(uint64_t resource_id);
+    json::value_object* export_item(uint64_t target_location, const std::string& entry);
+    json::value_object* export_item(const item_path& target_location, const std::string& entry);
+    json::value_object* export_items(uint64_t target_location, const std::vector<std::string>& entries);
+    json::value_object* export_items(const item_path& target_location, const std::vector<std::string>& entries);
 };
 
 extern system* system_ptr;
