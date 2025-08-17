@@ -1,0 +1,316 @@
+#include "value.h"
+#include "value_null.h"
+#include "value_bool.h"
+#include "value_int.h"
+#include "value_float.h"
+#include "value_string.h"
+#include "value_array.h"
+#include "value_object.h"
+#include <fstream>
+#include <sstream>
+
+namespace strtb::json {
+
+const char* invalid_type::what() const noexcept {return "invalid or unwanted json value type";}
+
+wrong_type::wrong_type(val_type expected, val_type got)
+    : expected(expected), got(got),
+    _what(std::string("expected type ") + type_to_string(expected) + " but got " + type_to_string(got)) {}
+
+const char* wrong_type::what() const noexcept {return _what.c_str();}
+
+const char* undefined_exception::what() const noexcept {return "undefined value";}
+
+value::value(val_type type) : _type(type) {}
+
+val_type value::type() const {return this->_type;}
+
+void value::write_to_stream(std::ostream &stream, int pretty_print, const char* newline) const {
+    write_to_stream(stream, pretty_print, 0, newline);
+}
+
+void value::write_to_file(const char *path, int pretty_print, const char* newline) const {
+    std::ofstream output_file(path, std::ofstream::out);
+    output_file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+    write_to_stream(output_file, pretty_print, 0, newline);
+}
+
+std::string value::write_to_string(int pretty_print, const char* newline) const {
+    std::stringstream str_stream(std::ios_base::out);
+    write_to_stream(str_stream, pretty_print, 0, newline);
+    return str_stream.str();
+}
+
+value_auto::value_auto(bool v) : _type(VAL_BOOL) {_value.b = v;}
+value_auto::value_auto(int v) : _type(VAL_INT) {_value.i = v;}
+value_auto::value_auto(long v) : _type(VAL_INT) {_value.i = v;}
+value_auto::value_auto(long long v) : _type(VAL_INT) {_value.i = v;}
+value_auto::value_auto(unsigned int v) : _type(VAL_INT) {_value.i = v;}
+value_auto::value_auto(unsigned long v) : _type(VAL_INT) {_value.i = v;}
+value_auto::value_auto(unsigned long long v) : _type(VAL_INT) {_value.i = v;}
+value_auto::value_auto(double v) : _type(VAL_FLOAT) {_value.f = v;}
+value_auto::value_auto(const char* v) : _type(VAL_STRING), _is_c_str(true) {_value.c_str = v;}
+value_auto::value_auto(const std::string &v) : _type(VAL_STRING) {_value.str = &v;}
+value_auto::value_auto(const std::vector<value*> &v) : _type(VAL_ARRAY) {_value.arr = &v;}
+value_auto::value_auto(const std::map<std::string, value*> &v) : _type(VAL_OBJECT) {_value.obj = &v;}
+value_auto::value_auto(const value* v) : _is_ptr(true) {_value.v = v;}
+val_type value_auto::type() const {return _type;}
+bool value_auto::is_ptr() const {return _is_ptr;}
+bool value_auto::is_c_str() const {return _is_c_str;}
+bool value_auto::value_as_bool() const {return _value.b;}
+long long value_auto::value_as_int() const {return _value.i;}
+double value_auto::value_as_float() const {return _value.f;}
+const char* value_auto::value_as_c_str() const {return _value.c_str;}
+const std::string& value_auto::value_as_string() const {return *_value.str;}
+const std::vector<value*>& value_auto::value_as_array() const {return *_value.arr;}
+const std::map<std::string, value*>& value_auto::value_as_object() const {return *_value.obj;}
+const value* value_auto::value_as_ptr() const {return _value.v;}
+
+value* new_default(val_type type) {
+    switch (type) {
+    case VAL_NULL:
+        return new value_null();
+        break;
+    case VAL_BOOL:
+        return new value_bool();
+        break;
+    case VAL_INT:
+        return new value_int();
+        break;
+    case VAL_FLOAT:
+        return new value_float();
+        break;
+    case VAL_STRING:
+        return new value_string();
+        break;
+    case VAL_ARRAY:
+        return new value_array();
+        break;
+    case VAL_OBJECT:
+        return new value_object();
+        break;
+    default:
+        throw json::invalid_type();
+    }
+}
+
+value* new_auto(const value_auto &val) {
+    if (val.is_ptr()) {
+        if (!val.value_as_ptr())
+            throw undefined_exception();
+        return val.value_as_ptr()->copy();
+    } else switch (val.type()) {
+    case VAL_BOOL:
+        return new value_bool(val.value_as_bool());
+    case VAL_INT:
+        return new value_int(val.value_as_int());
+    case VAL_FLOAT:
+        return new value_float(val.value_as_float());
+    case VAL_STRING:
+        if (val.is_c_str()) {
+            if (!val.value_as_c_str())
+                throw undefined_exception();
+            return new value_string(val.value_as_c_str());
+        } else
+            return new value_string(val.value_as_string());
+    case VAL_ARRAY:
+        return new value_array(val.value_as_array());
+    case VAL_OBJECT:
+        return new value_object(val.value_as_object());
+    default:
+        throw json::invalid_type();
+    }
+}
+
+void change_default(value** old_val, val_type type) {
+    val_type old_type = (*old_val)->type();
+    switch (type) {
+    case VAL_NULL:
+        if (old_type != VAL_NULL) {
+            delete *old_val;
+            *old_val = new value_null();
+        }
+        break;
+
+    case VAL_BOOL:
+        if (old_type == VAL_BOOL)
+            ((value_bool*)*old_val)->set_value(false);
+        else {
+            delete *old_val;
+            *old_val = new value_bool();
+        }
+        break;
+
+    case VAL_INT:
+        if (old_type == VAL_INT)
+            ((value_int*)*old_val)->set_value(0);
+        else {
+            delete *old_val;
+            *old_val = new value_int();
+        }
+        break;
+
+    case VAL_FLOAT:
+        if (old_type == VAL_FLOAT)
+            ((value_float*)*old_val)->set_value(0);
+        else {
+            delete *old_val;
+            *old_val = new value_float();
+        }
+        break;
+
+    case VAL_STRING:
+        if (old_type == VAL_STRING)
+            ((value_string*)*old_val)->set_value("");
+        else {
+            delete *old_val;
+            *old_val = new value_string();
+        }
+        break;
+
+    case VAL_ARRAY:
+        if (old_type == VAL_ARRAY)
+            ((value_array*)*old_val)->clear();
+        else {
+            delete *old_val;
+            *old_val = new value_array();
+        }
+        break;
+
+    case VAL_OBJECT:
+        if (old_type == VAL_OBJECT)
+            ((value_object*)*old_val)->clear();
+        else {
+            delete *old_val;
+            *old_val = new value_object();
+        }
+        break;
+
+    default:
+        throw json::invalid_type();
+    }
+}
+
+void change_auto(value** old_val, const value_auto &new_val) {
+    val_type old_type = (*old_val)->type();
+
+    if (new_val.is_ptr()) {
+        if (!new_val.value_as_ptr())
+            throw undefined_exception();
+        delete *old_val;
+        *old_val = new_val.value_as_ptr()->copy();
+    } else switch (new_val.type()) {
+
+    case VAL_BOOL:
+        if (old_type == VAL_BOOL)
+            ((value_bool*)*old_val)->set_value(new_val.value_as_bool());
+        else {
+            delete *old_val;
+            *old_val = new value_bool(new_val.value_as_bool());
+        }
+        break;
+
+    case VAL_INT:
+        if (old_type == VAL_INT)
+            ((value_int*)*old_val)->set_value(new_val.value_as_int());
+        else {
+            delete *old_val;
+            *old_val = new value_int(new_val.value_as_int());
+        }
+        break;
+
+    case VAL_FLOAT:
+        if (old_type == VAL_FLOAT)
+            ((value_float*)*old_val)->set_value(new_val.value_as_float());
+        else {
+            delete *old_val;
+            *old_val = new value_float(new_val.value_as_float());
+        }
+        break;
+
+    case VAL_STRING:
+        if (new_val.is_c_str()) {
+            if (!new_val.value_as_c_str())
+                throw undefined_exception();
+            if (old_type == VAL_STRING)
+                ((value_string*)*old_val)->set_value(new_val.value_as_c_str());
+            else {
+                delete *old_val;
+                *old_val = new value_string(new_val.value_as_c_str());
+            }
+        } else {
+            if (old_type == VAL_STRING)
+                ((value_string*)*old_val)->set_value(new_val.value_as_string());
+            else {
+                delete *old_val;
+                *old_val = new value_string(new_val.value_as_string());
+            }
+        }
+        break;
+
+    case VAL_ARRAY:
+        if (old_type == VAL_ARRAY)
+            ((value_array*)*old_val)->set_contents(new_val.value_as_array());
+        else {
+            delete *old_val;
+            *old_val = new value_array(new_val.value_as_array());
+        }
+        break;
+
+    case VAL_OBJECT:
+        if (old_type == VAL_OBJECT)
+            ((value_object*)*old_val)->set_contents(new_val.value_as_object());
+        else {
+            delete *old_val;
+            *old_val = new value_object(new_val.value_as_object());
+        }
+        break;
+
+    default:
+        throw json::invalid_type();
+    }
+}
+
+val_type type_from_string(const std::string& str) {
+    if (str == "null")
+        return VAL_NULL;
+    else if (str == "bool")
+        return VAL_BOOL;
+    else if (str == "int")
+        return VAL_INT;
+    else if (str == "float")
+        return VAL_FLOAT;
+    else if (str == "string")
+        return VAL_STRING;
+    else if (str == "array")
+        return VAL_ARRAY;
+    else if (str == "object")
+        return VAL_OBJECT;
+    else
+        return VAL_UNDEFINED;
+}
+
+const char* type_to_string(val_type type) {
+    switch (type) {
+    case VAL_NULL:
+        return "null";
+    case VAL_BOOL:
+        return "bool";
+    case VAL_INT:
+        return "int";
+    case VAL_FLOAT:
+        return "float";
+    case VAL_STRING:
+        return "string";
+    case VAL_ARRAY:
+        return "array";
+    case VAL_OBJECT:
+        return "object";
+    case VAL_UNDEFINED:
+        return "undefined";
+    default:
+        return "invalid";
+    }
+}
+
+}

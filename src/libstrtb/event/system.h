@@ -1,0 +1,224 @@
+#ifndef STRTB_EVENT_SYSTEM_H
+#define STRTB_EVENT_SYSTEM_H
+
+#include "item.h"
+
+#include <map>
+#include <vector>
+#include <mutex>
+#include <string>
+#include <memory>
+#include <set>
+
+#define STRTB_EVENT_ROOT 1
+
+namespace strtb::event {
+
+class provider;
+class event_listener_base;
+class event_listener_queued;
+class event_listener_qt_signal;
+class action_handler;
+class action_requester;
+struct action_request_internal;
+
+class system {
+private:
+    // used by event subs (and more later) to locate an item that hasn't been registered yet by its provider
+    struct res_path_follower {
+        const std::string& owner_name;
+        item_path path;
+        size_t path_pos_found = -1; // position of path segment it's currently looking for, path.size() if found
+        item_type wanted_type = ITEM_UNDEFINED;
+        uint64_t follower_rid = 0, target_rid = 0;
+        path_follower_status status = PATH_FL_WAITING;
+        std::string diagnostic_info;
+
+        res_path_follower(const std::string& owner_name, const item_path& path, item_type wanted_type, uint64_t sub_rid);
+    };
+
+    struct res_event_sub {
+        res_path_follower path;
+        json::holder param;
+        event_listener_base& listener;
+
+        res_event_sub(const item_path& path, const json::value* param, event_listener_base& listener, uint64_t rid);
+    };
+
+    struct res_item {
+        item_type type = ITEM_UNDEFINED;
+        std::string display_name, description;
+        uint64_t provider_id = 0;
+        // TODO: maybe a resource string for an icon for better GUI appearance?
+        virtual ~res_item() = default;
+    };
+
+    struct res_item_category : public res_item {
+        std::map<std::string, uint64_t> list;
+        std::map<std::string, std::set<res_path_follower*> > waiting_path_followers;
+
+        void path_follower_attach(res_path_follower* path_fl, uint64_t my_rid);
+        void path_follower_detach(res_path_follower* path_fl);  // detaches for unsubbing
+        void path_follower_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid);   // detaches for item removal (moves back)
+        bool has_path_followers();
+    };
+
+    struct res_item_event_src : public res_item {
+        param_definition param, returns;
+        std::vector<example_definition> examples;
+
+        // Subscribed event listeners, based on parameter type
+        std::set<res_event_sub*> subs_none;
+        std::set<res_event_sub*> subs_bool[2];
+        std::map<long long, std::set<res_event_sub*> > subs_int;
+        std::map<std::string, std::set<res_event_sub*> > subs_string;
+
+        bool sub_attach(res_path_follower& path_fl, uint64_t my_rid);
+        void sub_detach(res_event_sub* sub_ptr);    // detaches for unsubbing
+        void sub_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid); // detaches for item removal (moves back)
+        bool has_subs();
+    };
+
+    struct res_item_action_sink : public res_item {
+        std::vector<param_definition> params;
+        param_definition returns;
+        std::vector<example_definition> examples;
+
+        action_handler* handler = nullptr;
+        std::set<res_path_follower*> requesters;
+
+        void requester_attach(res_path_follower* path_fl, uint64_t my_rid);
+        void requester_detach(res_path_follower* path_fl);  // detaches for unsubbing
+        void requester_detach_all(std::set<res_path_follower*>& move_into, uint64_t cat_rid);   // detaches for item removal (moves back)
+        bool has_requesters();
+    };
+
+    struct res_cnt {
+        // Resource container
+        res_item* ptr = nullptr;
+
+        res_cnt() = default;
+        res_cnt(res_item* ptr);
+        // Copy constructors deleted, cause there should only ever be one instance of the resource held underneath.
+        res_cnt(res_cnt&) = delete;
+        res_cnt(const res_cnt&) = delete;
+        res_cnt(res_cnt&& from);
+        ~res_cnt();
+        void make_item(item_type type,
+                       const std::string& display_name,
+                       const std::string& description,
+                       uint64_t provider_id);
+        void make_item(item_type type,
+                       const std::string& display_name,
+                       const std::string& description,
+                       uint64_t provider_id,
+                       const std::vector<param_definition>& params,
+                       const param_definition& returns,
+                       const std::vector<example_definition>& examples);
+        item_type type() const;
+        res_item_category* as_category() const;
+        res_item_event_src* as_event_src() const;
+        res_item_action_sink* as_action_sink() const;
+    };
+
+    std::map<uint64_t, res_cnt> _items;
+    std::map<uint64_t, std::unique_ptr<res_event_sub> > _event_subs;
+    std::map<uint64_t, std::unique_ptr<res_path_follower> > _action_requesters;
+    uint64_t _resid_counter = STRTB_EVENT_ROOT + 1;
+
+    uint64_t _resid_new();
+    uint64_t _follow_path(uint64_t start, const item_path& path);
+    res_item_category* _get_category(uint64_t target_location);
+    std::pair<res_item_category*, uint64_t> _get_category(uint64_t start, const item_path& target_location);
+    res_item_event_src* _get_event_src(uint64_t target_location);
+    res_item_action_sink* _get_action_sink(uint64_t target_location);
+    static void _path_follower_detached(res_path_follower* path_fl,
+                                      std::set<res_path_follower*> &move_into,
+                                      uint64_t cat_rid);
+    static void _path_follower_attached(res_path_follower* path_fl, uint64_t my_rid);
+    std::pair<uint64_t, res_cnt&> _provider_item_add(uint64_t provider_id,
+                                                     res_item_category* location,
+                                                     const std::string& name,
+                                                     const item_info& item);
+    void _provider_item_remove_path_followers(uint64_t location_rid,
+                                              res_item_category* location,
+                                              const std::string& name,
+                                              res_cnt& item);
+    void _provider_item_remove(uint64_t location_rid, res_item_category* location, const std::string& name);
+    void _provider_category_clear(uint64_t location_rid, res_item_category* location);
+    void _provider_import(uint64_t provider_id,
+                          uint64_t location_rid,
+                          res_item_category* location,
+                          const json::value_object* entries);
+    void _action_requester_path_clear(uint64_t rid);
+    void _info(uint64_t resource_id, item_info& item);
+    std::vector<item_listing> _list(const res_item_category *location);
+    void _export_item(json::value_object* parent_entries, const std::string& name, uint64_t rid);
+
+protected:
+    friend provider;
+    friend event_listener_base;
+    friend event_listener_queued;
+    friend event_listener_qt_signal;
+    friend action_handler;
+    friend action_requester;
+
+    std::mutex _lock;
+
+    uint64_t provider_item_add(uint64_t provider_id,
+                               uint64_t target_location,
+                               const std::string& name,
+                               const item_info& item);
+    uint64_t provider_item_add(uint64_t provider_id,
+                               const item_path& target_location,
+                               const std::string& name,
+                               const item_info& item);
+    void provider_item_remove(uint64_t provider_id, uint64_t target_location, const std::string& name);
+    void provider_item_remove(uint64_t provider_id, const item_path& target_location, const std::string& name);
+    uint64_t provider_item_get_id(uint64_t provider_id, const item_path& target);
+    // TODO: bulk add/remove
+    void provider_category_clear(uint64_t provider_id, uint64_t target_location);
+    void provider_category_clear(uint64_t provider_id, const item_path& target_location);
+    void provider_import(uint64_t provider_id, uint64_t target_location, const json::value_object* entries);
+    void provider_import(uint64_t provider_id, const item_path& target_location, const json::value_object* entries);
+    void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event);
+    void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, bool filter);
+    void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, long long filter);
+    void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const std::string& filter);
+    void provider_push_event(uint64_t provider_id, uint64_t target, const json::value* event, const json::value* filter);
+
+    uint64_t event_listener_subscribe(event_listener_base& listener, const item_path& event_source, const json::value* param);
+    void event_listener_unsubscribe(uint64_t subscription_id);
+    void event_listener_unsubscribe(const std::set<uint64_t>& subscription_ids);
+
+    const param_definition* action_handler_add(uint64_t provider_id, uint64_t target, action_handler* handler);
+    void action_handler_remove(uint64_t provider_id, uint64_t target, action_handler* handler);
+    void action_handler_clear(uint64_t provider_id,
+                              const std::map<uint64_t, const param_definition*>& targets,
+                              action_handler* handler);
+
+    uint64_t action_requester_path_set(uint64_t old_rid, const item_path& path, const std::string& owner_name);
+    void action_requester_path_clear(uint64_t rid);
+    void action_requester_run(uint64_t path_fl_rid, const std::shared_ptr<action_request_internal>& request);
+
+public:
+    system();
+    ~system();
+    item_info info(uint64_t resource_id);
+    item_listing info(const item_path& path);
+    std::vector<item_listing> list(uint64_t resource_id);
+    std::vector<item_listing> list(const item_path& path);
+    std::vector<item_info_path_follower> info_path_followers(uint64_t resource_id);
+    std::vector<item_info_event_sub> info_event_subs(uint64_t resource_id);
+    item_info_action_sink info_action_sink(uint64_t resource_id);
+    json::value_object* export_item(uint64_t target_location, const std::string& entry);
+    json::value_object* export_item(const item_path& target_location, const std::string& entry);
+    json::value_object* export_items(uint64_t target_location, const std::vector<std::string>& entries);
+    json::value_object* export_items(const item_path& target_location, const std::vector<std::string>& entries);
+};
+
+extern system* system_ptr;
+
+}
+
+#endif // STRTB_EVENT_SYSTEM_H
