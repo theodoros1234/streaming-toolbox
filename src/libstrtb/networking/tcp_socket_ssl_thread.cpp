@@ -122,7 +122,7 @@ size_t tcp_socket_ssl_thread::recv(char* buffer, size_t length) {
     return _length_read;
 }
 
-size_t tcp_socket_ssl_thread::send(const char* buffer, size_t length) {
+void tcp_socket_ssl_thread::send(const char* buffer, size_t length) {
     std::unique_lock<std::mutex> guard(_lock);
 
     if (length <= 0)
@@ -152,8 +152,6 @@ size_t tcp_socket_ssl_thread::send(const char* buffer, size_t length) {
 
     if (!_successful_write)
         _decide_exception();
-
-    return _length_write;
 }
 
 void tcp_socket_ssl_thread::shutdown_gracefully() {

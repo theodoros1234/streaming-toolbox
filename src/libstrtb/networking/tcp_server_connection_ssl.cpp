@@ -8,14 +8,15 @@ using namespace strtb::networking;
 static strtb::logging::source log("TCP Socket", false);
 
 tcp_server_connection_ssl::tcp_server_connection_ssl(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
-                                                     size_t recv_buffer_size,
+                                                     bool buffered_send,
+                                                     size_t buffer_size,
                                                      int fd,
                                                      std::string server_ip,
                                                      int server_port,
                                                      std::string remote_ip,
                                                      int remote_port,
                                                      SSL_CTX* ctx) :
-    tcp_server_connection(parent, recv_buffer_size, fd, server_ip, server_port, remote_ip, remote_port) {
+    tcp_server_connection(parent, buffered_send, buffer_size, fd, server_ip, server_port, remote_ip, remote_port) {
     _ssl = SSL_new(ctx);
     if (!_ssl)
         throw internal_error_ssl("Could not create SSL object", 0);
@@ -49,7 +50,8 @@ tcp_server_connection_ssl::~tcp_server_connection_ssl() {
         SSL_free(_ssl);
         _ssl = nullptr;
         _sock = -1;
-        buffer_clear();
+        buffer_clear_recv();
+        buffer_clear_send();
 
         if (_parent)
             _parent->deregister(this);
@@ -107,49 +109,23 @@ void tcp_server_connection_ssl::close() {
         SSL_free(_ssl);
         _ssl = nullptr;
         _sock = -1;
-        buffer_clear();
+        buffer_clear_recv();
+        buffer_clear_send();
+        _line_leftovers = 0;
     }
 
     if (_parent)
         _parent->deregister(this);
 }
 
-ssize_t tcp_server_connection_ssl::recv(size_t max_len) {
+size_t tcp_server_connection_ssl::_recv(size_t len) {
     assert((_sock == -1) == (_ssl == nullptr));
-
-    if (_ssl == nullptr)
-        throw connection_closed("socket already closed", 0);
-
-    if (max_len == 0)
-        throw std::invalid_argument("max_len cannot be 0");
-
-    if (max_len > _buffer_size)
-        max_len = _buffer_size;
-
-    // Return from recv_line's leftovers if there are enough to cover the request
-    if (max_len <= _line_leftovers) {   // TODO: I haven't properly tested this part, but it should be working
-        memmove(_buffer, _buffer + _line_leftovers_pos, max_len);
-        _line_leftovers_pos += max_len;
-        _line_leftovers -= max_len;
-        return max_len;
-    }
-
-    // Move back any leftover bytes from recv_line
-    if (_line_leftovers) {
-        memmove(_buffer, _buffer + _line_leftovers_pos, _line_leftovers);
-        _line_leftovers = 0;
-    }
-
-    return _thread.recv(_buffer + _line_leftovers, max_len - _line_leftovers);
+    return _thread.recv(_buffer_recv, len);
 }
 
-ssize_t tcp_server_connection_ssl::send(const char* buf, size_t len) {
+void tcp_server_connection_ssl::_send(const char* buf, size_t len) {
     assert((_sock == -1) == (_ssl == nullptr));
-
-    if (_ssl == nullptr)
-        throw connection_closed("socket already closed", 0);
-
-    return _thread.send(buf, len);
+    _thread.send(buf, len);
 }
 
 void tcp_server_connection_ssl::shutdown_gracefully() {

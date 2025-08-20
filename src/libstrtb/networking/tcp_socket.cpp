@@ -14,16 +14,22 @@ using namespace strtb::networking;
 
 static logging::source log("TCP Socket", false);
 
-tcp_socket::tcp_socket() : tcp_socket(STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT) {}
-
-tcp_socket::tcp_socket(size_t recv_buffer_size) : _buffer_size(recv_buffer_size) {
-    if (recv_buffer_size < STRTB_NETWORKING_RECV_BUFFER_SIZE_MIN)
+tcp_socket::tcp_socket(bool buffered_send, size_t buffer_size) : _buffer_size(buffer_size) {
+    if (buffer_size < STRTB_NETWORKING_RECV_BUFFER_SIZE_MIN)
         throw std::invalid_argument("tcp_socket recv_buffer_size must be at least 256 bytes");
-    _buffer = (char*) std::malloc(recv_buffer_size);
-    if (!_buffer)
-        throw internal_error("Failed to allocate memory for TCP socket recv buffer: " + std::string(std::strerror(errno)), errno);
-    buffer = _buffer;
-    buffer_clear();
+    _buffer_recv = (char*) std::malloc(buffer_size);
+    if (!_buffer_recv)
+        throw internal_error(errno);
+    buffer_clear_recv();
+    buffer_clear_send();
+
+    if (buffered_send) {
+        _buffer_send = (char*) std::malloc(buffer_size);
+        if (!_buffer_send) {
+            std::free(_buffer_recv);
+            throw internal_error(errno);
+        }
+    }
 }
 
 tcp_socket::~tcp_socket() {
@@ -31,16 +37,29 @@ tcp_socket::~tcp_socket() {
         log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
         ::shutdown(_sock, SHUT_RDWR);
         ::close(_sock);
-        buffer_clear();
+        buffer_clear_recv();
+        buffer_clear_send();
     }
-    free(_buffer);
+    free(_buffer_recv);
+    if (_buffer_send)
+        free(_buffer_send);
 }
 
-ssize_t tcp_socket::recv() {
+size_t tcp_socket::_recv(size_t len) {
+    ssize_t result = ::recv(_sock, _buffer_recv, len, 0);
+    if (result == -1) switch (errno) {      // Error
+    case ECONNREFUSED:
+        throw connection_error(errno);
+    default:
+        throw internal_error(errno);
+    } else return result;                   // Success, or connection closed normally
+}
+
+std::pair<const char *, size_t> tcp_socket::recv() {
     return recv(_buffer_size);
 }
 
-ssize_t tcp_socket::recv(size_t max_len) {
+std::pair<const char *, size_t> tcp_socket::recv(size_t max_len) {
     if (_sock == -1)
         throw connection_closed("socket closed or hasn't been opened yet", 0);
 
@@ -50,51 +69,90 @@ ssize_t tcp_socket::recv(size_t max_len) {
     if (max_len > _buffer_size)
         max_len = _buffer_size;
 
-    // Return from recv_line's leftovers if there are enough to cover the request
-    if (max_len <= _line_leftovers) {   // TODO: I haven't properly tested this part, but it should be working
-        memmove(_buffer, _buffer + _line_leftovers_pos, max_len);
-        _line_leftovers_pos += max_len;
-        _line_leftovers -= max_len;
-        return max_len;
-    }
-
-    // Move back any leftover bytes from recv_line
+    // Return from recv_line's leftovers if there are any
     if (_line_leftovers) {
-        memmove(_buffer, _buffer + _line_leftovers_pos, _line_leftovers);
-        _line_leftovers = 0;
+        if (_line_leftovers > max_len) {
+            // too many leftovers, just take a piece from them
+            std::pair<const char*, size_t> r = {_buffer_recv + _line_leftovers_pos, max_len};
+            _line_leftovers_pos += max_len;
+            _line_leftovers -= max_len;
+            return r;
+        } else {
+            // take the entire leftovers and reset
+            std::pair<const char*, size_t> r = {_buffer_recv + _line_leftovers_pos, _line_leftovers};
+            _line_leftovers_pos = 0;
+            _line_leftovers = 0;
+            return r;
+        }
     }
 
-    ssize_t result = ::recv(_sock, _buffer + _line_leftovers, max_len - _line_leftovers, 0);
-    if (result == -1) switch (errno) {      // Error
-    case ECONNREFUSED:
-        throw connection_error(errno);
-    default:
-        throw internal_error(errno);
-    } else {                                // Success, or connection closed normally
-        ssize_t r = result + _line_leftovers;
-        _line_leftovers = 0;
-        return r;
+    // No leftovers, get new data from network
+    return std::make_pair(_buffer_recv, _recv(max_len));
+}
+
+void tcp_socket::_send(const char* buf, size_t len) {
+    while (len > 0) {
+        ssize_t result = ::send(_sock, buf, len, MSG_NOSIGNAL);
+        if (result == -1) {     // error
+            switch (errno) {
+            case ECONNRESET:
+                throw connection_error(errno);
+            case EPIPE:
+            case ENOTCONN:
+                throw connection_closed(errno);
+            default:
+                throw internal_error(errno);
+            }
+        } else {        // maybe partial send
+            len -= result;
+            buf += result;
+        }
     }
 }
 
-ssize_t tcp_socket::send(const char* buf, size_t len) {
+void tcp_socket::send(const char* buf, size_t len) {
     if (_sock == -1)
         throw connection_closed("socket closed or hasn't been opened yet", 0);
 
-    ssize_t result = ::send(_sock, buf, len, MSG_NOSIGNAL);
-    if (result == -1) switch (errno) {      // Error
-    case ECONNRESET:
-        throw connection_error(errno);
-    case EPIPE:
-    case ENOTCONN:
-        throw connection_closed(errno);
-    default:
-        throw internal_error(errno);
-    } else return result;
+    if (_buffer_send) {
+        while (len > 0) {
+            if (len >= _buffer_size && _send_pos == 0) {
+                // empty buffer and input is bigger than it => send directly without storing in buffer
+                _send(buf, _buffer_size);
+                len -= _buffer_size;
+                buf += _buffer_size;
+            } else {
+                // store into send buffer without it overflowing
+                size_t len_to_store = std::min(len, _buffer_size - _send_pos);
+                std::memcpy(_buffer_send + _send_pos, buf, len_to_store);
+                _send_pos += len_to_store;
+                len -= len_to_store;
+                buf += len_to_store;
+
+                // flush if send buffer is full
+                if (_send_pos == _buffer_size)
+                    flush();
+            }
+        }
+    } else {
+        _send(buf, len);
+    }
 }
 
-ssize_t tcp_socket::send(const std::string& buf) {
+void tcp_socket::send(const std::string& buf) {
     return send(buf.data(), buf.size());
+}
+
+void tcp_socket::flush() {
+    if (_sock == -1)
+        throw connection_closed("socket closed or hasn't been opened yet", 0);
+    if (_buffer_send == nullptr)
+        throw connection_error("buffered send is not enabled", 0);
+    if (_send_pos == 0)
+        return;
+
+    _send(_buffer_send, _send_pos);
+    _send_pos = 0;
 }
 
 static int shutdown_convert[2][2] = {{-1, SHUT_WR}, {SHUT_RD, SHUT_RDWR}};
@@ -115,7 +173,10 @@ void tcp_socket::close() {
     shutdown(true, true);
     int close_ret = ::close(_sock);
     _sock = -1;
-    buffer_clear();
+    _send_pos = 0;
+    buffer_clear_recv();
+    buffer_clear_send();
+    _line_leftovers = 0;
     if (close_ret)
         throw internal_error(errno);
 }
@@ -142,22 +203,18 @@ void tcp_socket::recv_line(std::string& line, const std::string& endline, size_t
     if (max_len < endline.size())
         throw std::invalid_argument("recv_line: max_len must be at least as long as the endline");
 
-    ssize_t received, i;
+    size_t received = 0, i = 0;
+    const char* buf = nullptr;
     bool more = true;
     do {
-        if (_line_leftovers) {
-            // Read any previous leftovers first
-            received = recv(_line_leftovers);
-        } else {
-            // Keep receiving more data while the line has not ended yet
-            received = recv();
-        }
+        std::tie(buf, received) = recv();
+
         // Stop if no data was received (socket is closed)
         if (received == 0)
             return;
         // Examine each block of received data separately
         for (i=0; i<received; i++) {
-            line.push_back(_buffer[i]);
+            line.push_back(buf[i]);
 
             // Check for maximum length
             if (line.size() >= max_len) {
@@ -166,7 +223,7 @@ void tcp_socket::recv_line(std::string& line, const std::string& endline, size_t
             }
 
             // Check for endline
-            if (_buffer[i] == endline.back()) {
+            if (buf[i] == endline.back()) {
                 // Also handle 2 character endlines
                 if (endline.size() == 2) {
                     if (line.size() >= 2 && line[line.size() - 2] == endline.front()) {
@@ -185,7 +242,7 @@ void tcp_socket::recv_line(std::string& line, const std::string& endline, size_t
     // Mark any excess bytes left in the receive buffer
     if (i < received) {
         _line_leftovers = received - i;
-        _line_leftovers_pos = i;
+        _line_leftovers_pos = i + (buf - _buffer_recv);
     } else {
         _line_leftovers = 0;
     }
@@ -195,8 +252,17 @@ size_t tcp_socket::buffer_size() const {
     return _buffer_size;
 }
 
-void tcp_socket::buffer_clear() {
-    std::memset(_buffer, 0, _buffer_size);
+void tcp_socket::buffer_clear_recv() {
+    std::memset(_buffer_recv, 0, _buffer_size);
+}
+
+void tcp_socket::buffer_clear_send() {
+    if (_buffer_send)
+        std::memset(_buffer_send, 0, _buffer_size);
+}
+
+bool tcp_socket::buffered_send() const {
+    return _buffer_send != nullptr;
 }
 
 #ifdef __linux__

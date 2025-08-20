@@ -3,13 +3,14 @@
 using namespace strtb::networking;
 
 tcp_server_connection::tcp_server_connection(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
-                                             size_t recv_buffer_size,
+                                             bool buffered_send,
+                                             size_t buffer_size,
                                              int fd,
                                              std::string server_ip,
                                              int server_port,
                                              std::string remote_ip,
                                              int remote_port) :
-    tcp_socket(recv_buffer_size),
+    tcp_socket(buffered_send, buffer_size),
     _parent(parent),
     _server_ip(server_ip),
     _remote_ip(remote_ip),

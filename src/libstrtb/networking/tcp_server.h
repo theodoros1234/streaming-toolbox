@@ -25,7 +25,8 @@ public:
 protected:
     std::mutex _lock;
     std::condition_variable _connections_cv;
-    size_t _max_active, _recv_buffer_size;
+    size_t _max_active, _buffer_size;
+    bool _buffered_send;
 
     // Platform-specific
 #ifdef __linux__
@@ -38,8 +39,7 @@ protected:
     virtual tcp_server_connection* _new_connection(const bound_port& server, int sock, std::string remote_ip, int remote_port);
 
 public:
-    tcp_server();
-    tcp_server(size_t recv_buffer_size);
+    tcp_server(bool buffered_send = false, size_t buffer_size = STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT);
     tcp_server(const tcp_server&) = delete;
     tcp_server(tcp_server&&) = delete;
     virtual ~tcp_server();
@@ -51,7 +51,8 @@ public:
     bool shutdown();
     bool close(bool pre_accept = false);
     std::vector<bound_port> bound_ports();
-    size_t recv_buffer_size() const;
+    size_t buffer_size() const;
+    bool buffered_send() const;
     void deregister(tcp_server_connection* target);
 };
 

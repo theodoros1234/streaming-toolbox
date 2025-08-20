@@ -17,19 +17,20 @@ private:
 protected:
     friend tcp_server_ssl;
     tcp_server_connection_ssl(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
-                              size_t recv_buffer_size,
+                              bool buffered_send,
+                              size_t buffer_size,
                               int fd,
                               std::string server_ip,
                               int server_port,
                               std::string remote_ip,
                               int remote_port,
                               SSL_CTX* ctx);
+    virtual size_t _recv(size_t len);
+    virtual void _send(const char* buf, size_t len);
 public:
     ~tcp_server_connection_ssl();
     void handshake();
     void close();
-    ssize_t recv(size_t max_len);
-    ssize_t send(const char* buf, size_t len);
     void shutdown_gracefully();
     SSL* ssl() const;
 };

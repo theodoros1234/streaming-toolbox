@@ -44,9 +44,8 @@ static struct default_context_container {
     }
 } default_context;
 
-tcp_client_ssl::tcp_client_ssl() : tcp_client(STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT_SSL) {}
-
-tcp_client_ssl::tcp_client_ssl(size_t recv_buffer_size) : tcp_client(recv_buffer_size) {}
+tcp_client_ssl::tcp_client_ssl(bool buffered_send, size_t recv_buffer_size)
+    : tcp_client(buffered_send, recv_buffer_size) {}
 
 tcp_client_ssl::~tcp_client_ssl() {
     if (_ssl) {
@@ -153,42 +152,14 @@ void tcp_client_ssl::connect(const char* address, uint16_t port, bool allow_abru
     }
 }
 
-ssize_t tcp_client_ssl::recv(size_t max_len) {
+size_t tcp_client_ssl::_recv(size_t len) {
     assert((_sock == -1) == (_ssl == nullptr));
-
-    if (_ssl == nullptr)
-        throw connection_closed("socket closed or hasn't been opened yet", 0);
-
-    if (max_len == 0)
-        throw std::invalid_argument("max_len cannot be 0");
-
-    if (max_len > _buffer_size)
-        max_len = _buffer_size;
-
-    // Return from recv_line's leftovers if there are enough to cover the request
-    if (max_len <= _line_leftovers) {   // TODO: I haven't properly tested this part, but it should be working
-        memmove(_buffer, _buffer + _line_leftovers_pos, max_len);
-        _line_leftovers_pos += max_len;
-        _line_leftovers -= max_len;
-        return max_len;
-    }
-
-    // Move back any leftover bytes from recv_line
-    if (_line_leftovers) {
-        memmove(_buffer, _buffer + _line_leftovers_pos, _line_leftovers);
-        _line_leftovers = 0;
-    }
-
-    return _thread.recv(_buffer + _line_leftovers, max_len - _line_leftovers);
+    return _thread.recv(_buffer_recv, len);
 }
 
-ssize_t tcp_client_ssl::send(const char* buf, size_t len) {
+void tcp_client_ssl::_send(const char* buf, size_t len) {
     assert((_sock == -1) == (_ssl == nullptr));
-
-    if (_ssl == nullptr)
-        throw connection_closed("socket closed or hasn't been opened yet", 0);
-
-    return _thread.send(buf, len);
+    _thread.send(buf, len);
 }
 
 void tcp_client_ssl::shutdown_gracefully() {
@@ -216,7 +187,9 @@ void tcp_client_ssl::close() {
     _thread.stop();
     SSL_free(_ssl);
     _ssl = nullptr;
-    buffer_clear();
+    buffer_clear_recv();
+    buffer_clear_send();
+    _line_leftovers = 0;
 }
 
 SSL* tcp_client_ssl::ssl() const {

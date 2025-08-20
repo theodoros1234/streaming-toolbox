@@ -20,10 +20,9 @@ using namespace strtb;
 
 static logging::source log("TCP Server", false);
 
-tcp_server::tcp_server() : tcp_server(STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT) {}
-
-tcp_server::tcp_server(size_t recv_buffer_size) : _max_active(64) {
-    _recv_buffer_size = recv_buffer_size;
+tcp_server::tcp_server(bool buffered_send, size_t buffer_size) : _max_active(64) {
+    _buffer_size = buffer_size;
+    _buffered_send = buffered_send;
     // Create new eventfd (used for shutting down server from another thread)
     _event = eventfd(0, 0);
     if (_event == -1)
@@ -264,7 +263,8 @@ tcp_server_connection* tcp_server::accept() {
 
 tcp_server_connection* tcp_server::_new_connection(const bound_port& server, int sock, std::string remote_ip, int remote_port) {
     // This is a separate function because it can be overriden by tcp_server_ssl
-    return new tcp_server_connection(this, _recv_buffer_size, sock, server.server_ip, server.server_port, remote_ip, remote_port);
+    return new tcp_server_connection(this, _buffered_send, _buffer_size,
+                                     sock, server.server_ip, server.server_port, remote_ip, remote_port);
 }
 
 bool tcp_server::shutdown() {
@@ -325,8 +325,12 @@ void tcp_server::deregister(tcp_server_connection* target) {
     _connections_cv.notify_all();
 }
 
-size_t tcp_server::recv_buffer_size() const {
-    return _recv_buffer_size;
+size_t tcp_server::buffer_size() const {
+    return _buffer_size;
+}
+
+bool tcp_server::buffered_send() const {
+    return _buffered_send;
 }
 
 std::vector<tcp_server::bound_port> tcp_server::bound_ports() {

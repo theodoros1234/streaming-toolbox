@@ -34,7 +34,7 @@ public:
     void start(int sock, SSL* ssl);
     void stop();
     size_t recv(char* buffer, size_t length);
-    size_t send(const char* buffer, size_t length);
+    void send(const char* buffer, size_t length);
     void shutdown_gracefully();
 };
 

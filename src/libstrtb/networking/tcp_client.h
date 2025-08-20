@@ -19,8 +19,7 @@ protected:
 #endif
 
 public:
-    tcp_client();
-    tcp_client(size_t recv_buffer_size);
+    tcp_client(bool buffered_send = false, size_t buffer_size = STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT);
     ~tcp_client();
     void connect(const char* address, uint16_t port, time_t timeout = 30);
     void connect(const std::string& address, uint16_t port, time_t timeout = 30);

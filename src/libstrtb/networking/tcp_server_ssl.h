@@ -16,7 +16,8 @@ protected:
     tcp_server_connection* _new_connection(const bound_port& server, int sock, std::string remote_ip, int remote_port);
 
 public:
-    tcp_server_ssl(SSL_CTX* ctx = nullptr);
+    tcp_server_ssl(SSL_CTX* ctx = nullptr, bool buffered_send = false,
+                   size_t buffer_size = STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT_SSL);
     ~tcp_server_ssl();
     SSL_CTX* ssl_ctx() const;
     tcp_server_connection_ssl* accept();

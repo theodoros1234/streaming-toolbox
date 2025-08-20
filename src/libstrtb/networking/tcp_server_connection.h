@@ -16,7 +16,8 @@ protected:
     const int _server_port = 0, _remote_port = 0;
     friend tcp_server;
     tcp_server_connection(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
-                          size_t recv_buffer_size,
+                          bool buffered_send,
+                          size_t buffer_size,
                           int fd,
                           std::string server_ip,
                           int server_port,
