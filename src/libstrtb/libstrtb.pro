@@ -52,7 +52,8 @@ SOURCES += \
     networking/tcp_server_ssl.cpp \
     networking/tcp_socket.cpp \
     networking/tcp_socket_ssl_thread.cpp \
-    unicode/unicode.cpp
+    unicode/unicode.cpp \
+    uri.cpp
 
 HEADERS += \
     chat/channel.h \
@@ -96,7 +97,8 @@ HEADERS += \
     networking/tcp_socket.h \
     networking/tcp_socket_ssl_thread.h \
     plugins/link.h \
-    unicode/unicode.h
+    unicode/unicode.h \
+    uri.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
