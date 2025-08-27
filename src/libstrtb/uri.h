@@ -3,10 +3,40 @@
 
 #include <string>
 #include <utility>
+#include <cstdint>
 
 // RFC Specification: https://datatracker.ietf.org/doc/html/rfc3986
 
 namespace strtb::uri {
+
+inline bool is_alpha(char c) {
+    return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z');
+}
+
+inline bool is_digit(char c) {
+    return '0' <= c && c <= '9';
+}
+
+inline bool is_unreserved(char c) {
+    return is_alpha(c) || is_digit(c) ||
+           c == '-' || c == '.' || c == '_' || c == '~';
+}
+
+inline bool is_gen_delim(char c) {
+    return c == ':' || c == '/' || c == '?' || c == '#' || c == '[' || c == ']' || c == '@';
+}
+
+inline bool is_sub_delim(char c) {
+    return c == '!' || c == '$' || c == '&' || c == '\''|| c == '(' || c == ')' ||
+           c == '*' || c == '+' || c == ',' || c == ';' || c == '=';
+}
+
+inline bool is_pchar(char c, bool nc = false) {
+    return is_unreserved(c) || c == '%' || is_sub_delim(c) || c == '@' || (!nc && c == ':');
+}
+
+typedef enum {HOST_EMPTY, HOST_REGNAME, HOST_IPV4, HOST_IPV6, HOST_IPVFUTURE} host_type_enum;
+typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is valid
 
 class parser {
 public:
@@ -18,19 +48,30 @@ public:
            path_from = 0, path_to = 0,
            query_from = 0, query_to = 0,
            fragment_from = 0, fragment_to = 0;
+    host_type_enum host_type = HOST_EMPTY;
 
-    // host_type enum    
-    typedef std::pair<size_t, bool> parse_ret;  // .first: ends at, .second: is valid
+    parser_ret parse_uri(const std::string& str, size_t from = 0, size_t to = 0);
+    parser_ret parse_authority(const std::string& str, size_t from = 0, size_t to = 0);
+    parser_ret parse_host(const std::string& str, size_t from = 0, size_t to = 0);
 
-    parse_ret parse_scheme(const std::string& str, size_t from, size_t to);
-    ssize_t parse(const std::string& uri_str);
+    void clear_uri();
+    void clear_authority();
+    void clear_host();
 
-    void clear_scheme();
-    void clear();
+    std::string scheme_str(const std::string& str) const;
+    std::string authority_str(const std::string& str) const;
+    std::string userinfo_str(const std::string& str) const;
+    std::string host_str(const std::string& str) const;
+    std::string port_str(const std::string& str) const;
+    int port_uint16(const std::string& str) const;  // returns -1 when out of range or not specified
+    std::string path_str(const std::string& str) const;
+    std::string query_str(const std::string& str) const;
+    std::string fragment_str(const std::string& str) const;
 };
 
-std::string percent_encode(const std::string& from, bool plus_space = false);
-std::pair<std::string, ssize_t> percent_decode(const std::string& from, bool plus_space = false);
+std::string percent_encode(const std::string& from);    // like encodeURIComponent()
+std::string percent_encode_limited(const std::string& from);    // like encodeURI()
+std::pair<std::string, ssize_t> percent_decode(const std::string& from);    // like decodeURIComponent()
 
 }
 

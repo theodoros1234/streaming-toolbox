@@ -1,4 +1,6 @@
 #include "uri.h"
+#include <stdexcept>
+#include <cassert>
 
 using namespace strtb::uri;
 
@@ -15,51 +17,55 @@ static inline unsigned char from_hex(char c) {
         return 255; // invalid
 }
 
-static inline bool is_alpha(char c) {
-    return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z');
-}
-
-static inline bool is_digit(char c) {
-    return '0' <= c && c <= '9';
-}
-
-static inline bool is_unreserved(char c) {
-    return is_alpha(c) || is_digit(c) ||
-           c == '-' || c == '.' || c == '_' || c == '~';
-}
-
-static inline bool is_gen_delim(char c) {
-    return c == ':' || c == '/' || c == '?' || c == '#' || c == '[' || c == ']' || c == '@';
-}
-
-static inline bool is_sub_delim(char c) {
-    return c == '!' || c == '$' || c == '&' || c == '\''|| c == '(' || c == ')' ||
-           c == '*' || c == '+' || c == ',' || c == ';' || c == '=';
+// makes sure the range params of parser functions is in string's bounds
+static inline void verify_range(const std::string& str, size_t from, size_t to) {
+    if (from > str.size())
+        throw std::out_of_range("'from' is out of range");
+    if (to > str.size())
+        throw std::out_of_range("'to' is out of range");
+    if (from > to)
+        throw std::out_of_range("'from' is bigger than 'to'");
 }
 
 // NOTE: percent encode/decode doesn't check for invalid UTF-8 sequences
 
-std::string strtb::uri::percent_encode(const std::string& from, bool plus_space) {
+std::string strtb::uri::percent_encode(const std::string& from) {
     std::string to;
     to.reserve(from.size() + from.size()/2);
-    for (auto i : from) {
+    for (auto c : from) {
         // unreserved characters: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
-        if (is_unreserved(i)) {
-            to.push_back(i);
-        } else if (plus_space && i == ' ') {
-            // HTTP sometimes encodes spaces as a plus character
-            to.push_back('+');
+        if (is_unreserved(c)) {
+            to.push_back(c);
         } else {
             // percent-encode
             to.push_back('%');
-            to.push_back(to_hex[((unsigned char) i) / 16]);
-            to.push_back(to_hex[((unsigned char) i) % 16]);
+            to.push_back(to_hex[((unsigned char) c) / 16]);
+            to.push_back(to_hex[((unsigned char) c) % 16]);
         }
     }
     return to;
 }
 
-std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& from, bool plus_space) {
+std::string strtb::uri::percent_encode_limited(const std::string& from) {
+    // useful for encoding user-input URIs that may have special characters, without breaking the rest of the URI
+    std::string to;
+    to.reserve(from.size() + from.size()/2);
+    for (auto c : from) {
+        // reserved characters: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
+        // unreserved characters: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
+        if (is_unreserved(c) || is_gen_delim(c) || is_sub_delim(c) || c == '%') {
+            to.push_back(c);
+        } else {
+            // percent-encode
+            to.push_back('%');
+            to.push_back(to_hex[((unsigned char) c) / 16]);
+            to.push_back(to_hex[((unsigned char) c) % 16]);
+        }
+    }
+    return to;
+}
+
+std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& from) {
     std::string to;
     to.reserve(from.size());
     for (size_t i=0; i<from.size(); i++) {
@@ -76,9 +82,6 @@ std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& fr
                 return {"invalid hex digit", i+2};
             to.push_back(16 * h1 + h2);
             i += 2;
-        } else if (plus_space && c == '+') {
-            // HTTP sometimes encodes spaces as a plus character
-            to.push_back(' ');
         } else {
             // no decoding needed
             to.push_back(c);
@@ -90,132 +93,644 @@ std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& fr
     return {std::move(to), -1};
 }
 
-void parser::clear() {
+void parser::clear_uri() {
     scheme_from = 0, scheme_to = 0;
-    authority_from = 0, authority_to = 0;
-    userinfo_from = 0, userinfo_to = 0;
-    host_from = 0, host_to = 0;
-    port_from = 0, port_to = 0;
+    clear_authority();
     path_from = 0, path_to = 0;
     query_from = 0, query_to = 0;
     fragment_from = 0, fragment_to = 0;
 }
 
-void parser::clear_scheme() {
-    scheme_from = 0, scheme_to = 0;
+void parser::clear_authority() {
+    authority_from = 0, authority_to = 0;
+    userinfo_from = 0, userinfo_to = 0;
+    clear_host();
+    port_from = 0, port_to = 0;
 }
 
-parser::parse_ret parse_scheme(const std::string& str, size_t from, size_t to) {
-
+void parser::clear_host() {
+    host_from = 0, host_to = 0;
+    host_type = HOST_EMPTY;
 }
 
-ssize_t parser::parse(const std::string& uri_str) {
-    /* WARNING: even though user info is supported, it is considered depcecated by the RFC
-     *          and should be rejected by the caller of this function if it's present   */
-    clear();
+std::string parser::scheme_str(const std::string& str) const {
+    return str.substr(scheme_from, scheme_to - scheme_from);
+}
 
-    enum {
-        SCHEME,
-        AUTHORITY,
-        PATH,
-        QUERY,
-        FRAGMENT
-    } state = SCHEME;
+std::string parser::authority_str(const std::string& str) const {
+    return str.substr(authority_from, authority_to - authority_from);
+}
 
-    size_t size = uri_str.size();
-    ssize_t userinfo_delim_pos = -1;
-    for (size_t i=0; i<size; i++) {
-        char c = uri_str[i];
+std::string parser::userinfo_str(const std::string& str) const {
+    return str.substr(userinfo_from, userinfo_to - userinfo_from);
+}
 
-        switch (state) {
-        case SCHEME:
-            if (i == 0) {
-                // first char must be alpha
-                if (!is_alpha(c))
-                    return i;
-            } else {
-                if (c == ':') {
-                    // scheme ends with ://
-                    scheme_to = i;
+std::string parser::host_str(const std::string& str) const {
+    return str.substr(host_from, host_to - host_from);
+}
 
-                    // check if URI ends too soon
-                    if (i + 2 >= size)
-                        return size;
-                    // check if separator is wrong
-                    if (uri_str[i+1] != '/')
-                        return i+1;
-                    if (uri_str[i+2] != '/')
-                        return i+2;
+std::string parser::port_str(const std::string& str) const {
+    return str.substr(port_from, port_to - port_from);
+}
 
-                    state = AUTHORITY;
-                    authority_from = i+3;
-                    i+=2;
-                } else if (!(is_alpha(c) || is_digit(c) || c == '+' || c == '-' || c == '.')) {
-                    // not allowed chars in scheme
-                    return i;
-                }
+int parser::port_uint16(const std::string& str) const {
+    if (port_to == port_from)
+        return -1;  // no port specified
+
+    int x;
+    try {
+        x = std::stoi(port_str(str));
+    } catch (std::out_of_range&) {
+        return -1;  // overflows massively
+    } catch (std::invalid_argument&) {
+        return -1;  // something else went wrong
+    }
+
+    if (port_to - port_from > 5 || x >= 65536)
+        return -1;  // overflows
+    else
+        return (uint16_t) x;    // good
+}
+
+std::string parser::path_str(const std::string& str) const {
+    return str.substr(path_from, path_to - path_from);
+}
+
+std::string parser::query_str(const std::string& str) const {
+    return str.substr(query_from, query_to - query_from);
+}
+
+std::string parser::fragment_str(const std::string& str) const {
+    return str.substr(fragment_from, fragment_to - fragment_from);
+}
+
+// NOTE: parser functions will accept invalid percent-encoded parts, percent_decode will catch these errors
+
+static parser_ret parse_scheme(const std::string& str, size_t from, size_t to);
+static parser_ret parse_userinfo(const std::string& str, size_t from, size_t to);
+static parser_ret parse_port(const std::string& str, size_t from, size_t to);
+static parser_ret parse_path_abempty(const std::string& str, size_t from, size_t to);
+static parser_ret parse_path_absolute(const std::string& str, size_t from, size_t to);
+static parser_ret parse_path_noscheme(const std::string& str, size_t from, size_t to);
+static parser_ret parse_path_rootless(const std::string& str, size_t from, size_t to);
+static parser_ret parse_path_segment(const std::string& str, size_t from, size_t to, bool nz = false, bool nc = false);
+static parser_ret parse_query(const std::string& str, size_t from, size_t to);
+static parser_ret parse_fragment(const std::string& str, size_t from, size_t to);
+static parser_ret parse_host_ipv6(const std::string& str, size_t from, size_t to);
+static parser_ret parse_h16_multi(const std::string& str, size_t from, size_t to, size_t min, size_t max);
+static parser_ret parse_h16(const std::string& str, size_t from, size_t to);
+static parser_ret parse_ls32(const std::string& str, size_t from, size_t to);
+static parser_ret parse_host_ipvfuture(const std::string& str, size_t from, size_t to);
+static parser_ret parse_host_ipv4(const std::string& str, size_t from, size_t to);
+static parser_ret parse_dec_octet(const std::string& str, size_t from, size_t to);
+static parser_ret parse_host_regname(const std::string& str, size_t from, size_t to);
+
+parser_ret parser::parse_uri(const std::string& str, size_t from, size_t to) {
+    if (to == 0)
+        to = str.size();
+    verify_range(str, from, to);
+    clear_uri();
+
+    // scheme
+    parser_ret ret = parse_scheme(str, from, to);
+    if (!ret.second)
+        return ret;
+    if (ret.first >= to || str[ret.first] != ':')   // colon after scheme
+        return {ret.first, false};
+    scheme_from = from;
+    scheme_to = ret.first;
+
+    // hier-part (all variations and things after it)
+    size_t pos_pre_hier_part = ret.first + 1;
+    size_t best_progress = pos_pre_hier_part;
+    for (unsigned int var=0; var<4; var++) {
+        size_t pos = pos_pre_hier_part;
+
+        // hier-part
+        switch (var) {
+        // "//" authority path-abempty
+        case 0:
+            // "//"
+            if (pos >= to || str[pos] != '/') {
+                if (pos > best_progress)
+                    best_progress = pos;
+                continue;
             }
-            break;
-
-        case AUTHORITY:
-            if (c == '@') {     // @ delim separates userinfo from host and port
-                if (userinfo_delim_pos != -1)   // more than one @ delim
-                    return i;
-
-                userinfo_delim_pos = i;
-                userinfo_from = authority_from;
-                userinfo_to = i;
-                host_from = i+1;
-            } else if (c == '/' || c == '?' || c == '#') {
-                authority_to = i;
-                if (userinfo_delim_pos == -1)   // no userinfo => host starts where authority starts
-                    host_from = authority_from;
-                host_to = i;
-                // NOTE: host details and port are ignored, they will be scanned for later
-
-                // select next part based on character
-                switch (c) {
-                case '/':
-                    state = PATH;
-                    path_from = i;
-                    break;
-
-                case '?':
-                    state = QUERY;
-                    query_from = i;
-                    break;
-
-                case '#':
-                    state = FRAGMENT;
-                    fragment_from = i;
-                    break;
-                }
-            } else if (!(is_unreserved(c) || c == '%' || is_sub_delim(c) || c == ':' ||
-                         c == '[' || c == ']')) {   // if not an allowed character
-                // NOTE: there are additional constraints for some characters, they will be scanned for later
-                return i;
+            pos++;
+            if (pos >= to || str[pos] != '/') {
+                if (pos > best_progress)
+                    best_progress = pos;
+                continue;
             }
+            pos++;
+
+            // authority
+            ret = parse_authority(str, pos, to);
+            if (!ret.second) {
+                if (ret.first > best_progress)
+                    best_progress = ret.first;
+                continue;
+            }
+            pos = ret.first;
+
+            // path-abempty (either starting with / or empty)
+            path_from = pos;
+            pos = parse_path_abempty(str, pos, to).first;
+            path_to = pos;
             break;
 
-        case PATH:
-
+        // path-absolute
+        case 1:
+            ret = parse_path_absolute(str, pos, to);
+            if (!ret.second) {
+                if (ret.first > best_progress)
+                    best_progress = ret.first;
+                continue;
+            }
+            path_from = pos;
+            pos = ret.first;
+            path_to = pos;
             break;
+
+        // path-rootless
+        case 2:
+            ret = parse_path_rootless(str, pos, to);
+            if (!ret.second) {
+                if (ret.first > best_progress)
+                    best_progress = ret.first;
+                continue;
+            }
+            path_from = pos;
+            pos = ret.first;
+            path_to = pos;
+            break;
+
+        // path-empty
+        case 3:
+            path_from = path_to = pos;
+            break;
+        }
+
+        // query (optional)
+        ret = parse_query(str, pos, to);
+        if (ret.second) {
+            query_from = pos + 1;   // skip ?
+            pos = ret.first;
+            query_to = pos;
+        }
+
+        // fragment (optional)
+        ret = parse_fragment(str, pos, to);
+        if (ret.second) {
+            fragment_from = pos + 1;    // skip #
+            pos = ret.first;
+            fragment_to = pos;
+        }
+
+        // must have reached the end, otherwise there's some kind of error
+        if (pos < to) {
+            if (pos > best_progress)
+                best_progress = pos;
+            clear_authority();
+            path_from = 0, path_to = 0;
+            query_from = 0, query_to = 0;
+            fragment_from = 0, fragment_to = 0;
+            continue;
+        }
+
+        return {to, true};
+    }
+
+    // no full matches
+    clear_uri();
+    return {best_progress, false};
+}
+
+parser_ret parse_scheme(const std::string& str, size_t from, size_t to) {
+    if (from >= to || !is_alpha(str[from]))     // first char alpha
+        return {from, false};
+
+    size_t pos;
+    for (pos=from+1; pos<to; pos++) {
+        char c = str[pos];
+        if (!(is_alpha(c) || is_digit(c) || c == '+' || c == '-' || c == '.'))  // stop on first invalid char
+            break;
+    }
+
+    return {pos, true};
+}
+
+parser_ret parser::parse_authority(const std::string& str, size_t from, size_t to) {
+    if (to == 0)
+        to = str.size();
+    verify_range(str, from, to);
+    clear_authority();
+    size_t pos = from;
+
+    // try to get userinfo if it exists
+    parser_ret ret = parse_userinfo(str, from, to);
+    if (ret.first < to && str[ret.first] == '@') {  // userinfo exists
+        userinfo_from = pos;
+        userinfo_to = ret.first;
+        pos = ret.first + 1;
+    }
+
+    // get host
+    ret = parse_host(str, pos, to);
+    if (!ret.second) {  // invalid host
+        clear_authority();
+        return ret;
+    } else {
+        pos = ret.first;
+    }
+
+    // get port if specified
+    if (pos < to && str[pos] == ':') {
+        port_from = pos + 1;
+        pos = parse_port(str, pos + 1, to).first;
+        port_to = pos;
+    }
+
+    authority_from = from;
+    authority_to = pos;
+    return {pos, true};
+}
+
+parser_ret parse_userinfo(const std::string& str, size_t from, size_t to) {
+    size_t pos;
+    for (pos=from; pos<to; pos++) {
+        char c = str[pos];
+        if (!(is_unreserved(c) || c == '%' || is_sub_delim(c) || c == ':')) // stop on first invalid char
+            break;
+    }
+
+    return {pos, true};
+}
+
+parser_ret parser::parse_host(const std::string& str, size_t from, size_t to) {
+    if (to == 0)
+        to = str.size();
+    verify_range(str, from, to);
+    clear_host();
+
+    // array with function ptrs for all the possible host types
+    parser_ret (*ptrs[4])(const std::string&, size_t, size_t) = {
+        &parse_host_ipvfuture, &parse_host_ipv6, &parse_host_ipv4, &parse_host_regname
+    };
+    host_type_enum types[4] = {HOST_IPVFUTURE, HOST_IPV6, HOST_IPV4, HOST_REGNAME};
+
+    size_t best_progress = from;
+    // check all host types until one matches
+    for (unsigned int i=0; i<4; i++) {
+        parser_ret ret = ptrs[i](str, from, to);
+        if (ret.first > best_progress)
+            best_progress = ret.first;
+        if (ret.second) {   // matched
+            char c;
+            if (ret.first < to)
+                c = str[ret.first];
+            // make sure the host part ends here (end of uri, or delim for port, path, query, fragment)
+            if (ret.first >= to || c == ':' || c == '/' || c == '?' || c == '#') {
+                host_from = from;
+                host_to = ret.first;
+                if (host_to == host_from)
+                    host_type = HOST_EMPTY;
+                else
+                    host_type = types[i];
+                return ret;
+            }
         }
     }
 
-    // Check state when URI ends
-    switch (state) {
-    case SCHEME:    // incomplete URI
-        return size;
+    // none matched fully, or host part didn't end after the match
+    return {best_progress, false};
+}
 
-    case AUTHORITY:
-        authority_to = size;
-        if (userinfo_delim_pos == -1)   // no userinfo => host starts where authority starts
-            host_from = authority_from;
-        host_to = size;
+static parser_ret parse_host_ipv6(const std::string& str, size_t from, size_t to) {
+    // starts with [
+    if (from >= to || str[from] != '[')
+        return {from, false};
+
+    size_t best_progress = from + 1;
+    // test for all the variations of IPv6 addresses, as specified in the RFC
+    for (unsigned int variant=0; variant<9; variant++) {
+        size_t pos = from + 1;
+
+        // pre :: (optional piece)
+        if (variant >= 2) {
+            parser_ret ret = parse_h16_multi(str, pos, to, 0, variant-2);
+            if (ret.second) {
+                ret = parse_h16(str, ret.first, to);
+                if (ret.second)
+                    pos = ret.first;
+            }
+        }
+
+        // ::
+        if (variant >= 1) {
+            if (pos >= to || str[pos] != ':') {
+                if (pos > best_progress)
+                    best_progress = pos;
+                continue;
+            }
+            if (pos+1 >= to || str[pos+1] != ':') {
+                if (pos+1 > best_progress)
+                    best_progress = pos+1;
+                continue;
+            }
+            pos += 2;
+        }
+
+        // post :: or no ::
+        if (variant <= 6) {
+            parser_ret ret = parse_h16_multi(str, pos, to, 6-variant, 6-variant);
+            if (!ret.second) {
+                if (ret.first > best_progress)
+                    best_progress = ret.first;
+                continue;
+            }
+            pos = ret.first;
+
+            ret = parse_ls32(str, pos, to);
+            if (!ret.second) {
+                if (ret.first > best_progress)
+                    best_progress = ret.first;
+                continue;
+            }
+            pos = ret.first;
+        }
+
+        if (variant == 7) {
+            parser_ret ret = parse_h16(str, pos, to);
+            if (!ret.second) {
+                if (ret.first > best_progress)
+                    best_progress = ret.first;
+                continue;
+            }
+            pos = ret.first;
+        }
+
+        // ends with ]
+        if (pos >= to || str[pos] != ']') {
+            if (pos > best_progress)
+                best_progress = pos;
+            continue;
+        }
+        pos++;
+
+        // full address read, success
+        return {pos, true};
     }
 
-    // Analyze authority components in more detail
+    // no variants matched, failure
+    return {best_progress, false};
+}
 
-    return -1;
+// get multiple pieces of h16: (with the colon) for IPv6
+static parser_ret parse_h16_multi(const std::string& str, size_t from, size_t to, size_t min, size_t max) {
+    assert(min <= max);
+    size_t pos = from;
+    for (size_t i=0; i<max; i++) {
+        parser_ret ret = parse_h16(str, pos, to);
+        if (!ret.second ||
+            ret.first >= to || str[ret.first] != ':' ||     // piece must end with :
+            (ret.first + 1 < to && str[ret.first + 1] == ':')) {   // but not ::
+            // error in this piece
+            if (i >= min)           // already got enough pieces, success
+                return {pos, true};
+            else if (!ret.second)   // not enough pieces, error in h16
+                return ret;
+            else                    // not enough pieces, error in colon char
+                return {ret.first, false};
+        }
+        pos = ret.first + 1;
+    }
+    // got max amount of pieces, success
+    return {pos, true};
+}
+
+// get 4 hex chars (16 bits of data) for IPv6
+static parser_ret parse_h16(const std::string& str, size_t from, size_t to) {
+    // 1 to 4 chars allowed
+    if (to - from < 1)
+        return {to, false};
+    if (to - from > 4)
+        to = from + 4;
+
+    for (size_t i=from; i<to; i++) {
+        if (from_hex(str[i]) == 255) {  // invalid hex char marks end of h16 part
+            if (i == from)  // must be at least 1 char
+                return {i, false};
+            else
+                return {i, true};
+        }
+    }
+
+    // 4 valid hex chars
+    return {to, true};
+}
+
+// get 32 bits of data for IPv6 ending (either 8 hex chars and a : or an IPv4 address)
+static parser_ret parse_ls32(const std::string& str, size_t from, size_t to) {
+    // IPv6 can end with an IPv4 piece in some cases
+    parser_ret ret = parse_host_ipv4(str, from, to);
+    if (ret.second)
+        return ret;
+
+    // h16:h16
+    ret = parse_h16(str, from, to);
+    if (!ret.second)    // first h16 invalid
+        return ret;
+    if (ret.first >= to || str[ret.first] != ':') // missing colon separator
+        return {ret.first, false};
+    return parse_h16(str, ret.first+1, to);     // second h16
+}
+
+static parser_ret parse_host_ipvfuture(const std::string& str, size_t from, size_t to) {
+    // starts with [
+    if (from >= to || str[from] != '[')
+        return {from, false};
+    size_t pos = from + 1;
+
+    // version flag
+    if (pos >= to || str[pos] != 'v')
+        return {pos, false};
+    pos++;
+    for (; pos<to; pos++)
+        if (from_hex(str[pos]) == 255)  // stop when hex digits end
+            break;
+    if (pos <= from + 2)        // must have at least one hex digit
+        return {pos, false};
+
+    // dot separator
+    size_t dot_pos = pos;
+    if (dot_pos >= to || str[dot_pos] != '.')   // missing dot
+        return {dot_pos, false};
+    pos++;
+
+    // address
+    for (; pos<to; pos++) {
+        char c = str[pos];
+        if (!(is_unreserved(c) || is_sub_delim(c) || c == ':')) // stop on invalid char
+            break;
+    }
+    if (pos - dot_pos < 2)  // must have at least one char after dot
+        return {pos, false};
+
+    // ends with ]
+    if (pos >= to || str[pos] != ']')
+        return {pos, false};
+    pos++;
+
+    // full address read, success
+    return {pos, true};
+}
+
+static parser_ret parse_host_ipv4(const std::string& str, size_t from, size_t to) {
+    // get four octets
+    size_t pos = from;
+    for (unsigned int i=0; i<4; i++) {
+        if (i != 0) {
+            if (pos >= to || str[pos] != '.')   // dot separator
+                return {pos, false};
+            pos++;
+        }
+
+        // octet
+        parser_ret ret = parse_dec_octet(str, pos, to);
+        if (!ret.second)    // error in octet
+            return ret;
+        pos = ret.first;
+    }
+
+    // success
+    return {pos, true};
+}
+
+static parser_ret parse_dec_octet(const std::string& str, size_t from, size_t to) {
+    // 3 digits max
+    if (to > from + 3)
+        to = from + 3;
+
+    // find where digits stop
+    size_t pos;
+    for (pos = from; pos < to; pos++)
+        if (!is_digit(str[pos]))
+            break;
+
+    // at least 1 digit
+    if (pos - from < 1)
+        return {from, false};
+
+    // max number is 255
+    if (std::stoi(str.substr(from, pos - from)) < 256)
+        return {pos, true};
+    else
+        return {from, false};
+}
+
+static parser_ret parse_host_regname(const std::string& str, size_t from, size_t to) {
+    for (size_t i=from; i<to; i++) {    // stop on first invalid character
+        char c = str[i];
+        if (!(is_unreserved(c) || c == '%' || is_sub_delim(c)))
+            return {i, true};
+    }
+
+    return {to, true};
+}
+
+parser_ret parse_port(const std::string& str, size_t from, size_t to) {
+    // just keep reading as long as there are digits
+    size_t pos;
+    for (pos=from; pos<to; pos++)
+        if (!is_digit(str[pos]))
+            break;
+
+    return {pos, true};
+}
+
+static parser_ret parse_path_abempty(const std::string &str, size_t from, size_t to) {
+    // abempty = absolute or empty (kinda)
+    size_t pos = from;
+    while (pos < to) {
+        if (str[pos] != '/')
+            break;
+        pos = parse_path_segment(str, pos + 1, to).first;
+    }
+    return {pos, true};
+}
+
+static parser_ret parse_path_absolute(const std::string &str, size_t from, size_t to) {
+    // must start with /
+    if (from >= to || str[from] != '/')
+        return {from, false};
+
+    // optional segment-nz
+    parser_ret ret = parse_path_segment(str, from + 1, to, true);
+    if (!ret.second)
+        return {from + 1, true};
+
+    // optional other segments after segment-nz
+    return parse_path_abempty(str, ret.first, to);
+}
+
+static parser_ret parse_path_noscheme(const std::string &str, size_t from, size_t to) {
+    // first segment has no : and starts without / (segment-nz-nc)
+    parser_ret ret = parse_path_segment(str, from, to, true, true);
+    if (!ret.second)
+        return ret;
+
+    // optional other segments
+    return parse_path_abempty(str, ret.first, to);
+}
+
+static parser_ret parse_path_rootless(const std::string &str, size_t from, size_t to) {
+    // starts with segment-nz, without /
+    parser_ret ret = parse_path_segment(str, from, to, true);
+    if (!ret.second)
+        return ret;
+
+    // optional other segments
+    return parse_path_abempty(str, ret.first, to);
+}
+
+static parser_ret parse_path_segment(const std::string &str, size_t from, size_t to, bool nz, bool nc) {
+    // nz = non-zero size, nc = no colon (more info in RFC: segment, segment-nz, segment-nz-nc)
+    size_t pos;
+    for (pos = from; pos < to; pos++)
+        if (!is_pchar(str[pos], nc))
+            break;
+    if (nz && pos == from)  // check if non-zero requirement failed
+        return {pos, false};
+    return {pos, true};
+}
+
+static parser_ret parse_query(const std::string &str, size_t from, size_t to) {
+    // starts with ?
+    if (from >= to || str[from] != '?')
+        return {from, false};
+
+    size_t pos;
+    for (pos = from + 1; pos < to; pos++) {
+        char c = str[pos];
+        if (!(is_pchar(c) || c == '/' || c == '?'))     // stop at first invalid char
+            break;
+    }
+
+    return {pos, true};
+}
+
+static parser_ret parse_fragment(const std::string &str, size_t from, size_t to) {
+    // starts with #
+    if (from >= to || str[from] != '#')
+        return {from, false};
+
+    size_t pos;
+    for (pos = from + 1; pos < to; pos++) {
+        char c = str[pos];
+        if (!(is_pchar(c) || c == '/' || c == '?'))     // stop at first invalid char
+            break;
+    }
+
+    return {pos, true};
 }
