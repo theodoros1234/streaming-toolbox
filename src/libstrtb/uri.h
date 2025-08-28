@@ -50,13 +50,17 @@ public:
            fragment_from = 0, fragment_to = 0;
     host_type_enum host_type = HOST_EMPTY;
 
-    parser_ret parse_uri(const std::string& str, size_t from, size_t to);
-    parser_ret parse_authority(const std::string& str, size_t from, size_t to);
-    parser_ret parse_host(const std::string& str, size_t from, size_t to);
-
     parser_ret parse_uri(const std::string& str);
+    parser_ret parse_uri_suffix(const std::string& str);
+    parser_ret parse_relative_ref(const std::string& str);
     parser_ret parse_authority(const std::string& str);
     parser_ret parse_host(const std::string& str);
+
+    parser_ret parse_uri(const std::string& str, size_t from, size_t to);
+    parser_ret parse_uri_suffix(const std::string& str, size_t from, size_t to);
+    parser_ret parse_relative_ref(const std::string& str, size_t from, size_t to);
+    parser_ret parse_authority(const std::string& str, size_t from, size_t to);
+    parser_ret parse_host(const std::string& str, size_t from, size_t to);
 
     void clear_uri();
     void clear_authority();

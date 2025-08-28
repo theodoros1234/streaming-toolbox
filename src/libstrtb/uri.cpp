@@ -206,6 +206,14 @@ parser_ret parser::parse_uri(const std::string& str) {
     return parse_uri(str, 0, str.length());
 }
 
+parser_ret parser::parse_uri_suffix(const std::string& str) {
+    return parse_uri_suffix(str, 0, str.length());
+}
+
+parser_ret parser::parse_relative_ref(const std::string& str) {
+    return parse_relative_ref(str, 0, str.length());
+}
+
 parser_ret parser::parse_authority(const std::string& str) {
     return parse_authority(str, 0, str.length());
 }
@@ -322,6 +330,169 @@ parser_ret parser::parse_uri(const std::string& str, size_t from, size_t to) {
             path_from = 0, path_to = 0;
             query_from = 0, query_to = 0;
             fragment_from = 0, fragment_to = 0;
+            continue;
+        }
+
+        return {to, true};
+    }
+
+    // no full matches
+    clear_uri();
+    return {best_progress, false};
+}
+
+/* authority path-abempty [?query] [#fragment]
+ * e.g. www.theonicolaou.net/path/to/resource?q=something
+ *      theonicolaou.net/page.html
+ *
+ * This is an invalid URI syntax, but is often used for human-written URLs.
+ * This can ONLY be used when a user-written ABSOLUTE path is entered,
+ * and NEVER in situations where the input could be a relative reference,
+ * as their syntax is the same. Also, there can be false positives.
+ * Those could be reduced by checking if there's at least one dot in the host,
+ * if the host is of type HOST_REGNAME.
+ *
+ * Read more: https://datatracker.ietf.org/doc/html/rfc3986#section-4.5
+ */
+parser_ret parser::parse_uri_suffix(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    clear_uri();
+
+    parser_ret ret;
+    size_t pos = from;
+
+    // authority
+    ret = parse_authority(str, pos, to);
+    if (!ret.second)
+        return ret;
+    pos = ret.first;
+
+    // path-abempty (either starting with / or empty)
+    path_from = pos;
+    pos = parse_path_abempty(str, pos, to).first;
+    path_to = pos;
+
+    // query (optional)
+    ret = parse_query(str, pos, to);
+    if (ret.second) {
+        query_from = pos + 1;   // skip ?
+        pos = ret.first;
+        query_to = pos;
+    }
+
+    // fragment (optional)
+    ret = parse_fragment(str, pos, to);
+    if (ret.second) {
+        fragment_from = pos + 1;    // skip #
+        pos = ret.first;
+        fragment_to = pos;
+    }
+
+    // must have reached the end, otherwise there's some kind of error
+    if (pos < to) {
+        clear_uri();
+        return {pos, false};
+    }
+
+    return {to, true};
+}
+
+parser_ret parser::parse_relative_ref(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    clear_uri();
+
+    // relative-part (all variations and things after it)
+    size_t best_progress = from;
+    for (unsigned int var=0; var<4; var++) {
+        size_t pos = from;
+        parser_ret ret;
+
+        // relative-part
+        switch (var) {
+        // "//" authority path-abempty
+        case 0:
+            // "//"
+            if (pos >= to || str[pos] != '/') {
+                if (pos > best_progress)
+                    best_progress = pos;
+                continue;
+            }
+            pos++;
+            if (pos >= to || str[pos] != '/') {
+                if (pos > best_progress)
+                    best_progress = pos;
+                continue;
+            }
+            pos++;
+
+            // authority
+            ret = parse_authority(str, pos, to);
+            if (!ret.second) {
+                if (ret.first > best_progress)
+                    best_progress = ret.first;
+                continue;
+            }
+            pos = ret.first;
+
+            // path-abempty (either starting with / or empty)
+            path_from = pos;
+            pos = parse_path_abempty(str, pos, to).first;
+            path_to = pos;
+            break;
+
+        // path-absolute
+        case 1:
+            ret = parse_path_absolute(str, pos, to);
+            if (!ret.second) {
+                if (ret.first > best_progress)
+                    best_progress = ret.first;
+                continue;
+            }
+            path_from = pos;
+            pos = ret.first;
+            path_to = pos;
+            break;
+
+        // path-noscheme
+        case 2:
+            ret = parse_path_noscheme(str, pos, to);
+            if (!ret.second) {
+                if (ret.first > best_progress)
+                    best_progress = ret.first;
+                continue;
+            }
+            path_from = pos;
+            pos = ret.first;
+            path_to = pos;
+            break;
+
+        // path-empty
+        case 3:
+            path_from = path_to = pos;
+            break;
+        }
+
+        // query (optional)
+        ret = parse_query(str, pos, to);
+        if (ret.second) {
+            query_from = pos + 1;   // skip ?
+            pos = ret.first;
+            query_to = pos;
+        }
+
+        // fragment (optional)
+        ret = parse_fragment(str, pos, to);
+        if (ret.second) {
+            fragment_from = pos + 1;    // skip #
+            pos = ret.first;
+            fragment_to = pos;
+        }
+
+        // must have reached the end, otherwise there's some kind of error
+        if (pos < to) {
+            if (pos > best_progress)
+                best_progress = pos;
+            clear_uri();
             continue;
         }
 
