@@ -50,9 +50,13 @@ public:
            fragment_from = 0, fragment_to = 0;
     host_type_enum host_type = HOST_EMPTY;
 
-    parser_ret parse_uri(const std::string& str, size_t from = 0, size_t to = 0);
-    parser_ret parse_authority(const std::string& str, size_t from = 0, size_t to = 0);
-    parser_ret parse_host(const std::string& str, size_t from = 0, size_t to = 0);
+    parser_ret parse_uri(const std::string& str, size_t from, size_t to);
+    parser_ret parse_authority(const std::string& str, size_t from, size_t to);
+    parser_ret parse_host(const std::string& str, size_t from, size_t to);
+
+    parser_ret parse_uri(const std::string& str);
+    parser_ret parse_authority(const std::string& str);
+    parser_ret parse_host(const std::string& str);
 
     void clear_uri();
     void clear_authority();
@@ -69,9 +73,13 @@ public:
     std::string fragment_str(const std::string& str) const;
 };
 
-std::string percent_encode(const std::string& from);    // like encodeURIComponent()
-std::string percent_encode_limited(const std::string& from);    // like encodeURI()
-std::pair<std::string, ssize_t> percent_decode(const std::string& from);    // like decodeURIComponent()
+std::string percent_encode(const std::string& str);     // like encodeURIComponent()
+std::string percent_encode_limited(const std::string& str);     // like encodeURI()
+std::pair<std::string, ssize_t> percent_decode(const std::string& str);     // like decodeURIComponent()
+
+std::string percent_encode(const std::string& str, size_t from, size_t to);
+std::string percent_encode_limited(const std::string& str, size_t from, size_t to);
+std::pair<std::string, ssize_t> percent_decode(const std::string& str, size_t from, size_t to);
 
 }
 

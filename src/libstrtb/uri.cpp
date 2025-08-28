@@ -29,68 +29,85 @@ static inline void verify_range(const std::string& str, size_t from, size_t to) 
 
 // NOTE: percent encode/decode doesn't check for invalid UTF-8 sequences
 
-std::string strtb::uri::percent_encode(const std::string& from) {
-    std::string to;
-    to.reserve(from.size() + from.size()/2);
-    for (auto c : from) {
-        // unreserved characters: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
-        if (is_unreserved(c)) {
-            to.push_back(c);
-        } else {
-            // percent-encode
-            to.push_back('%');
-            to.push_back(to_hex[((unsigned char) c) / 16]);
-            to.push_back(to_hex[((unsigned char) c) % 16]);
-        }
-    }
-    return to;
+std::string strtb::uri::percent_encode(const std::string& str) {
+    return percent_encode(str, 0, str.length());
 }
 
-std::string strtb::uri::percent_encode_limited(const std::string& from) {
+std::string strtb::uri::percent_encode_limited(const std::string& str) {
+    return percent_encode_limited(str, 0, str.length());
+}
+
+std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& str) {
+    return percent_decode(str, 0, str.length());
+}
+
+std::string strtb::uri::percent_encode(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    std::string encoded;
+    encoded.reserve(str.size() + str.size()/2);
+    for (auto i = str.begin() + from; i < str.begin() + to; i++) {
+        char c = *i;
+        // unreserved characters: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
+        if (is_unreserved(c)) {
+            encoded.push_back(c);
+        } else {
+            // percent-encode
+            encoded.push_back('%');
+            encoded.push_back(to_hex[((unsigned char) c) / 16]);
+            encoded.push_back(to_hex[((unsigned char) c) % 16]);
+        }
+    }
+    return encoded;
+}
+
+std::string strtb::uri::percent_encode_limited(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
     // useful for encoding user-input URIs that may have special characters, without breaking the rest of the URI
-    std::string to;
-    to.reserve(from.size() + from.size()/2);
-    for (auto c : from) {
+    std::string encoded;
+    encoded.reserve(str.size() + str.size()/2);
+    for (auto i = str.begin() + from; i < str.begin() + to; i++) {
+        char c = *i;
         // reserved characters: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
         // unreserved characters: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
         if (is_unreserved(c) || is_gen_delim(c) || is_sub_delim(c) || c == '%') {
-            to.push_back(c);
+            encoded.push_back(c);
         } else {
             // percent-encode
-            to.push_back('%');
-            to.push_back(to_hex[((unsigned char) c) / 16]);
-            to.push_back(to_hex[((unsigned char) c) % 16]);
+            encoded.push_back('%');
+            encoded.push_back(to_hex[((unsigned char) c) / 16]);
+            encoded.push_back(to_hex[((unsigned char) c) % 16]);
         }
     }
-    return to;
+    return encoded;
 }
 
-std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& from) {
-    std::string to;
-    to.reserve(from.size());
-    for (size_t i=0; i<from.size(); i++) {
-        char c = from[i];
+std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    std::string decoded;
+    decoded.reserve(to - from);
+    for (size_t i=from; i<to; i++) {
+        char c = str[i];
         if (c == '%') {
             // decode percentage encoded char
-            if (i+2 >= from.size())
-                return {"incomplete escape code", from.size()};
-            unsigned char h1 = from_hex(from[i+1]);
-            unsigned char h2 = from_hex(from[i+2]);
+            if (i+2 >= to)
+                return {"incomplete escape code", str.size()};
+            unsigned char h1 = from_hex(str[i+1]);
+            unsigned char h2 = from_hex(str[i+2]);
             if (h1 == 255)
                 return {"invalid hex digit", i+1};
             if (h2 == 255)
                 return {"invalid hex digit", i+2};
-            to.push_back(16 * h1 + h2);
+            decoded.push_back(16 * h1 + h2);
             i += 2;
         } else {
             // no decoding needed
-            to.push_back(c);
+            decoded.push_back(c);
         }
     }
-    if (to.size() <= from.size()/2)
-        to.shrink_to_fit();
+    if (decoded.size() <= to - from)
+        decoded.shrink_to_fit();
     // .second == -1 means no error, != -1 means error at that pos
-    return {std::move(to), -1};
+    return {std::move(decoded), -1};
 }
 
 void parser::clear_uri() {
@@ -185,9 +202,19 @@ static parser_ret parse_host_ipv4(const std::string& str, size_t from, size_t to
 static parser_ret parse_dec_octet(const std::string& str, size_t from, size_t to);
 static parser_ret parse_host_regname(const std::string& str, size_t from, size_t to);
 
+parser_ret parser::parse_uri(const std::string& str) {
+    return parse_uri(str, 0, str.length());
+}
+
+parser_ret parser::parse_authority(const std::string& str) {
+    return parse_authority(str, 0, str.length());
+}
+
+parser_ret parser::parse_host(const std::string& str) {
+    return parse_host(str, 0, str.length());
+}
+
 parser_ret parser::parse_uri(const std::string& str, size_t from, size_t to) {
-    if (to == 0)
-        to = str.size();
     verify_range(str, from, to);
     clear_uri();
 
@@ -321,8 +348,6 @@ parser_ret parse_scheme(const std::string& str, size_t from, size_t to) {
 }
 
 parser_ret parser::parse_authority(const std::string& str, size_t from, size_t to) {
-    if (to == 0)
-        to = str.size();
     verify_range(str, from, to);
     clear_authority();
     size_t pos = from;
@@ -368,8 +393,6 @@ parser_ret parse_userinfo(const std::string& str, size_t from, size_t to) {
 }
 
 parser_ret parser::parse_host(const std::string& str, size_t from, size_t to) {
-    if (to == 0)
-        to = str.size();
     verify_range(str, from, to);
     clear_host();
 
