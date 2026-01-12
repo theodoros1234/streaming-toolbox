@@ -1,6 +1,7 @@
 #include "uri.h"
 #include <stdexcept>
 #include <cassert>
+#include <cstdint>
 
 using namespace strtb::uri;
 
@@ -130,8 +131,16 @@ void parser::clear_host() {
     host_type = HOST_EMPTY;
 }
 
-std::string parser::scheme_str(const std::string& str) const {
-    return str.substr(scheme_from, scheme_to - scheme_from);
+std::string parser::scheme_str(const std::string& str, bool fix_case) const {
+    if (fix_case) {
+        std::string new_str = str.substr(scheme_from, scheme_to - scheme_from);
+        for (auto& c : new_str) // to lowercase, as the RFC recommends
+            if ('A' <= c && c <= 'Z')
+                c += 32;
+        return new_str;
+    } else {
+        return str.substr(scheme_from, scheme_to - scheme_from);
+    }
 }
 
 std::string parser::authority_str(const std::string& str) const {
@@ -142,8 +151,31 @@ std::string parser::userinfo_str(const std::string& str) const {
     return str.substr(userinfo_from, userinfo_to - userinfo_from);
 }
 
-std::string parser::host_str(const std::string& str) const {
-    return str.substr(host_from, host_to - host_from);
+std::string parser::host_str(const std::string& str, bool fix_case) const {
+    if (fix_case) {
+        std::string new_str = str.substr(host_from, host_to - host_from);
+
+        // to lowercase, except for percent-escaped characters, as the RFC recommends
+        unsigned int pct_encode_remaining = 0;
+        for (auto& c : new_str) {
+            if (c == '%') {
+                pct_encode_remaining = 2;
+            } else if (pct_encode_remaining) {
+                // pct encoded to uppercase
+                if ('a' <= c && c <= 'z')
+                    c -= 32;
+                pct_encode_remaining--;
+            } else {
+                // regular chars to lowercase
+                if ('A' <= c && c <= 'Z')
+                    c += 32;
+            }
+        }
+
+        return new_str;
+    } else {
+        return str.substr(host_from, host_to - host_from);
+    }
 }
 
 std::string parser::port_str(const std::string& str) const {
@@ -206,7 +238,7 @@ parser_ret parser::parse_uri(const std::string& str) {
     return parse_uri(str, 0, str.length());
 }
 
-parser_ret parser::parse_uri_suffix(const std::string& str) {
+parser_ret_suffix parser::parse_uri_suffix(const std::string& str) {
     return parse_uri_suffix(str, 0, str.length());
 }
 
@@ -353,8 +385,15 @@ parser_ret parser::parse_uri(const std::string& str, size_t from, size_t to) {
  * if the host is of type HOST_REGNAME.
  *
  * Read more: https://datatracker.ietf.org/doc/html/rfc3986#section-4.5
+ *
+ * Heuristics:
+ * SUFFIX_ERROR            = failed to parse
+ * SUFFIX_UNLIKELY         = parsed successfully, but it's probably by mistake
+ * SUFFIX_POSSIBLE_FILE    = string could be a file path
+ * SUFFIX_POSSIBLE_WEBSITE = parsed URI could be a website link, ONLY accept if typed into a URL bar or similar
+ * SUFFIX_LIKELY_WEBSITE   = parsed URI likely is a website link, could be used to detect links in chat messages
  */
-parser_ret parser::parse_uri_suffix(const std::string& str, size_t from, size_t to) {
+parser_ret_suffix parser::parse_uri_suffix(const std::string& str, size_t from, size_t to) {
     verify_range(str, from, to);
     clear_uri();
 
@@ -364,7 +403,7 @@ parser_ret parser::parse_uri_suffix(const std::string& str, size_t from, size_t 
     // authority
     ret = parse_authority(str, pos, to);
     if (!ret.second)
-        return ret;
+        return {ret.first, SUFFIX_ERROR};
     pos = ret.first;
 
     // path-abempty (either starting with / or empty)
@@ -391,10 +430,60 @@ parser_ret parser::parse_uri_suffix(const std::string& str, size_t from, size_t 
     // must have reached the end, otherwise there's some kind of error
     if (pos < to) {
         clear_uri();
-        return {pos, false};
+        return {pos, SUFFIX_ERROR};
     }
 
-    return {to, true};
+    // determine how likely this is an intentional URI
+    // empty authority
+    if (authority_to == authority_from) {
+        if (path_from < path_to && str[path_from] == '/')   // str could be a regular file path
+            return {to, SUFFIX_POSSIBLE_FILE};
+        else
+            return {to, SUFFIX_UNLIKELY};
+    }
+
+    // possible windows file path, drive letter could've been mistakenly recognized as an authority
+    if (authority_to - authority_from == 2 &&
+        is_alpha(str[authority_from]) && str[authority_from + 1] == ':')
+        return {to, SUFFIX_POSSIBLE_FILE};
+
+    // empty host is probably a mistake
+    if (host_type == HOST_EMPTY)
+        return {to, SUFFIX_UNLIKELY};
+
+    // IP addresses only recognized as possible, so they don't get picked up from chat messages
+    if (host_type != HOST_REGNAME)
+        return {to, SUFFIX_POSSIBLE_WEBSITE};
+
+    // scan host pieces
+    size_t piece_start = host_from;
+    for (size_t i = host_from; i < host_to; i++) {
+        char c = str[i];
+
+        if (c == '.') {
+            if (i == piece_start)   // empty segment in host (e.g. "example..com")
+                return {to, SUFFIX_UNLIKELY};
+
+            piece_start = i+1;
+        } else if (!(is_alpha(c) || is_digit(c) || c == '-')) {
+            // invalid character
+            return {to, SUFFIX_UNLIKELY};
+        }
+    }
+
+    // check if host ends with empty segment
+    // NOTE: extra dots at the end must be removed by the caller
+    if (piece_start == host_to)
+        return {to, SUFFIX_UNLIKELY};
+    // TODO: check if TLD is valid, combine with existence of path if TLD is invalid for SUFFIX_POSSIBLE_WEBSITE
+
+    // userinfo
+    if (userinfo_to != 0)
+        return {to, SUFFIX_POSSIBLE_WEBSITE};
+    // TODO: combine userinfo with host heuristics, but return AT MOST SUFFIX_POSSIBLE_WEBSITE FOR SECURITY
+
+    // TODO: think about this again after host heuristics are implemented
+    return {to, SUFFIX_LIKELY_WEBSITE};
 }
 
 parser_ret parser::parse_relative_ref(const std::string& str, size_t from, size_t to) {

@@ -3,7 +3,8 @@
 
 #include <string>
 #include <utility>
-#include <cstdint>
+#include <set>
+#include <string>
 
 // RFC Specification: https://datatracker.ietf.org/doc/html/rfc3986
 
@@ -36,7 +37,10 @@ inline bool is_pchar(char c, bool nc = false) {
 }
 
 typedef enum {HOST_EMPTY, HOST_REGNAME, HOST_IPV4, HOST_IPV6, HOST_IPVFUTURE} host_type_enum;
+typedef enum {SUFFIX_ERROR, SUFFIX_UNLIKELY, SUFFIX_POSSIBLE_FILE,
+              SUFFIX_POSSIBLE_WEBSITE, SUFFIX_LIKELY_WEBSITE} suffix_confidence;
 typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is valid
+typedef std::pair<size_t, suffix_confidence> parser_ret_suffix;
 
 class parser {
 public:
@@ -51,13 +55,13 @@ public:
     host_type_enum host_type = HOST_EMPTY;
 
     parser_ret parse_uri(const std::string& str);
-    parser_ret parse_uri_suffix(const std::string& str);
+    parser_ret_suffix parse_uri_suffix(const std::string& str);
     parser_ret parse_relative_ref(const std::string& str);
     parser_ret parse_authority(const std::string& str);
     parser_ret parse_host(const std::string& str);
 
     parser_ret parse_uri(const std::string& str, size_t from, size_t to);
-    parser_ret parse_uri_suffix(const std::string& str, size_t from, size_t to);
+    parser_ret_suffix parse_uri_suffix(const std::string& str, size_t from, size_t to);
     parser_ret parse_relative_ref(const std::string& str, size_t from, size_t to);
     parser_ret parse_authority(const std::string& str, size_t from, size_t to);
     parser_ret parse_host(const std::string& str, size_t from, size_t to);
@@ -66,10 +70,10 @@ public:
     void clear_authority();
     void clear_host();
 
-    std::string scheme_str(const std::string& str) const;
+    std::string scheme_str(const std::string& str, bool fix_case = false) const;
     std::string authority_str(const std::string& str) const;
     std::string userinfo_str(const std::string& str) const;
-    std::string host_str(const std::string& str) const;
+    std::string host_str(const std::string& str, bool fix_case = false) const;
     std::string port_str(const std::string& str) const;
     int port_uint16(const std::string& str) const;  // returns -1 when out of range or not specified
     std::string path_str(const std::string& str) const;
@@ -84,6 +88,9 @@ std::pair<std::string, ssize_t> percent_decode(const std::string& str);     // l
 std::string percent_encode(const std::string& str, size_t from, size_t to);
 std::string percent_encode_limited(const std::string& str, size_t from, size_t to);
 std::pair<std::string, ssize_t> percent_decode(const std::string& str, size_t from, size_t to);
+
+extern const std::set<std::string> known_tlds;
+bool is_known_tld(const std::string& str);
 
 }
 
