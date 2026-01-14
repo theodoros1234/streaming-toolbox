@@ -53,7 +53,8 @@ SOURCES += \
     networking/tcp_socket.cpp \
     networking/tcp_socket_ssl_thread.cpp \
     unicode/unicode.cpp \
-    uri.cpp
+    uri.cpp \
+    uri_known_tlds_default.cpp
 
 HEADERS += \
     chat/channel.h \

@@ -3,7 +3,6 @@
 
 #include <string>
 #include <utility>
-#include <set>
 #include <string>
 
 // RFC Specification: https://datatracker.ietf.org/doc/html/rfc3986
@@ -89,7 +88,11 @@ std::string percent_encode(const std::string& str, size_t from, size_t to);
 std::string percent_encode_limited(const std::string& str, size_t from, size_t to);
 std::pair<std::string, ssize_t> percent_decode(const std::string& str, size_t from, size_t to);
 
-extern const std::set<std::string> known_tlds;
+extern const char known_tlds_default[];
+extern const size_t known_tlds_default_length;
+void known_tlds_load_str(const char* str, size_t len);
+bool is_known_tld(const char* str, size_t from, size_t to);     // case-insensitive
+bool is_known_tld(const std::string& str, size_t from, size_t to);
 bool is_known_tld(const std::string& str);
 
 }

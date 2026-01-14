@@ -5,6 +5,7 @@
 #include "../libstrtb/config/system.h"
 #include "../libstrtb/common/version.h"
 #include "../libstrtb/event/system.h"
+#include "../libstrtb/uri.h"
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -69,6 +70,7 @@ int main(int argc, char *argv[]) {
     config::main = &config_system;
 
     // Init other things
+    uri::known_tlds_load_str(uri::known_tlds_default, uri::known_tlds_default_length);
     event::system event_system;
     chat::system chat_system;
     chat::main = &chat_system;

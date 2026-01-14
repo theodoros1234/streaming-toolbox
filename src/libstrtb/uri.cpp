@@ -2,8 +2,13 @@
 #include <stdexcept>
 #include <cassert>
 #include <cstdint>
+#include <vector>
+#include "common/strescape.h"
+#include "logging/logging.h"
 
 using namespace strtb::uri;
+
+static strtb::logging::source log("URI");
 
 static const char to_hex[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
@@ -1016,4 +1021,138 @@ static parser_ret parse_fragment(const std::string &str, size_t from, size_t to)
     }
 
     return {pos, true};
+}
+
+#define TLD_TRIE_CHAR_COUNT 10 + 1 + 26
+#define TLD_TRIE_NUM_POS 0
+#define TLD_TRIE_DASH_POS 10
+#define TLD_TRIE_ALPHA_POS 11
+struct tld_trie_node {
+    int next[TLD_TRIE_CHAR_COUNT];
+    bool match = false;
+    // next[0 to 9]: numbers
+    // next[10]: dash
+    // next[11 to 36]: upper&lowercase chars combined
+    // next[i] == -1 means no next node for that char
+    // points to the next node for each character
+    // if the string ends on a node with match == true it means it's in the trie
+
+    tld_trie_node() {
+        for (size_t i = 0; i < TLD_TRIE_CHAR_COUNT; i++)
+            next[i] = -1;
+    }
+};
+
+static std::vector<struct tld_trie_node> known_tlds_trie;
+
+static void tld_trie_reset() {
+    known_tlds_trie.clear();
+    known_tlds_trie.emplace_back();
+}
+
+static inline int tld_trie_charcode(char c) {
+    if ('A' <= c && c <= 'Z')
+        return c - 'A' + TLD_TRIE_ALPHA_POS;
+    else if ('a' <= c && c <= 'z')
+        return c - 'a' + TLD_TRIE_ALPHA_POS;
+    else if (is_digit(c))
+        return c - '0' + TLD_TRIE_NUM_POS;
+    else if (c == '-')
+        return TLD_TRIE_DASH_POS;
+    else
+        return -1;
+}
+
+static void tld_trie_add_word(const char* word, size_t from, size_t to) {
+    int current_node = 0;
+    for (size_t i = from; i < to; i++) {
+        int code = tld_trie_charcode(word[i]);
+        if (code == -1) {
+            log.warning({"Failed to add ", strtb::common::string_escape(std::string(word).substr(from, to-from)),
+                         " to the set of known TLDs due to an unsupported character."});
+            return;
+        }
+
+        int next_node = known_tlds_trie[current_node].next[code];
+        if (next_node == -1) {
+            // next node doesn't exist, create it
+            next_node = known_tlds_trie.size();
+            known_tlds_trie[current_node].next[code] = next_node;
+            known_tlds_trie.emplace_back();
+        }
+        current_node = next_node;
+    }
+
+    known_tlds_trie[current_node].match = true;
+}
+
+static inline bool is_whitespace_not_crlf(char c) {
+    return c == '\0' || c == '\t' || c == '\v' || c == '\f' || c == ' ';
+}
+
+static inline bool is_crlf(char c) {
+    return c == '\n' || c == '\r';
+}
+
+static inline bool is_whitespace(char c) {
+    return is_whitespace_not_crlf(c) || is_crlf(c);
+}
+
+static void known_tlds_load_line(const char* str, size_t from, size_t to) {
+    size_t i;
+
+    // trim starting whitespace
+    for (i = from; i < to && is_whitespace_not_crlf(str[i]); i++);
+    from = i;
+
+    // trim ending whitespace
+    for (i = to - 1; i >= from && is_whitespace(str[i]); i--);
+    to = i + 1;
+
+    // ignore empty lines or comments
+    if (to <= from || str[from] == '#')
+        return;
+
+    tld_trie_add_word(str, from, to);
+}
+
+void strtb::uri::known_tlds_load_str(const char* str, size_t len) {
+    size_t line_start = 0, line_end = 0;
+    tld_trie_reset();
+
+    for (size_t i = 0; i < len; i++) {
+        if (str[i] == '\n') {
+            line_start = line_end;
+            line_end = i + 1;
+            known_tlds_load_line(str, line_start, line_end);
+        }
+    }
+
+    line_start = line_end;
+    line_end = len;
+    known_tlds_load_line(str, line_start, line_end);
+}
+
+bool strtb::uri::is_known_tld(const char* str, size_t from, size_t to) {
+    int current_node = 0;
+
+    for (size_t i = from; i < to; i++) {
+        int code = tld_trie_charcode(str[i]);
+        if (code == -1)
+            return false;
+
+        current_node = known_tlds_trie[current_node].next[code];
+        if (current_node == -1)
+            return false;
+    }
+
+    return known_tlds_trie[current_node].match;
+}
+
+bool strtb::uri::is_known_tld(const std::string& str, size_t from, size_t to) {
+    return is_known_tld(str.data(), from, to);
+}
+
+bool strtb::uri::is_known_tld(const std::string& str) {
+    return is_known_tld(str.data(), 0, str.length());
 }
