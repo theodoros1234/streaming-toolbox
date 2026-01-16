@@ -36,10 +36,14 @@ inline bool is_pchar(char c, bool nc = false) {
 }
 
 typedef enum {HOST_EMPTY, HOST_REGNAME, HOST_IPV4, HOST_IPV6, HOST_IPVFUTURE} host_type_enum;
-// NOTE: file paths are absolute, and for Windows it's with forward slashes
-typedef enum {SUFFIX_ERROR, SUFFIX_UNLIKELY, SUFFIX_POSSIBLE_WEBSITE, SUFFIX_LIKELY_WEBSITE} suffix_confidence;
+typedef enum {
+    WEB_URL_ERROR,      // failed to parse
+    WEB_URL_UNLIKELY,   // successfully parsed, but is almost certainly by mistake
+    WEB_URL_POSSIBLE,   // can be accepted on dedicated and trusted URL input fields
+    WEB_URL_LIKELY      // can be accepted in chat messages and other viewer-generated text
+} web_url_confidence;
 typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is valid
-typedef std::pair<size_t, suffix_confidence> parser_ret_suffix;
+typedef std::pair<web_url_confidence, bool> web_url_ret;    // .second = true if suffix, false if full URL
 
 class parser {
 public:
@@ -54,16 +58,19 @@ public:
     host_type_enum host_type = HOST_EMPTY;
 
     parser_ret parse_uri(const std::string& str);
-    parser_ret_suffix parse_uri_suffix(const std::string& str);
+    parser_ret parse_uri_suffix(const std::string& str);
     parser_ret parse_relative_ref(const std::string& str);
     parser_ret parse_authority(const std::string& str);
     parser_ret parse_host(const std::string& str);
 
     parser_ret parse_uri(const std::string& str, size_t from, size_t to);
-    parser_ret_suffix parse_uri_suffix(const std::string& str, size_t from, size_t to);
+    parser_ret parse_uri_suffix(const std::string& str, size_t from, size_t to);
     parser_ret parse_relative_ref(const std::string& str, size_t from, size_t to);
     parser_ret parse_authority(const std::string& str, size_t from, size_t to);
     parser_ret parse_host(const std::string& str, size_t from, size_t to);
+
+    web_url_ret is_web_url(const std::string& str);
+    web_url_ret is_web_url(const std::string& str, size_t from, size_t to);
 
     void clear_uri();
     void clear_authority();

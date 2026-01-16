@@ -243,7 +243,7 @@ parser_ret parser::parse_uri(const std::string& str) {
     return parse_uri(str, 0, str.length());
 }
 
-parser_ret_suffix parser::parse_uri_suffix(const std::string& str) {
+parser_ret parser::parse_uri_suffix(const std::string& str) {
     return parse_uri_suffix(str, 0, str.length());
 }
 
@@ -386,19 +386,12 @@ parser_ret parser::parse_uri(const std::string& str, size_t from, size_t to) {
  * This can ONLY be used when a user-written ABSOLUTE path is entered,
  * and NEVER in situations where the input could be a relative reference,
  * as their syntax is the same. Also, there can be false positives.
- * Those could be reduced by checking if there's at least one dot in the host,
- * if the host is of type HOST_REGNAME.
+ * Use is_web_url() instead, which checks for both full and suffix URLs
+ * and further analyzes the URL to reduce false positives and security issues.
  *
  * Read more: https://datatracker.ietf.org/doc/html/rfc3986#section-4.5
- *
- * Heuristics:
- * SUFFIX_ERROR            = failed to parse
- * SUFFIX_UNLIKELY         = parsed successfully, but it's probably by mistake
- * SUFFIX_POSSIBLE_FILE    = string could be a file path
- * SUFFIX_POSSIBLE_WEBSITE = parsed URI could be a website link, ONLY accept if typed into a URL bar or similar
- * SUFFIX_LIKELY_WEBSITE   = parsed URI likely is a website link, could be used to detect links in chat messages
  */
-parser_ret_suffix parser::parse_uri_suffix(const std::string& str, size_t from, size_t to) {
+parser_ret parser::parse_uri_suffix(const std::string& str, size_t from, size_t to) {
     verify_range(str, from, to);
     clear_uri();
 
@@ -408,7 +401,7 @@ parser_ret_suffix parser::parse_uri_suffix(const std::string& str, size_t from, 
     // authority
     ret = parse_authority(str, pos, to);
     if (!ret.second)
-        return {ret.first, SUFFIX_ERROR};
+        return {ret.first, false};
     pos = ret.first;
 
     // path-abempty (either starting with / or empty)
@@ -435,72 +428,10 @@ parser_ret_suffix parser::parse_uri_suffix(const std::string& str, size_t from, 
     // must have reached the end, otherwise there's some kind of error
     if (pos < to) {
         clear_uri();
-        return {pos, SUFFIX_ERROR};
+        return {pos, false};
     }
 
-    // determine how likely this is an intentional URI, specifically a web URL
-    // empty authority or host
-    if (authority_to == authority_from || host_type == HOST_EMPTY)
-        return {to, SUFFIX_UNLIKELY};
-
-    // if a port was specified, it must be within the valid port range (also port 0 and 1 are unsafe)
-    if (host_to != authority_to) {
-        size_t port_len = port_to - port_from;
-        if (port_len < 1 || port_len > 5)
-            return {to, SUFFIX_UNLIKELY};
-        int n = std::stoi(str.substr(port_from, port_len));
-        if (n <= 1 || n >= 65536)
-            return {to, SUFFIX_UNLIKELY};
-    }
-
-    // IP addresses only recognized as possible, so they don't get picked up from chat messages
-    if (host_type != HOST_REGNAME)
-        return {to, SUFFIX_POSSIBLE_WEBSITE};
-
-    // scan host pieces
-    size_t piece_start = host_from;
-    size_t piece_count = 1;
-    bool more_than_numbers = false;
-    for (size_t i = host_from; i < host_to; i++) {
-        char c = str[i];
-
-        if (c == '.') {
-            if (i == piece_start)   // empty segment in host (e.g. "example..com")
-                return {to, SUFFIX_UNLIKELY};
-
-            piece_start = i+1;
-            piece_count++;
-            more_than_numbers = false;
-        } else if (!(is_alpha(c) || is_digit(c) || c == '-')) {
-            // invalid character
-            return {to, SUFFIX_UNLIKELY};
-        } else if (!is_digit(c)) {
-            // current segment isn't only numbers
-            more_than_numbers = true;
-        }
-    }
-
-    // check if host ends with empty segment
-    // NOTE: extra dots at the end must be removed by the caller
-    if (piece_start == host_to)
-        return {to, SUFFIX_UNLIKELY};
-    // TLD cannot be only numbers
-    if (!more_than_numbers)
-        return {to, SUFFIX_UNLIKELY};
-    // must have multiple pieces (e.g. example.com) to be recognized in chat messages
-    if (piece_count == 1)
-        return {to, SUFFIX_POSSIBLE_WEBSITE};
-    // check TLD
-    if (!is_known_tld(str, piece_start, host_to))
-        return {to, SUFFIX_POSSIBLE_WEBSITE};
-    // unknown TLDs are still accepted as "possible" so they'll get recognized in an address input field
-    // but NOT in chat messages. remember that TLDs such as "local" are NOT in the IANA list
-
-    // check if userinfo was specified, return at most SUFFIX_POSSIBLE_WEBSITE for security
-    if (host_from > authority_from)
-        return {to, SUFFIX_POSSIBLE_WEBSITE};
-
-    return {to, SUFFIX_LIKELY_WEBSITE};
+    return {pos, true};
 }
 
 parser_ret parser::parse_relative_ref(const std::string& str, size_t from, size_t to) {
@@ -608,6 +539,97 @@ parser_ret parser::parse_relative_ref(const std::string& str, size_t from, size_
     // no full matches
     clear_uri();
     return {best_progress, false};
+}
+
+web_url_ret parser::is_web_url(const std::string& str) {
+    return is_web_url(str, 0, str.length());
+}
+
+web_url_ret parser::is_web_url(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    bool type = true;
+
+    // try to parse a full URL first
+    if (parse_uri(str, from, to).second) {
+        // make sure the scheme is http(s)
+        std::string scheme = scheme_str(str);
+        for (size_t i = 0; i < scheme.length(); i++)
+            if ('A' <= scheme[i] && scheme[i] <= 'Z')
+                scheme[i] += 'a' - 'A';
+        if (scheme == "http" || scheme == "https")
+            type = false;
+    }
+
+    // if that fails, try to parse a suffix
+    if (type)
+        if (!parse_uri_suffix(str, from, to).second)
+            return {WEB_URL_ERROR, false};
+
+    // determine how likely this is an intentional URI, specifically a web URL
+    // empty authority or host
+    if (authority_to == authority_from || host_type == HOST_EMPTY)
+        return {WEB_URL_UNLIKELY, type};
+
+    // if a port was specified, it must be within the valid port range (also port 0 and 1 are unsafe)
+    if (host_to != authority_to) {
+        size_t port_len = port_to - port_from;
+        if (!(!type && port_len == 0)) {    // ignore empty port for full URLs
+            if (port_len < 1 || port_len > 5)
+                return {WEB_URL_UNLIKELY, type};
+            int n = std::stoi(port_str(str));
+            if (n <= 1 || n >= 65536)
+                return {WEB_URL_UNLIKELY, type};
+        }
+    }
+
+    // IP addresses only recognized as possible, so they don't get picked up from chat messages
+    if (host_type != HOST_REGNAME)
+        return {WEB_URL_POSSIBLE, type};
+
+    // scan host pieces
+    size_t piece_start = host_from;
+    size_t piece_count = 1;
+    bool more_than_numbers = false;
+    for (size_t i = host_from; i < host_to; i++) {
+        char c = str[i];
+
+        if (c == '.') {
+            if (i == piece_start)   // empty segment in host (e.g. "example..com")
+                return {WEB_URL_UNLIKELY, type};
+
+            piece_start = i+1;
+            piece_count++;
+            more_than_numbers = false;
+        } else if (!(is_alpha(c) || is_digit(c) || c == '-')) {
+            // invalid character
+            return {WEB_URL_UNLIKELY, type};
+        } else if (!is_digit(c)) {
+            // current segment isn't only numbers
+            more_than_numbers = true;
+        }
+    }
+
+    // check if host ends with empty segment
+    // NOTE: extra dots at the end must be removed by the caller
+    if (piece_start == host_to)
+        return {WEB_URL_UNLIKELY, type};
+    // TLD cannot be only numbers
+    if (!more_than_numbers)
+        return {WEB_URL_UNLIKELY, type};
+    // must have multiple pieces (e.g. example.com) to be recognized in chat messages
+    if (piece_count == 1)
+        return {WEB_URL_POSSIBLE, type};
+    // check TLD
+    if (!is_known_tld(str, piece_start, host_to))
+        return {WEB_URL_POSSIBLE, type};
+    // unknown TLDs are still accepted as "possible" so they'll get recognized in an address input field
+    // but NOT in chat messages. remember that TLDs such as "local" are NOT in the IANA list
+
+    // check if userinfo was specified, return at most SUFFIX_POSSIBLE_WEBSITE for security
+    if (host_from > authority_from)
+        return {WEB_URL_POSSIBLE, type};
+
+    return {WEB_URL_LIKELY, type};
 }
 
 parser_ret parse_scheme(const std::string& str, size_t from, size_t to) {
