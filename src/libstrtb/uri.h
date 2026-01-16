@@ -37,8 +37,7 @@ inline bool is_pchar(char c, bool nc = false) {
 
 typedef enum {HOST_EMPTY, HOST_REGNAME, HOST_IPV4, HOST_IPV6, HOST_IPVFUTURE} host_type_enum;
 // NOTE: file paths are absolute, and for Windows it's with forward slashes
-typedef enum {SUFFIX_ERROR, SUFFIX_UNLIKELY, SUFFIX_POSSIBLE_FILE_UNIX, SUFFIX_POSSIBLE_FILE_WINDOWS,
-              SUFFIX_POSSIBLE_WEBSITE, SUFFIX_LIKELY_WEBSITE} suffix_confidence;
+typedef enum {SUFFIX_ERROR, SUFFIX_UNLIKELY, SUFFIX_POSSIBLE_WEBSITE, SUFFIX_LIKELY_WEBSITE} suffix_confidence;
 typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is valid
 typedef std::pair<size_t, suffix_confidence> parser_ret_suffix;
 

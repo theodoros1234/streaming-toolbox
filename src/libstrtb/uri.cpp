@@ -438,22 +438,9 @@ parser_ret_suffix parser::parse_uri_suffix(const std::string& str, size_t from, 
         return {pos, SUFFIX_ERROR};
     }
 
-    // determine how likely this is an intentional URI
-    // empty authority
-    if (authority_to == authority_from) {
-        if (path_from < path_to && str[path_from] == '/')   // str could be a regular file path
-            return {to, SUFFIX_POSSIBLE_FILE_UNIX};
-        else
-            return {to, SUFFIX_UNLIKELY};
-    }
-
-    // possible windows file path, drive letter could've been mistakenly recognized as an authority
-    if (authority_to - authority_from == 2 &&
-        is_alpha(str[authority_from]) && str[authority_from + 1] == ':')
-        return {to, SUFFIX_POSSIBLE_FILE_WINDOWS};
-
-    // empty host is probably a mistake
-    if (host_type == HOST_EMPTY)
+    // determine how likely this is an intentional URI, specifically a web URL
+    // empty authority or host
+    if (authority_to == authority_from || host_type == HOST_EMPTY)
         return {to, SUFFIX_UNLIKELY};
 
     // if a port was specified, it must be within the valid port range (also port 0 and 1 are unsafe)
