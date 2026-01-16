@@ -442,7 +442,7 @@ parser_ret_suffix parser::parse_uri_suffix(const std::string& str, size_t from, 
     // empty authority
     if (authority_to == authority_from) {
         if (path_from < path_to && str[path_from] == '/')   // str could be a regular file path
-            return {to, SUFFIX_POSSIBLE_FILE};
+            return {to, SUFFIX_POSSIBLE_FILE_UNIX};
         else
             return {to, SUFFIX_UNLIKELY};
     }
@@ -450,11 +450,21 @@ parser_ret_suffix parser::parse_uri_suffix(const std::string& str, size_t from, 
     // possible windows file path, drive letter could've been mistakenly recognized as an authority
     if (authority_to - authority_from == 2 &&
         is_alpha(str[authority_from]) && str[authority_from + 1] == ':')
-        return {to, SUFFIX_POSSIBLE_FILE};
+        return {to, SUFFIX_POSSIBLE_FILE_WINDOWS};
 
     // empty host is probably a mistake
     if (host_type == HOST_EMPTY)
         return {to, SUFFIX_UNLIKELY};
+
+    // if a port was specified, it must be within the valid port range (also port 0 and 1 are unsafe)
+    if (host_to != authority_to) {
+        size_t port_len = port_to - port_from;
+        if (port_len < 1 || port_len > 5)
+            return {to, SUFFIX_UNLIKELY};
+        int n = std::stoi(str.substr(port_from, port_len));
+        if (n <= 1 || n >= 65536)
+            return {to, SUFFIX_UNLIKELY};
+    }
 
     // IP addresses only recognized as possible, so they don't get picked up from chat messages
     if (host_type != HOST_REGNAME)
@@ -462,6 +472,8 @@ parser_ret_suffix parser::parse_uri_suffix(const std::string& str, size_t from, 
 
     // scan host pieces
     size_t piece_start = host_from;
+    size_t piece_count = 1;
+    bool more_than_numbers = false;
     for (size_t i = host_from; i < host_to; i++) {
         char c = str[i];
 
@@ -470,9 +482,14 @@ parser_ret_suffix parser::parse_uri_suffix(const std::string& str, size_t from, 
                 return {to, SUFFIX_UNLIKELY};
 
             piece_start = i+1;
+            piece_count++;
+            more_than_numbers = false;
         } else if (!(is_alpha(c) || is_digit(c) || c == '-')) {
             // invalid character
             return {to, SUFFIX_UNLIKELY};
+        } else if (!is_digit(c)) {
+            // current segment isn't only numbers
+            more_than_numbers = true;
         }
     }
 
@@ -480,14 +497,22 @@ parser_ret_suffix parser::parse_uri_suffix(const std::string& str, size_t from, 
     // NOTE: extra dots at the end must be removed by the caller
     if (piece_start == host_to)
         return {to, SUFFIX_UNLIKELY};
-    // TODO: check if TLD is valid, combine with existence of path if TLD is invalid for SUFFIX_POSSIBLE_WEBSITE
-
-    // userinfo
-    if (userinfo_to != 0)
+    // TLD cannot be only numbers
+    if (!more_than_numbers)
+        return {to, SUFFIX_UNLIKELY};
+    // must have multiple pieces (e.g. example.com) to be recognized in chat messages
+    if (piece_count == 1)
         return {to, SUFFIX_POSSIBLE_WEBSITE};
-    // TODO: combine userinfo with host heuristics, but return AT MOST SUFFIX_POSSIBLE_WEBSITE FOR SECURITY
+    // check TLD
+    if (!is_known_tld(str, piece_start, host_to))
+        return {to, SUFFIX_POSSIBLE_WEBSITE};
+    // unknown TLDs are still accepted as "possible" so they'll get recognized in an address input field
+    // but NOT in chat messages. remember that TLDs such as "local" are NOT in the IANA list
 
-    // TODO: think about this again after host heuristics are implemented
+    // check if userinfo was specified, return at most SUFFIX_POSSIBLE_WEBSITE for security
+    if (host_from > authority_from)
+        return {to, SUFFIX_POSSIBLE_WEBSITE};
+
     return {to, SUFFIX_LIKELY_WEBSITE};
 }
 
