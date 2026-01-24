@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 #include <string>
+#include <vector>
 
 // RFC Specification: https://datatracker.ietf.org/doc/html/rfc3986
 
@@ -43,7 +44,11 @@ typedef enum {
     WEB_URL_LIKELY      // can be accepted in chat messages and other viewer-generated text
 } web_url_confidence;
 typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is valid
-typedef std::pair<web_url_confidence, bool> web_url_ret;    // .second = true if suffix, false if full URL
+typedef struct {
+    web_url_confidence confidence;
+    bool is_suffix;
+    size_t retry_upto;  // ONLY use for finding links in chat messages (and similar)
+} web_url_ret;
 
 class parser {
 public:
@@ -111,6 +116,15 @@ std::pair<std::string, ssize_t> percent_decode(const std::string& str);     // l
 std::string percent_encode(const std::string& str, size_t from, size_t to);
 std::string percent_encode_limited(const std::string& str, size_t from, size_t to);
 std::pair<std::string, ssize_t> percent_decode(const std::string& str, size_t from, size_t to);
+
+typedef struct {
+    size_t from;
+    size_t to;
+    bool is_suffix;
+} link_match;
+std::vector<link_match> find_links_in_message(const std::string& str);
+std::vector<link_match> find_links_in_message(const std::string& str, size_t from, size_t to);
+std::vector<link_match> find_links_in_message(const char* str, size_t from, size_t to);
 
 extern const char known_tlds_default[];
 extern const size_t known_tlds_default_length;

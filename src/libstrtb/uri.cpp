@@ -617,9 +617,11 @@ web_url_ret parser::is_web_url(const std::string& str, size_t from, size_t to) {
 
 web_url_ret parser::is_web_url(const char *str, size_t from, size_t to) {
     bool type = true;
+    size_t fail_pos_full = 0;
 
     // try to parse a full URL first
-    if (parse_uri(str, from, to).second) {
+    auto ret = parse_uri(str, from, to);
+    if (ret.second) {
         // make sure the scheme is http(s)
         std::string scheme = scheme_str(str);
         for (size_t i = 0; i < scheme.length(); i++)
@@ -627,17 +629,21 @@ web_url_ret parser::is_web_url(const char *str, size_t from, size_t to) {
                 scheme[i] += 'a' - 'A';
         if (scheme == "http" || scheme == "https")
             type = false;
+    } else {
+        fail_pos_full = ret.first;
     }
 
     // if that fails, try to parse a suffix
-    if (type)
-        if (!parse_uri_suffix(str, from, to).second)
-            return {WEB_URL_ERROR, false};
+    if (type) {
+        ret = parse_uri_suffix(str, from, to);
+        if (!ret.second)
+            return {WEB_URL_ERROR, false, std::max(fail_pos_full, ret.first)};
+    }
 
     // determine how likely this is an intentional URI, specifically a web URL
     // empty authority or host
     if (authority_to == authority_from || host_type == HOST_EMPTY)
-        return {WEB_URL_UNLIKELY, type};
+        return {WEB_URL_UNLIKELY, type, from};
 
     // if a port was specified, it must be within the valid port range (also port 0 and 1 are unsafe)
     if (host_to != authority_to) {
@@ -645,13 +651,13 @@ web_url_ret parser::is_web_url(const char *str, size_t from, size_t to) {
         if (!(!type && port_len == 0)) {    // ignore empty port for full URLs
             int n = port_uint16(str);
             if (n <= 1 || n >= 65536)
-                return {WEB_URL_UNLIKELY, type};
+                return {WEB_URL_UNLIKELY, type, host_to};
         }
     }
 
     // IP addresses only recognized as possible, so they don't get picked up from chat messages
     if (host_type != HOST_REGNAME)
-        return {WEB_URL_POSSIBLE, type};
+        return {WEB_URL_POSSIBLE, type, to};
 
     // scan host pieces
     size_t piece_start = host_from;
@@ -662,14 +668,14 @@ web_url_ret parser::is_web_url(const char *str, size_t from, size_t to) {
 
         if (c == '.') {
             if (i == piece_start)   // empty segment in host (e.g. "example..com")
-                return {WEB_URL_UNLIKELY, type};
+                return {WEB_URL_UNLIKELY, type, std::max(from, i-1)};
 
             piece_start = i+1;
             piece_count++;
             more_than_numbers = false;
         } else if (!(is_alpha(c) || is_digit(c) || c == '-')) {
             // invalid character
-            return {WEB_URL_UNLIKELY, type};
+            return {WEB_URL_UNLIKELY, type, i};
         } else if (!is_digit(c)) {
             // current segment isn't only numbers
             more_than_numbers = true;
@@ -677,26 +683,26 @@ web_url_ret parser::is_web_url(const char *str, size_t from, size_t to) {
     }
 
     // check if host ends with empty segment
-    // NOTE: extra dots at the end must be removed by the caller
+    // NOTE: extra dots at the end must be removed by the caller (can use retry_upto return info to do this)
     if (piece_start == host_to)
-        return {WEB_URL_UNLIKELY, type};
+        return {WEB_URL_UNLIKELY, type, std::max(from, piece_start-1)};
     // TLD cannot be only numbers
     if (!more_than_numbers)
-        return {WEB_URL_UNLIKELY, type};
+        return {WEB_URL_UNLIKELY, type, std::max(from, piece_start-1)};
     // must have multiple pieces (e.g. example.com) to be recognized in chat messages
     if (piece_count == 1)
-        return {WEB_URL_POSSIBLE, type};
+        return {WEB_URL_POSSIBLE, type, to};
     // check TLD
     if (!is_known_tld(str, piece_start, host_to))
-        return {WEB_URL_POSSIBLE, type};
+        return {WEB_URL_POSSIBLE, type, to};
     // unknown TLDs are still accepted as "possible" so they'll get recognized in an address input field
     // but NOT in chat messages. remember that TLDs such as "local" are NOT in the IANA list
 
     // check if userinfo was specified, return at most SUFFIX_POSSIBLE_WEBSITE for security
     if (host_from > authority_from)
-        return {WEB_URL_POSSIBLE, type};
+        return {WEB_URL_POSSIBLE, type, to};
 
-    return {WEB_URL_LIKELY, type};
+    return {WEB_URL_LIKELY, type, to};
 }
 
 parser_ret parse_scheme(const char *str, size_t from, size_t to) {
@@ -1249,9 +1255,50 @@ bool strtb::uri::is_known_tld(const char* str, size_t from, size_t to) {
 }
 
 bool strtb::uri::is_known_tld(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
     return is_known_tld(str.data(), from, to);
 }
 
 bool strtb::uri::is_known_tld(const std::string& str) {
     return is_known_tld(str.data(), 0, str.length());
+}
+
+std::vector<link_match> strtb::uri::find_links_in_message(const std::string& str) {
+    return find_links_in_message(str.data(), 0, str.length());
+}
+
+std::vector<link_match> strtb::uri::find_links_in_message(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return find_links_in_message(str.data(), from, to);
+}
+
+std::vector<link_match> strtb::uri::find_links_in_message(const char* str, size_t from, size_t to) {
+    size_t i = from, i_next = from;
+    std::vector<link_match> results;
+
+    while (i < to) {
+        // find next space or end
+        for (i_next = i; i_next < to && str[i_next] != ' '; i_next++);
+
+        // check if word is a link
+        if (i < i_next) {
+            size_t upto = i_next;
+            parser p;
+            web_url_ret ret;
+            do {
+                ret = p.is_web_url(str, i, upto);
+                if (ret.retry_upto == i || ret.retry_upto >= upto)
+                    break;
+                // retry ignoring some characters from the end that could've caused issues
+                upto = ret.retry_upto;
+            } while (ret.confidence <= WEB_URL_UNLIKELY);
+
+            if (ret.confidence == WEB_URL_LIKELY)
+                results.push_back({i, upto, ret.is_suffix});
+        }
+
+        i = i_next + 1;
+    }
+
+    return results;
 }
