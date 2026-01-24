@@ -117,6 +117,10 @@ std::string percent_encode(const std::string& str, size_t from, size_t to);
 std::string percent_encode_limited(const std::string& str, size_t from, size_t to);
 std::pair<std::string, ssize_t> percent_decode(const std::string& str, size_t from, size_t to);
 
+std::string percent_encode(const char* str, size_t from, size_t to);
+std::string percent_encode_limited(const char* str, size_t from, size_t to);
+std::pair<std::string, ssize_t> percent_decode(const char* str, size_t from, size_t to);
+
 typedef struct {
     size_t from;
     size_t to;

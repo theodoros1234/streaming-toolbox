@@ -43,23 +43,37 @@ static std::string char_substr(const char* str, size_t from, size_t len) {
 // NOTE: percent encode/decode doesn't check for invalid UTF-8 sequences
 
 std::string strtb::uri::percent_encode(const std::string& str) {
-    return percent_encode(str, 0, str.length());
+    return percent_encode(str.data(), 0, str.length());
 }
 
 std::string strtb::uri::percent_encode_limited(const std::string& str) {
-    return percent_encode_limited(str, 0, str.length());
+    return percent_encode_limited(str.data(), 0, str.length());
 }
 
 std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& str) {
-    return percent_decode(str, 0, str.length());
+    return percent_decode(str.data(), 0, str.length());
 }
 
 std::string strtb::uri::percent_encode(const std::string& str, size_t from, size_t to) {
     verify_range(str, from, to);
+    return percent_encode(str.data(), from, to);
+}
+
+std::string strtb::uri::percent_encode_limited(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return percent_encode_limited(str.data(), from, to);
+}
+
+std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return percent_decode(str.data(), from, to);
+}
+
+std::string strtb::uri::percent_encode(const char *str, size_t from, size_t to) {
     std::string encoded;
-    encoded.reserve(str.size() + str.size()/2);
-    for (auto i = str.begin() + from; i < str.begin() + to; i++) {
-        char c = *i;
+    encoded.reserve(((to - from) * 3) / 2);
+    for (size_t i=from; i<to; i++) {
+        char c = str[i];
         // unreserved characters: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
         if (is_unreserved(c)) {
             encoded.push_back(c);
@@ -73,13 +87,12 @@ std::string strtb::uri::percent_encode(const std::string& str, size_t from, size
     return encoded;
 }
 
-std::string strtb::uri::percent_encode_limited(const std::string& str, size_t from, size_t to) {
-    verify_range(str, from, to);
+std::string strtb::uri::percent_encode_limited(const char* str, size_t from, size_t to) {
     // useful for encoding user-input URIs that may have special characters, without breaking the rest of the URI
     std::string encoded;
-    encoded.reserve(str.size() + str.size()/2);
-    for (auto i = str.begin() + from; i < str.begin() + to; i++) {
-        char c = *i;
+    encoded.reserve(((to - from) * 3) / 2);
+    for (size_t i=from; i<to; i++) {
+        char c = str[i];
         // reserved characters: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
         // unreserved characters: https://datatracker.ietf.org/doc/html/rfc3986#section-2.3
         if (is_unreserved(c) || is_gen_delim(c) || is_sub_delim(c) || c == '%') {
@@ -94,8 +107,7 @@ std::string strtb::uri::percent_encode_limited(const std::string& str, size_t fr
     return encoded;
 }
 
-std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& str, size_t from, size_t to) {
-    verify_range(str, from, to);
+std::pair<std::string, ssize_t> strtb::uri::percent_decode(const char *str, size_t from, size_t to) {
     std::string decoded;
     decoded.reserve(to - from);
     for (size_t i=from; i<to; i++) {
@@ -103,7 +115,7 @@ std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& st
         if (c == '%') {
             // decode percentage encoded char
             if (i+2 >= to)
-                return {"incomplete escape code", str.size()};
+                return {"incomplete escape code", to};
             unsigned char h1 = from_hex(str[i+1]);
             unsigned char h2 = from_hex(str[i+2]);
             if (h1 == 255)
@@ -117,8 +129,6 @@ std::pair<std::string, ssize_t> strtb::uri::percent_decode(const std::string& st
             decoded.push_back(c);
         }
     }
-    if (decoded.size() <= to - from)
-        decoded.shrink_to_fit();
     // .second == -1 means no error, != -1 means error at that pos
     return {std::move(decoded), -1};
 }
