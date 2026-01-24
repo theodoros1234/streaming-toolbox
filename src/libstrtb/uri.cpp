@@ -1,4 +1,5 @@
 #include "uri.h"
+#include <cstring>
 #include <stdexcept>
 #include <cassert>
 #include <cstdint>
@@ -31,6 +32,12 @@ static inline void verify_range(const std::string& str, size_t from, size_t to) 
         throw std::out_of_range("'to' is out of range");
     if (from > to)
         throw std::out_of_range("'from' is bigger than 'to'");
+}
+
+static std::string char_substr(const char* str, size_t from, size_t len) {
+    std::string result(len, ' ');
+    std::memcpy(result.data(), str + from, len);
+    return result;
 }
 
 // NOTE: percent encode/decode doesn't check for invalid UTF-8 sequences
@@ -137,15 +144,7 @@ void parser::clear_host() {
 }
 
 std::string parser::scheme_str(const std::string& str, bool fix_case) const {
-    if (fix_case) {
-        std::string new_str = str.substr(scheme_from, scheme_to - scheme_from);
-        for (auto& c : new_str) // to lowercase, as the RFC recommends
-            if ('A' <= c && c <= 'Z')
-                c += 32;
-        return new_str;
-    } else {
-        return str.substr(scheme_from, scheme_to - scheme_from);
-    }
+    return scheme_str(str.data(), fix_case);
 }
 
 std::string parser::authority_str(const std::string& str) const {
@@ -157,8 +156,52 @@ std::string parser::userinfo_str(const std::string& str) const {
 }
 
 std::string parser::host_str(const std::string& str, bool fix_case) const {
+    return host_str(str.data(), fix_case);
+}
+
+std::string parser::port_str(const std::string& str) const {
+    return str.substr(port_from, port_to - port_from);
+}
+
+int parser::port_uint16(const std::string& str) const {
+    return port_uint16(str.data());
+}
+
+std::string parser::path_str(const std::string& str) const {
+    return str.substr(path_from, path_to - path_from);
+}
+
+std::string parser::query_str(const std::string& str) const {
+    return str.substr(query_from, query_to - query_from);
+}
+
+std::string parser::fragment_str(const std::string& str) const {
+    return str.substr(fragment_from, fragment_to - fragment_from);
+}
+
+std::string parser::scheme_str(const char* str, bool fix_case) const {
     if (fix_case) {
-        std::string new_str = str.substr(host_from, host_to - host_from);
+        std::string new_str = char_substr(str, scheme_from, scheme_to - scheme_from);
+        for (auto& c : new_str) // to lowercase, as the RFC recommends
+            if ('A' <= c && c <= 'Z')
+                c += 32;
+        return new_str;
+    } else {
+        return char_substr(str, scheme_from, scheme_to - scheme_from);
+    }
+}
+
+std::string parser::authority_str(const char* str) const {
+    return char_substr(str, authority_from, authority_to - authority_from);
+}
+
+std::string parser::userinfo_str(const char* str) const {
+    return char_substr(str, userinfo_from, userinfo_to - userinfo_from);
+}
+
+std::string parser::host_str(const char* str, bool fix_case) const {
+    if (fix_case) {
+        std::string new_str = char_substr(str, host_from, host_to - host_from);
 
         // to lowercase, except for percent-escaped characters, as the RFC recommends
         unsigned int pct_encode_remaining = 0;
@@ -179,15 +222,15 @@ std::string parser::host_str(const std::string& str, bool fix_case) const {
 
         return new_str;
     } else {
-        return str.substr(host_from, host_to - host_from);
+        return char_substr(str, host_from, host_to - host_from);
     }
 }
 
-std::string parser::port_str(const std::string& str) const {
-    return str.substr(port_from, port_to - port_from);
+std::string parser::port_str(const char* str) const {
+    return char_substr(str, port_from, port_to - port_from);
 }
 
-int parser::port_uint16(const std::string& str) const {
+int parser::port_uint16(const char* str) const {
     if (port_to == port_from)
         return -1;  // no port specified
 
@@ -206,61 +249,85 @@ int parser::port_uint16(const std::string& str) const {
         return (uint16_t) x;    // good
 }
 
-std::string parser::path_str(const std::string& str) const {
-    return str.substr(path_from, path_to - path_from);
+std::string parser::path_str(const char* str) const {
+    return char_substr(str, path_from, path_to - path_from);
 }
 
-std::string parser::query_str(const std::string& str) const {
-    return str.substr(query_from, query_to - query_from);
+std::string parser::query_str(const char* str) const {
+    return char_substr(str, query_from, query_to - query_from);
 }
 
-std::string parser::fragment_str(const std::string& str) const {
-    return str.substr(fragment_from, fragment_to - fragment_from);
+std::string parser::fragment_str(const char* str) const {
+    return char_substr(str, fragment_from, fragment_to - fragment_from);
 }
 
 // NOTE: parser functions will accept invalid percent-encoded parts, percent_decode will catch these errors
 
-static parser_ret parse_scheme(const std::string& str, size_t from, size_t to);
-static parser_ret parse_userinfo(const std::string& str, size_t from, size_t to);
-static parser_ret parse_port(const std::string& str, size_t from, size_t to);
-static parser_ret parse_path_abempty(const std::string& str, size_t from, size_t to);
-static parser_ret parse_path_absolute(const std::string& str, size_t from, size_t to);
-static parser_ret parse_path_noscheme(const std::string& str, size_t from, size_t to);
-static parser_ret parse_path_rootless(const std::string& str, size_t from, size_t to);
-static parser_ret parse_path_segment(const std::string& str, size_t from, size_t to, bool nz = false, bool nc = false);
-static parser_ret parse_query(const std::string& str, size_t from, size_t to);
-static parser_ret parse_fragment(const std::string& str, size_t from, size_t to);
-static parser_ret parse_host_ipv6(const std::string& str, size_t from, size_t to);
-static parser_ret parse_h16_multi(const std::string& str, size_t from, size_t to, size_t min, size_t max);
-static parser_ret parse_h16(const std::string& str, size_t from, size_t to);
-static parser_ret parse_ls32(const std::string& str, size_t from, size_t to);
-static parser_ret parse_host_ipvfuture(const std::string& str, size_t from, size_t to);
-static parser_ret parse_host_ipv4(const std::string& str, size_t from, size_t to);
-static parser_ret parse_dec_octet(const std::string& str, size_t from, size_t to);
-static parser_ret parse_host_regname(const std::string& str, size_t from, size_t to);
+static parser_ret parse_scheme(const char* str, size_t from, size_t to);
+static parser_ret parse_userinfo(const char* str, size_t from, size_t to);
+static parser_ret parse_port(const char* str, size_t from, size_t to);
+static parser_ret parse_path_abempty(const char* str, size_t from, size_t to);
+static parser_ret parse_path_absolute(const char* str, size_t from, size_t to);
+static parser_ret parse_path_noscheme(const char* str, size_t from, size_t to);
+static parser_ret parse_path_rootless(const char* str, size_t from, size_t to);
+static parser_ret parse_path_segment(const char* str, size_t from, size_t to, bool nz = false, bool nc = false);
+static parser_ret parse_query(const char* str, size_t from, size_t to);
+static parser_ret parse_fragment(const char* str, size_t from, size_t to);
+static parser_ret parse_host_ipv6(const char* str, size_t from, size_t to);
+static parser_ret parse_h16_multi(const char* str, size_t from, size_t to, size_t min, size_t max);
+static parser_ret parse_h16(const char* str, size_t from, size_t to);
+static parser_ret parse_ls32(const char* str, size_t from, size_t to);
+static parser_ret parse_host_ipvfuture(const char* str, size_t from, size_t to);
+static parser_ret parse_host_ipv4(const char* str, size_t from, size_t to);
+static parser_ret parse_dec_octet(const char* str, size_t from, size_t to);
+static parser_ret parse_host_regname(const char* str, size_t from, size_t to);
 
 parser_ret parser::parse_uri(const std::string& str) {
-    return parse_uri(str, 0, str.length());
+    return parse_uri(str.data(), 0, str.length());
 }
 
 parser_ret parser::parse_uri_suffix(const std::string& str) {
-    return parse_uri_suffix(str, 0, str.length());
+    return parse_uri_suffix(str.data(), 0, str.length());
 }
 
 parser_ret parser::parse_relative_ref(const std::string& str) {
-    return parse_relative_ref(str, 0, str.length());
+    return parse_relative_ref(str.data(), 0, str.length());
 }
 
 parser_ret parser::parse_authority(const std::string& str) {
-    return parse_authority(str, 0, str.length());
+    return parse_authority(str.data(), 0, str.length());
 }
 
 parser_ret parser::parse_host(const std::string& str) {
-    return parse_host(str, 0, str.length());
+    return parse_host(str.data(), 0, str.length());
 }
 
 parser_ret parser::parse_uri(const std::string& str, size_t from, size_t to) {
     verify_range(str, from, to);
+    return parse_uri(str.data(), from, to);
+}
+
+parser_ret parser::parse_uri_suffix(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_uri_suffix(str.data(), from, to);
+}
+
+parser_ret parser::parse_relative_ref(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_relative_ref(str.data(), from, to);
+}
+
+parser_ret parser::parse_authority(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_authority(str.data(), from, to);
+}
+
+parser_ret parser::parse_host(const std::string& str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_host(str.data(), from, to);
+}
+
+parser_ret parser::parse_uri(const char *str, size_t from, size_t to) {
     clear_uri();
 
     // scheme
@@ -391,8 +458,7 @@ parser_ret parser::parse_uri(const std::string& str, size_t from, size_t to) {
  *
  * Read more: https://datatracker.ietf.org/doc/html/rfc3986#section-4.5
  */
-parser_ret parser::parse_uri_suffix(const std::string& str, size_t from, size_t to) {
-    verify_range(str, from, to);
+parser_ret parser::parse_uri_suffix(const char *str, size_t from, size_t to) {
     clear_uri();
 
     parser_ret ret;
@@ -434,8 +500,7 @@ parser_ret parser::parse_uri_suffix(const std::string& str, size_t from, size_t 
     return {pos, true};
 }
 
-parser_ret parser::parse_relative_ref(const std::string& str, size_t from, size_t to) {
-    verify_range(str, from, to);
+parser_ret parser::parse_relative_ref(const char *str, size_t from, size_t to) {
     clear_uri();
 
     // relative-part (all variations and things after it)
@@ -542,11 +607,15 @@ parser_ret parser::parse_relative_ref(const std::string& str, size_t from, size_
 }
 
 web_url_ret parser::is_web_url(const std::string& str) {
-    return is_web_url(str, 0, str.length());
+    return is_web_url(str.data(), 0, str.length());
 }
 
 web_url_ret parser::is_web_url(const std::string& str, size_t from, size_t to) {
     verify_range(str, from, to);
+    return is_web_url(str.data(), from, to);
+}
+
+web_url_ret parser::is_web_url(const char *str, size_t from, size_t to) {
     bool type = true;
 
     // try to parse a full URL first
@@ -574,9 +643,7 @@ web_url_ret parser::is_web_url(const std::string& str, size_t from, size_t to) {
     if (host_to != authority_to) {
         size_t port_len = port_to - port_from;
         if (!(!type && port_len == 0)) {    // ignore empty port for full URLs
-            if (port_len < 1 || port_len > 5)
-                return {WEB_URL_UNLIKELY, type};
-            int n = std::stoi(port_str(str));
+            int n = port_uint16(str);
             if (n <= 1 || n >= 65536)
                 return {WEB_URL_UNLIKELY, type};
         }
@@ -632,7 +699,7 @@ web_url_ret parser::is_web_url(const std::string& str, size_t from, size_t to) {
     return {WEB_URL_LIKELY, type};
 }
 
-parser_ret parse_scheme(const std::string& str, size_t from, size_t to) {
+parser_ret parse_scheme(const char *str, size_t from, size_t to) {
     if (from >= to || !is_alpha(str[from]))     // first char alpha
         return {from, false};
 
@@ -646,8 +713,7 @@ parser_ret parse_scheme(const std::string& str, size_t from, size_t to) {
     return {pos, true};
 }
 
-parser_ret parser::parse_authority(const std::string& str, size_t from, size_t to) {
-    verify_range(str, from, to);
+parser_ret parser::parse_authority(const char *str, size_t from, size_t to) {
     clear_authority();
     size_t pos = from;
 
@@ -680,7 +746,7 @@ parser_ret parser::parse_authority(const std::string& str, size_t from, size_t t
     return {pos, true};
 }
 
-parser_ret parse_userinfo(const std::string& str, size_t from, size_t to) {
+parser_ret parse_userinfo(const char *str, size_t from, size_t to) {
     size_t pos;
     for (pos=from; pos<to; pos++) {
         char c = str[pos];
@@ -691,12 +757,11 @@ parser_ret parse_userinfo(const std::string& str, size_t from, size_t to) {
     return {pos, true};
 }
 
-parser_ret parser::parse_host(const std::string& str, size_t from, size_t to) {
-    verify_range(str, from, to);
+parser_ret parser::parse_host(const char *str, size_t from, size_t to) {
     clear_host();
 
     // array with function ptrs for all the possible host types
-    parser_ret (*ptrs[4])(const std::string&, size_t, size_t) = {
+    parser_ret (*ptrs[4])(const char*, size_t, size_t) = {
         &parse_host_ipvfuture, &parse_host_ipv6, &parse_host_ipv4, &parse_host_regname
     };
     host_type_enum types[4] = {HOST_IPVFUTURE, HOST_IPV6, HOST_IPV4, HOST_REGNAME};
@@ -728,7 +793,7 @@ parser_ret parser::parse_host(const std::string& str, size_t from, size_t to) {
     return {best_progress, false};
 }
 
-static parser_ret parse_host_ipv6(const std::string& str, size_t from, size_t to) {
+static parser_ret parse_host_ipv6(const char *str, size_t from, size_t to) {
     // starts with [
     if (from >= to || str[from] != '[')
         return {from, false};
@@ -809,7 +874,7 @@ static parser_ret parse_host_ipv6(const std::string& str, size_t from, size_t to
 }
 
 // get multiple pieces of h16: (with the colon) for IPv6
-static parser_ret parse_h16_multi(const std::string& str, size_t from, size_t to, size_t min, size_t max) {
+static parser_ret parse_h16_multi(const char *str, size_t from, size_t to, size_t min, size_t max) {
     assert(min <= max);
     size_t pos = from;
     for (size_t i=0; i<max; i++) {
@@ -832,7 +897,7 @@ static parser_ret parse_h16_multi(const std::string& str, size_t from, size_t to
 }
 
 // get 4 hex chars (16 bits of data) for IPv6
-static parser_ret parse_h16(const std::string& str, size_t from, size_t to) {
+static parser_ret parse_h16(const char *str, size_t from, size_t to) {
     // 1 to 4 chars allowed
     if (to - from < 1)
         return {to, false};
@@ -853,7 +918,7 @@ static parser_ret parse_h16(const std::string& str, size_t from, size_t to) {
 }
 
 // get 32 bits of data for IPv6 ending (either 8 hex chars and a : or an IPv4 address)
-static parser_ret parse_ls32(const std::string& str, size_t from, size_t to) {
+static parser_ret parse_ls32(const char *str, size_t from, size_t to) {
     // IPv6 can end with an IPv4 piece in some cases
     parser_ret ret = parse_host_ipv4(str, from, to);
     if (ret.second)
@@ -868,7 +933,7 @@ static parser_ret parse_ls32(const std::string& str, size_t from, size_t to) {
     return parse_h16(str, ret.first+1, to);     // second h16
 }
 
-static parser_ret parse_host_ipvfuture(const std::string& str, size_t from, size_t to) {
+static parser_ret parse_host_ipvfuture(const char *str, size_t from, size_t to) {
     // starts with [
     if (from >= to || str[from] != '[')
         return {from, false};
@@ -908,7 +973,7 @@ static parser_ret parse_host_ipvfuture(const std::string& str, size_t from, size
     return {pos, true};
 }
 
-static parser_ret parse_host_ipv4(const std::string& str, size_t from, size_t to) {
+static parser_ret parse_host_ipv4(const char *str, size_t from, size_t to) {
     // get four octets
     size_t pos = from;
     for (unsigned int i=0; i<4; i++) {
@@ -929,7 +994,7 @@ static parser_ret parse_host_ipv4(const std::string& str, size_t from, size_t to
     return {pos, true};
 }
 
-static parser_ret parse_dec_octet(const std::string& str, size_t from, size_t to) {
+static parser_ret parse_dec_octet(const char *str, size_t from, size_t to) {
     // 3 digits max
     if (to > from + 3)
         to = from + 3;
@@ -945,13 +1010,13 @@ static parser_ret parse_dec_octet(const std::string& str, size_t from, size_t to
         return {from, false};
 
     // max number is 255
-    if (std::stoi(str.substr(from, pos - from)) < 256)
+    if (std::stoi(char_substr(str, from, pos - from)) < 256)
         return {pos, true};
     else
         return {from, false};
 }
 
-static parser_ret parse_host_regname(const std::string& str, size_t from, size_t to) {
+static parser_ret parse_host_regname(const char *str, size_t from, size_t to) {
     for (size_t i=from; i<to; i++) {    // stop on first invalid character
         char c = str[i];
         if (!(is_unreserved(c) || c == '%' || is_sub_delim(c)))
@@ -961,7 +1026,7 @@ static parser_ret parse_host_regname(const std::string& str, size_t from, size_t
     return {to, true};
 }
 
-parser_ret parse_port(const std::string& str, size_t from, size_t to) {
+parser_ret parse_port(const char *str, size_t from, size_t to) {
     // just keep reading as long as there are digits
     size_t pos;
     for (pos=from; pos<to; pos++)
@@ -971,7 +1036,7 @@ parser_ret parse_port(const std::string& str, size_t from, size_t to) {
     return {pos, true};
 }
 
-static parser_ret parse_path_abempty(const std::string &str, size_t from, size_t to) {
+static parser_ret parse_path_abempty(const char *str, size_t from, size_t to) {
     // abempty = absolute or empty (kinda)
     size_t pos = from;
     while (pos < to) {
@@ -982,7 +1047,7 @@ static parser_ret parse_path_abempty(const std::string &str, size_t from, size_t
     return {pos, true};
 }
 
-static parser_ret parse_path_absolute(const std::string &str, size_t from, size_t to) {
+static parser_ret parse_path_absolute(const char *str, size_t from, size_t to) {
     // must start with /
     if (from >= to || str[from] != '/')
         return {from, false};
@@ -996,7 +1061,7 @@ static parser_ret parse_path_absolute(const std::string &str, size_t from, size_
     return parse_path_abempty(str, ret.first, to);
 }
 
-static parser_ret parse_path_noscheme(const std::string &str, size_t from, size_t to) {
+static parser_ret parse_path_noscheme(const char *str, size_t from, size_t to) {
     // first segment has no : and starts without / (segment-nz-nc)
     parser_ret ret = parse_path_segment(str, from, to, true, true);
     if (!ret.second)
@@ -1006,7 +1071,7 @@ static parser_ret parse_path_noscheme(const std::string &str, size_t from, size_
     return parse_path_abempty(str, ret.first, to);
 }
 
-static parser_ret parse_path_rootless(const std::string &str, size_t from, size_t to) {
+static parser_ret parse_path_rootless(const char *str, size_t from, size_t to) {
     // starts with segment-nz, without /
     parser_ret ret = parse_path_segment(str, from, to, true);
     if (!ret.second)
@@ -1016,7 +1081,7 @@ static parser_ret parse_path_rootless(const std::string &str, size_t from, size_
     return parse_path_abempty(str, ret.first, to);
 }
 
-static parser_ret parse_path_segment(const std::string &str, size_t from, size_t to, bool nz, bool nc) {
+static parser_ret parse_path_segment(const char *str, size_t from, size_t to, bool nz, bool nc) {
     // nz = non-zero size, nc = no colon (more info in RFC: segment, segment-nz, segment-nz-nc)
     size_t pos;
     for (pos = from; pos < to; pos++)
@@ -1027,7 +1092,7 @@ static parser_ret parse_path_segment(const std::string &str, size_t from, size_t
     return {pos, true};
 }
 
-static parser_ret parse_query(const std::string &str, size_t from, size_t to) {
+static parser_ret parse_query(const char *str, size_t from, size_t to) {
     // starts with ?
     if (from >= to || str[from] != '?')
         return {from, false};
@@ -1042,7 +1107,7 @@ static parser_ret parse_query(const std::string &str, size_t from, size_t to) {
     return {pos, true};
 }
 
-static parser_ret parse_fragment(const std::string &str, size_t from, size_t to) {
+static parser_ret parse_fragment(const char *str, size_t from, size_t to) {
     // starts with #
     if (from >= to || str[from] != '#')
         return {from, false};

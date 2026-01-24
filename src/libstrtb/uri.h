@@ -69,8 +69,15 @@ public:
     parser_ret parse_authority(const std::string& str, size_t from, size_t to);
     parser_ret parse_host(const std::string& str, size_t from, size_t to);
 
+    parser_ret parse_uri(const char* str, size_t from, size_t to);
+    parser_ret parse_uri_suffix(const char* str, size_t from, size_t to);
+    parser_ret parse_relative_ref(const char* str, size_t from, size_t to);
+    parser_ret parse_authority(const char* str, size_t from, size_t to);
+    parser_ret parse_host(const char* str, size_t from, size_t to);
+
     web_url_ret is_web_url(const std::string& str);
     web_url_ret is_web_url(const std::string& str, size_t from, size_t to);
+    web_url_ret is_web_url(const char* str, size_t from, size_t to);
 
     void clear_uri();
     void clear_authority();
@@ -85,6 +92,16 @@ public:
     std::string path_str(const std::string& str) const;
     std::string query_str(const std::string& str) const;
     std::string fragment_str(const std::string& str) const;
+
+    std::string scheme_str(const char* str, bool fix_case = false) const;
+    std::string authority_str(const char* str) const;
+    std::string userinfo_str(const char* str) const;
+    std::string host_str(const char* str, bool fix_case = false) const;
+    std::string port_str(const char* str) const;
+    int port_uint16(const char* str) const;  // returns -1 when out of range or not specified
+    std::string path_str(const char* str) const;
+    std::string query_str(const char* str) const;
+    std::string fragment_str(const char* str) const;
 };
 
 std::string percent_encode(const std::string& str);     // like encodeURIComponent()
