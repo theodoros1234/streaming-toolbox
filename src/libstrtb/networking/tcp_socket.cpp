@@ -185,13 +185,12 @@ bool tcp_socket::is_open() const {
     return _sock != -1;
 }
 
-std::string tcp_socket::recv_line(const std::string& endline, size_t max_len) {
+std::pair<std::string, bool> tcp_socket::recv_line(const std::string& endline, size_t max_len) {
     std::string line;
-    recv_line(line, endline, max_len);
-    return line;
+    return std::make_pair(line, recv_line(line, endline, max_len));
 }
 
-void tcp_socket::recv_line(std::string& line, const std::string& endline, size_t max_len) {
+bool tcp_socket::recv_line(std::string& line, const std::string& endline, size_t max_len) {
     line.clear();
     // Up to 2 characters allowed for endline argument
     if (endline.size() > 2)
@@ -205,13 +204,13 @@ void tcp_socket::recv_line(std::string& line, const std::string& endline, size_t
 
     size_t received = 0, i = 0;
     const char* buf = nullptr;
-    bool more = true;
+    bool more = true, endline_reached = false;
     do {
         std::tie(buf, received) = recv();
 
         // Stop if no data was received (socket is closed)
         if (received == 0)
-            return;
+            return false;
         // Examine each block of received data separately
         for (i=0; i<received; i++) {
             line.push_back(buf[i]);
@@ -228,10 +227,12 @@ void tcp_socket::recv_line(std::string& line, const std::string& endline, size_t
                 if (endline.size() == 2) {
                     if (line.size() >= 2 && line[line.size() - 2] == endline.front()) {
                         more = false;
+                        endline_reached = true;
                         break;
                     }
                 } else {
                     more = false;
+                    endline_reached = true;
                     break;
                 }
             }
@@ -246,6 +247,8 @@ void tcp_socket::recv_line(std::string& line, const std::string& endline, size_t
     } else {
         _line_leftovers = 0;
     }
+
+    return endline_reached;
 }
 
 size_t tcp_socket::buffer_size() const {
