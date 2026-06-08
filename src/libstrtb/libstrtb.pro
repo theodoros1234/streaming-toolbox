@@ -25,6 +25,7 @@ SOURCES += \
     event/item.cpp \
     event/provider.cpp \
     event/system.cpp \
+    http/common.cpp \
     json/cast.cpp \
     json/holder.cpp \
     json/parser.cpp \
@@ -74,6 +75,7 @@ HEADERS += \
     event/item.h \
     event/provider.h \
     event/system.h \
+    http/common.h \
     json/all_value_types.h \
     json/cast.h \
     json/holder.h \
