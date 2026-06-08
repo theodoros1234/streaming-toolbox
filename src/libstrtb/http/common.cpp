@@ -111,6 +111,7 @@ bool field_parser::process_line(const char *line, size_t length) {
         // check for semicolon
         if (pos >= length || line[pos] != ':')
             return false;
+        pos++;
 
         // eat whitespace
         pos = parse_optional_whitespace(line, pos, length);
@@ -118,6 +119,10 @@ bool field_parser::process_line(const char *line, size_t length) {
         // folded field (see obs-fold in RFC)
         std::tie(pos, folded) = parse_required_whitespace(line, 0, length);
         if (!folded)
+            return false;
+
+        // reject if there wasn't a previous field to fold from
+        if (_previous_field.empty())
             return false;
     } else return false;
 
@@ -127,7 +132,7 @@ bool field_parser::process_line(const char *line, size_t length) {
         // mark last non-whitespace character as end of value
         char c = line[i];
         if (is_vchar(c) || is_obs_text(c))
-            field_value_to = i;
+            field_value_to = i+1;
         else if (!is_whitespace(c))
             return false;
     }
@@ -136,11 +141,8 @@ bool field_parser::process_line(const char *line, size_t length) {
 
     // store processed field
     if (folded) {   // folded field line
-        // reject if there wasn't a previous field
-        if (_previous_field.empty())
-            return false;
         // merge with previous line, separated by a space
-        auto& field = fields.at(field_name);
+        std::string& field = _previous_field == "set-cookie" ? fields_set_cookie.back() : fields.at(_previous_field);
         field.push_back(' ');
         field.append(field_value);
     } else {        // regular field line
@@ -160,6 +162,8 @@ bool field_parser::process_line(const char *line, size_t length) {
                 field->second.append(field_value);
             }
         }
+
+        _previous_field = std::move(field_name);
     }
 
     return true;
