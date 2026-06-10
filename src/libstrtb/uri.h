@@ -37,6 +37,7 @@ inline bool is_pchar(char c, bool nc = false) {
 }
 
 typedef enum {HOST_EMPTY, HOST_REGNAME, HOST_IPV4, HOST_IPV6, HOST_IPVFUTURE} host_type_enum;
+typedef enum {PATH_EMPTY, PATH_ABEMPTY, PATH_ABSOLUTE, PATH_NOSCHEME, PATH_ROOTLESS} path_type_enum;
 typedef enum {
     WEB_URL_ERROR,      // failed to parse
     WEB_URL_UNLIKELY,   // successfully parsed, but is almost certainly by mistake
@@ -61,6 +62,7 @@ public:
            query_from = 0, query_to = 0,
            fragment_from = 0, fragment_to = 0;
     host_type_enum host_type = HOST_EMPTY;
+    path_type_enum path_type = PATH_EMPTY;
 
     parser_ret parse_uri(const std::string& str);
     parser_ret parse_uri_suffix(const std::string& str);

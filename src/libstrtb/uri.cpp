@@ -136,7 +136,7 @@ std::pair<std::string, ssize_t> strtb::uri::percent_decode(const char *str, size
 void parser::clear_uri() {
     scheme_from = 0, scheme_to = 0;
     clear_authority();
-    path_from = 0, path_to = 0;
+    path_from = 0, path_to = 0, path_type = PATH_EMPTY;
     query_from = 0, query_to = 0;
     fragment_from = 0, fragment_to = 0;
 }
@@ -386,6 +386,7 @@ parser_ret parser::parse_uri(const char *str, size_t from, size_t to) {
             path_from = pos;
             pos = parse_path_abempty(str, pos, to).first;
             path_to = pos;
+            path_type = PATH_ABEMPTY;
             break;
 
         // path-absolute
@@ -399,6 +400,7 @@ parser_ret parser::parse_uri(const char *str, size_t from, size_t to) {
             path_from = pos;
             pos = ret.first;
             path_to = pos;
+            path_type = PATH_ABSOLUTE;
             break;
 
         // path-rootless
@@ -412,11 +414,13 @@ parser_ret parser::parse_uri(const char *str, size_t from, size_t to) {
             path_from = pos;
             pos = ret.first;
             path_to = pos;
+            path_type = PATH_ROOTLESS;
             break;
 
         // path-empty
         case 3:
             path_from = path_to = pos;
+            path_type = PATH_EMPTY;
             break;
         }
 
@@ -441,7 +445,7 @@ parser_ret parser::parse_uri(const char *str, size_t from, size_t to) {
             if (pos > best_progress)
                 best_progress = pos;
             clear_authority();
-            path_from = 0, path_to = 0;
+            path_from = 0, path_to = 0, path_type = PATH_EMPTY;
             query_from = 0, query_to = 0;
             fragment_from = 0, fragment_to = 0;
             continue;
@@ -484,6 +488,7 @@ parser_ret parser::parse_uri_suffix(const char *str, size_t from, size_t to) {
     path_from = pos;
     pos = parse_path_abempty(str, pos, to).first;
     path_to = pos;
+    path_type = PATH_ABEMPTY;
 
     // query (optional)
     ret = parse_query(str, pos, to);
@@ -550,6 +555,7 @@ parser_ret parser::parse_relative_ref(const char *str, size_t from, size_t to) {
             path_from = pos;
             pos = parse_path_abempty(str, pos, to).first;
             path_to = pos;
+            path_type = PATH_ABEMPTY;
             break;
 
         // path-absolute
@@ -563,6 +569,7 @@ parser_ret parser::parse_relative_ref(const char *str, size_t from, size_t to) {
             path_from = pos;
             pos = ret.first;
             path_to = pos;
+            path_type = PATH_ABSOLUTE;
             break;
 
         // path-noscheme
@@ -576,11 +583,13 @@ parser_ret parser::parse_relative_ref(const char *str, size_t from, size_t to) {
             path_from = pos;
             pos = ret.first;
             path_to = pos;
+            path_type = PATH_NOSCHEME;
             break;
 
         // path-empty
         case 3:
             path_from = path_to = pos;
+            path_type = PATH_EMPTY;
             break;
         }
 
