@@ -32,6 +32,13 @@ typedef struct request_line_ret {
     int http_version_major = 0, http_version_minor = 0;
 } request_line_ret;
 
+typedef struct status_line_ret {
+    bool valid = false;
+    int http_version_major = 0, http_version_minor = 0,
+        status_code = 0;
+    std::string reason_phrase;
+} status_line_ret;
+
 // all line parsers need CRLF pre-stripped from the end of the string
 
 parser_ret parse_token(const std::string &str);
@@ -39,10 +46,12 @@ parser_ret parse_token(const std::string &str, size_t from, size_t to);
 http_version_ret parse_http_version(const std::string &str);
 http_version_ret parse_http_version(const std::string &str, size_t from, size_t to);
 request_line_ret parse_request_line(const std::string &line);
+status_line_ret parse_status_line(const std::string &line);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 http_version_ret parse_http_version(const char *str, size_t from, size_t to);
 request_line_ret parse_request_line(const char *line, size_t length);
+status_line_ret parse_status_line(const char *line, size_t length);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {

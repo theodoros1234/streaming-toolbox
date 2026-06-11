@@ -123,6 +123,10 @@ request_line_ret parse_request_line(const std::string &line) {
     return parse_request_line(line.data(), line.length());
 }
 
+status_line_ret parse_status_line(const std::string &line) {
+    return parse_status_line(line.data(), line.length());
+}
+
 parser_ret parse_token(const char *str, size_t from, size_t to) {
     size_t pos;
 
@@ -244,9 +248,52 @@ request_line_ret parse_request_line(const char *line, size_t length) {
         return {};
     ret.http_version_major = http_version.v_major;
     ret.http_version_minor = http_version.v_minor;
-    ret.valid = true;
 
     // line end is checked by http version parser
+    ret.valid = true;
+    return ret;
+}
+
+status_line_ret parse_status_line(const char *line, size_t length) {
+    size_t pos = 0;
+    status_line_ret ret;
+
+    // http version and single space
+    size_t http_version_to = find_char(line, pos, length, ' ');
+    if (http_version_to == length || http_version_to == pos)
+        return {};
+    auto http_version = parse_http_version(line, pos, http_version_to);
+    if (!http_version.valid)
+        return {};
+    ret.http_version_major = http_version.v_major;
+    ret.http_version_minor = http_version.v_minor;
+    pos = http_version_to + 1;
+
+    // 3-digit status code
+    for (size_t i = pos; i < pos + 3; i++) {
+        char c = line[i];
+        if (is_digit(c))
+            ret.status_code = ret.status_code * 10 + (c - '0');
+        else
+            return {};
+    }
+    pos += 3;
+
+    // single space
+    if (!parse_char(line, pos, length, ' '))
+        return {};
+    pos++;
+
+    // optional reason phrase
+    for (size_t i = pos; i < length; i++) {
+        char c = line[i];
+        if (is_vchar(c) || is_whitespace(c) || is_obs_text(c))
+            ret.reason_phrase.push_back(c);
+        else
+            return {};
+    }
+
+    ret.valid = true;
     return ret;
 }
 
