@@ -1,10 +1,12 @@
-#ifndef STRTB_HTTP_PARSING_H
-#define STRTB_HTTP_PARSING_H
+#ifndef STRTB_HTTP_PROTOCOL_H
+#define STRTB_HTTP_PROTOCOL_H
 
 #include <string>
 #include <vector>
 #include <map>
 #include "../uri.h"
+
+// NOTE: currently targetting HTTP/1.1 compatibility
 
 namespace strtb::http {
 
@@ -52,6 +54,7 @@ parser_ret parse_token(const char *str, size_t from, size_t to);
 http_version_ret parse_http_version(const char *str, size_t from, size_t to);
 request_line_ret parse_request_line(const char *line, size_t length);
 status_line_ret parse_status_line(const char *line, size_t length);
+const char* get_status_code_phrase(int status_code);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
@@ -73,4 +76,4 @@ public:
 
 }
 
-#endif // STRTB_HTTP_PARSING_H
+#endif // STRTB_HTTP_PROTOCOL_H
