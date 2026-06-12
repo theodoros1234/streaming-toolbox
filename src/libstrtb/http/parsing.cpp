@@ -372,7 +372,10 @@ bool field_parser::process_line(const char *line, size_t length) {
                 // first appearance of this header
                 fields[field_name] = field_value;
             } else {
-                // TODO: deny combining some headers
+                // repeated appearance of this header
+                // host header cannot appear multiple times
+                if (field_name == "host")
+                    return false;
                 field->second.append(", ");
                 field->second.append(field_value);
             }
