@@ -5,6 +5,8 @@
 #include <map>
 #include "../logging/logging.h"
 
+namespace strtb::http {
+
 static std::map<unsigned int, const char*> status_code_phrases = {
     {100, "Continue"},
     {101, "Switching Protocols"},
@@ -57,7 +59,27 @@ static std::map<unsigned int, const char*> status_code_phrases = {
     {511, "Network Authentication Required"}
 };
 
-namespace strtb::http {
+typedef struct date_parser_inner_ret {
+    uint64_t year = 0, day = 0, hour = 0, minute = 0, second = 0;
+    month_enum month = MONTH_INVALID;
+    day_enum day_of_week = DAY_INVALID;
+    bool valid = false;
+} date_parser_inner_ret;
+
+static size_t parse_optional_whitespace(const char *str, size_t from, size_t to);
+static parser_ret parse_required_whitespace(const char *str, size_t from, size_t to);
+static parser_ret parse_word(const char *str, size_t from, size_t to, const char *word);
+static size_t find_char(const char *str, size_t from, size_t to, char c);
+static std::tuple<size_t, bool, unsigned int> parse_digits(const char *str, size_t from, size_t to, size_t digits);
+static constexpr size_t strlen_constexpr(const char *str);
+static constexpr uint64_t date_hash_short(const char *str);
+static constexpr uint64_t date_hash_short(const char *str, size_t from, size_t to);
+static constexpr uint64_t date_hash_long(const char *str);
+static constexpr uint64_t date_hash_long(const char *str, size_t from, size_t to);
+parser_ret parse_time_of_day(const char *str, size_t from, size_t to, date_parser_inner_ret &ret);
+date_parser_inner_ret parse_date_imf(const char *str, size_t from, size_t to);
+date_parser_inner_ret parse_date_rfc850(const char *str, size_t from, size_t to);
+date_parser_inner_ret parse_date_asctime(const char *str, size_t from, size_t to);
 
 static inline bool is_digit(char c) {
     return '0' <= c && c <= '9';
@@ -110,17 +132,6 @@ static inline std::pair<int, bool> parse_digit(const char *str, size_t from, siz
         return std::make_pair(0, false);
 }
 
-static size_t parse_optional_whitespace(const char *str, size_t from, size_t to);
-static parser_ret parse_required_whitespace(const char *str, size_t from, size_t to);
-static parser_ret parse_word(const char *str, size_t from, size_t to, const char *word);
-static size_t find_char(const char *str, size_t from, size_t to, char c);
-static std::tuple<size_t, bool, unsigned int> parse_digits(const char *str, size_t from, size_t to, size_t digits);
-static constexpr size_t strlen_constexpr(const char *str);
-static constexpr uint64_t date_hash_short(const char *str);
-static constexpr uint64_t date_hash_short(const char *str, size_t from, size_t to);
-static constexpr uint64_t date_hash_long(const char *str);
-static constexpr uint64_t date_hash_long(const char *str, size_t from, size_t to);
-
 static size_t parse_optional_whitespace(const char *str, size_t from, size_t to) {
     size_t pos;
 
@@ -167,7 +178,7 @@ static size_t find_char(const char *str, size_t from, size_t to, char c) {
 }
 
 static std::tuple<size_t, bool, unsigned int> parse_digits(const char *str, size_t from, size_t to, size_t digits) {
-    if (from + digits >= to)    // reached end of string
+    if (from + digits > to)     // reached end of string
         return {to, false, 0};
 
     unsigned int number = 0;
@@ -684,95 +695,251 @@ const char* month_to_str(month_enum month) {
     }
 }
 
-void parse_date_imf(const char *str, size_t from, size_t to) {
+parser_ret parse_time_of_day(const char *str, size_t from, size_t to, date_parser_inner_ret &ret) {
+    size_t pos = from;
+
+    // hour
+    std::tie(pos, ret.valid, ret.hour) = parse_digits(str, pos, to, 2);
+    if (!ret.valid)
+        return {};
+
+    // :
+    if (!parse_char(str, pos, to, ':'))
+        return {};
+    pos++;
+
+    // minute
+    std::tie(pos, ret.valid, ret.minute) = parse_digits(str, pos, to, 2);
+    if (!ret.valid)
+        return {};
+
+    // :
+    if (!parse_char(str, pos, to, ':'))
+        return {};
+    pos++;
+
+    // second
+    std::tie(pos, ret.valid, ret.second) = parse_digits(str, pos, to, 2);
+    if (!ret.valid)
+        return {};
+
+    return {pos, true};
+}
+
+date_parser_inner_ret parse_date_imf(const char *str, size_t from, size_t to) {
+    date_parser_inner_ret ret;
     size_t pos = from, pos_next = from;
-    uint64_t year = 0, day = 0, hour = 0, minute = 0, second = 0;
-    month_enum month = MONTH_INVALID;
-    day_enum day_of_week = DAY_INVALID;
-    bool valid = false; // only used on specific steps
 
     // day of week,
     pos_next = find_char(str, pos, to, ',');
     if (pos_next == to) // no comma
-        return;
-    day_of_week = parse_day_short(str, pos, pos_next);
-    if (day_of_week == DAY_INVALID)
-        return;
+        return {};
+    ret.day_of_week = parse_day_short(str, pos, pos_next);
+    if (ret.day_of_week == DAY_INVALID)
+        return {};
     pos = pos_next + 1;
 
     // space
     if (!parse_char(str, pos, to, ' '))
-        return;
+        return {};
     pos++;
 
     // day of month
-    std::tie(pos, valid, day) = parse_digits(str, pos, to, 2);
-    if (!valid)
-        return;
+    std::tie(pos, ret.valid, ret.day) = parse_digits(str, pos, to, 2);
+    if (!ret.valid)
+        return {};
 
     // space
     if (!parse_char(str, pos, to, ' '))
-        return;
+        return {};
     pos++;
 
     // month space
     pos_next = find_char(str, pos, to, ' ');
     if (pos_next == to) // no space after
-        return;
-    month = parse_month(str, pos, pos_next);
-    if (month == MONTH_INVALID)
-        return;
+        return {};
+    ret.month = parse_month(str, pos, pos_next);
+    if (ret.month == MONTH_INVALID)
+        return {};
     pos = pos_next + 1;
 
     // year
-    std::tie(pos, valid, year) = parse_digits(str, pos, to, 4);
-    if (!valid)
-        return;
+    std::tie(pos, ret.valid, ret.year) = parse_digits(str, pos, to, 4);
+    if (!ret.valid)
+        return {};
 
     // space
     if (!parse_char(str, pos, to, ' '))
-        return;
+        return {};
     pos++;
 
-    // hour
-    std::tie(pos, valid, hour) = parse_digits(str, pos, to, 2);
-    if (!valid)
-        return;
-
-    // :
-    if (!parse_char(str, pos, to, ':'))
-        return;
-    pos++;
-
-    // minute
-    std::tie(pos, valid, minute) = parse_digits(str, pos, to, 2);
-    if (!valid)
-        return;
-
-    // :
-    if (!parse_char(str, pos, to, ':'))
-        return;
-    pos++;
-
-    // second
-    std::tie(pos, valid, second) = parse_digits(str, pos, to, 2);
-    if (!valid)
-        return;
+    // time-of-day (hh:mm:ss)
+    std::tie(pos, ret.valid) = parse_time_of_day(str, pos, to, ret);
+    if (!ret.valid)
+        return {};
 
     // space
     if (!parse_char(str, pos, to, ' '))
-        return;
+        return {};
     pos++;
 
     // GMT
-    std::tie(pos, valid) = parse_word(str, pos, to, "GMT");
-    if (!valid || pos != to)
-        return;
+    std::tie(pos, ret.valid) = parse_word(str, pos, to, "GMT");
+    if (!ret.valid || pos != to)
+        return {};
+
+    ret.valid = true;
+    return ret;
+}
+
+date_parser_inner_ret parse_date_rfc850(const char *str, size_t from, size_t to) {
+    size_t pos = from, pos_next = from;
+    date_parser_inner_ret ret;
+
+    // day of week,
+    pos_next = find_char(str, pos, to, ',');
+    if (pos_next == to) // no comma
+        return {};
+    ret.day_of_week = parse_day_long(str, pos, pos_next);
+    if (ret.day_of_week == DAY_INVALID)
+        return {};
+    pos = pos_next + 1;
+
+    // space
+    if (!parse_char(str, pos, to, ' '))
+        return {};
+    pos++;
+
+    // day of month
+    std::tie(pos, ret.valid, ret.day) = parse_digits(str, pos, to, 2);
+    if (!ret.valid)
+        return {};
+
+    // -
+    if (!parse_char(str, pos, to, '-'))
+        return {};
+    pos++;
+
+    // month-
+    pos_next = find_char(str, pos, to, '-');
+    if (pos_next == to) // no space after
+        return {};
+    ret.month = parse_month(str, pos, pos_next);
+    if (ret.month == MONTH_INVALID)
+        return {};
+    pos = pos_next + 1;
+
+    // year
+    std::tie(pos, ret.valid, ret.year) = parse_digits(str, pos, to, 2);
+    if (!ret.valid)
+        return {};
+
+    // space
+    if (!parse_char(str, pos, to, ' '))
+        return {};
+    pos++;
+
+    // time-of-day (hh:mm:ss)
+    std::tie(pos, ret.valid) = parse_time_of_day(str, pos, to, ret);
+    if (!ret.valid)
+        return {};
+
+    // space
+    if (!parse_char(str, pos, to, ' '))
+        return {};
+    pos++;
+
+    // GMT
+    std::tie(pos, ret.valid) = parse_word(str, pos, to, "GMT");
+    if (!ret.valid || pos != to)
+        return {};
+
+    // TODO: convert 2-digit year to 4-digit year
+
+    ret.valid = true;
+    return ret;
+}
+
+date_parser_inner_ret parse_date_asctime(const char *str, size_t from, size_t to) {
+    date_parser_inner_ret ret;
+    size_t pos = from, pos_next = from;
+
+    // day of week space
+    pos_next = find_char(str, pos, to, ' ');
+    if (pos_next == to) // no comma
+        return {};
+    ret.day_of_week = parse_day_short(str, pos, pos_next);
+    if (ret.day_of_week == DAY_INVALID)
+        return {};
+    pos = pos_next + 1;
+
+    // month space
+    pos_next = find_char(str, pos, to, ' ');
+    if (pos_next == to) // no space after
+        return {};
+    ret.month = parse_month(str, pos, pos_next);
+    if (ret.month == MONTH_INVALID)
+        return {};
+    pos = pos_next + 1;
+
+    // day of month
+    if (parse_char(str, pos, to, ' ')) {
+        // single digit
+        std::tie(pos, ret.valid, ret.day) = parse_digits(str, pos + 1, to, 1);
+    } else {
+        // double digit
+        std::tie(pos, ret.valid, ret.day) = parse_digits(str, pos, to, 2);
+    }
+
+    if (!ret.valid)
+        return {};
+
+    // space
+    if (!parse_char(str, pos, to, ' '))
+        return {};
+    pos++;
+
+    // time-of-day (hh:mm:ss)
+    std::tie(pos, ret.valid) = parse_time_of_day(str, pos, to, ret);
+    if (!ret.valid)
+        return {};
+
+    // space
+    if (!parse_char(str, pos, to, ' '))
+        return {};
+    pos++;
+
+    // year
+    std::tie(pos, ret.valid, ret.year) = parse_digits(str, pos, to, 4);
+    if (!ret.valid || pos != to)
+        return {};
+
+    ret.valid = true;
+    return ret;
+}
+
+uint64_t parse_date(const char *str, size_t from, size_t to) {
+    date_parser_inner_ret inner_ret;
+
+    // try parsing all 3 date formats
+    inner_ret = parse_date_imf(str, from, to);
+    if (!inner_ret.valid) {
+        inner_ret = parse_date_rfc850(str, from, to);
+        if (!inner_ret.valid) {
+            inner_ret = parse_date_asctime(str, from, to);
+            if (!inner_ret.valid)
+                return UINT64_MAX;  // all invalid
+        }
+    }
 
     logging::source l("HTTP DATE TEST");
-    l.critical({'(', day_to_str(day_of_week), ") ", year, '-', month_to_str(month), '-', day, ' ', hour, ':', minute, ':', second});
+    l.critical({'(', day_to_str(inner_ret.day_of_week), ") ", inner_ret.year, '-', month_to_str(inner_ret.month), '-', inner_ret.day, ' ',
+                inner_ret.hour, ':', inner_ret.minute, ':', inner_ret.second});
 
     // TODO: verify that the date is actually valid
+
+    // TODO: convert to seconds since epoch
+    return 0;
 }
 
 }

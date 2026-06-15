@@ -1,6 +1,7 @@
 #ifndef STRTB_HTTP_PROTOCOL_H
 #define STRTB_HTTP_PROTOCOL_H
 
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <map>
@@ -92,9 +93,9 @@ const char* get_status_code_phrase(int status_code);
 day_enum parse_day_short(const char *str, size_t from, size_t to);
 day_enum parse_day_long(const char *str, size_t from, size_t to);
 month_enum parse_month(const char *str, size_t from, size_t to);
-void parse_date_imf(const char *str, size_t from, size_t to);
 const char* day_to_str(day_enum day);
 const char* month_to_str(month_enum month);
+uint64_t parse_date(const char *str, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
