@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <map>
+#include <ctime>
 #include "../logging/logging.h"
 
 namespace strtb::http {
@@ -854,7 +855,16 @@ date_parser_inner_ret parse_date_rfc850(const char *str, size_t from, size_t to)
     if (!ret.valid || pos != to)
         return {};
 
-    // TODO: convert 2-digit year to 4-digit year
+    // convert 2-digit year to 4-digit year
+    time_t current_time = std::time(NULL);
+    struct tm current_time_tm;
+    if (!gmtime_r(&current_time, &current_time_tm))
+        return {};
+    // limit timestamp to no more than 50 years in the future (ignoring month/day differences)
+    uint64_t year_in_50y = current_time_tm.tm_year + 1950;
+    uint64_t YY_in_50y = year_in_50y % 100;
+    uint64_t century_in_50y = year_in_50y - YY_in_50y;
+    ret.year += century_in_50y - (ret.year > YY_in_50y) * 100;
 
     ret.valid = true;
     return ret;
