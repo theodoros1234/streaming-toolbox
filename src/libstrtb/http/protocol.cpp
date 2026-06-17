@@ -1,8 +1,8 @@
 #include "protocol.h"
 
+#include <cstdint>
 #include <stdexcept>
 #include <map>
-#include "../logging/logging.h"
 
 namespace strtb::http {
 
@@ -58,10 +58,25 @@ static std::map<unsigned int, const char*> status_code_phrases = {
     {511, "Network Authentication Required"}
 };
 
+typedef enum month_enum {
+    MONTH_INVALID,
+    MONTH_JAN,
+    MONTH_FEB,
+    MONTH_MAR,
+    MONTH_APR,
+    MONTH_MAY,
+    MONTH_JUN,
+    MONTH_JUL,
+    MONTH_AUG,
+    MONTH_SEP,
+    MONTH_OCT,
+    MONTH_NOV,
+    MONTH_DEC
+} month_enum;
+
 typedef struct date_parser_inner_ret {
     int year = 0, day = 0, hour = 0, minute = 0, second = 0;
     month_enum month = MONTH_INVALID;
-    day_enum day_of_week = DAY_INVALID;
     bool valid = false;
 } date_parser_inner_ret;
 
@@ -73,12 +88,10 @@ static std::tuple<size_t, bool, unsigned int> parse_digits(const char *str, size
 static constexpr size_t strlen_constexpr(const char *str);
 static constexpr uint64_t date_hash_short(const char *str);
 static constexpr uint64_t date_hash_short(const char *str, size_t from, size_t to);
-static constexpr uint64_t date_hash_long(const char *str);
-static constexpr uint64_t date_hash_long(const char *str, size_t from, size_t to);
-parser_ret parse_time_of_day(const char *str, size_t from, size_t to, date_parser_inner_ret &ret);
-date_parser_inner_ret parse_date_imf(const char *str, size_t from, size_t to);
-date_parser_inner_ret parse_date_rfc850(const char *str, size_t from, size_t to);
-date_parser_inner_ret parse_date_asctime(const char *str, size_t from, size_t to);
+static parser_ret parse_time_of_day(const char *str, size_t from, size_t to, date_parser_inner_ret &ret);
+static date_parser_inner_ret parse_date_imf(const char *str, size_t from, size_t to);
+static date_parser_inner_ret parse_date_rfc850(const char *str, size_t from, size_t to);
+static date_parser_inner_ret parse_date_asctime(const char *str, size_t from, size_t to);
 
 static inline bool is_digit(char c) {
     return '0' <= c && c <= '9';
@@ -488,30 +501,6 @@ const char* get_status_code_phrase(int status_code) {
         return phrase->second;
 }
 
-day_enum parse_day_short(const std::string &str, size_t from, size_t to) {
-    return parse_day_short(str.data(), from, to);
-}
-
-day_enum parse_day_short(const std::string &str) {
-    return parse_day_short(str.data(), 0, str.length());
-}
-
-day_enum parse_day_long(const std::string &str, size_t from, size_t to) {
-    return parse_day_long(str.data(), from, to);
-}
-
-day_enum parse_day_long(const std::string &str) {
-    return parse_day_long(str.data(), 0, str.length());
-}
-
-month_enum parse_month(const std::string &str, size_t from, size_t to) {
-    return parse_month(str.data(), from, to);
-}
-
-month_enum parse_month(const std::string &str) {
-    return parse_month(str.data(), 0, str.length());
-}
-
 static constexpr size_t strlen_constexpr(const char *str) {
     const char *p = str;
     while (*p != 0)
@@ -521,10 +510,6 @@ static constexpr size_t strlen_constexpr(const char *str) {
 
 static constexpr uint64_t date_hash_short(const char *str) {
     return date_hash_short(str, 0, strlen_constexpr(str));
-}
-
-static constexpr uint64_t date_hash_long(const char *str) {
-    return date_hash_long(str, 0, strlen_constexpr(str));
 }
 
 // used for http dates, rejects unused stuff
@@ -547,69 +532,7 @@ static constexpr uint64_t date_hash_short(const char *str, size_t from, size_t t
     return hash;
 }
 
-// used for http dates, rejects unused stuff
-static constexpr uint64_t date_hash_long(const char *str, size_t from, size_t to) {
-    if (to - from > 9 || to == from)    // biggest valid day or month we'll encounter or empty
-        return UINT64_MAX;
-    uint64_t hash = UINT64_MAX;
-
-    for (size_t i = from; i < to; i++) {
-        hash *= 52;
-        char c = str[i];
-        if ('A' <= c && c <= 'Z')
-            hash += c - 'A';
-        else if ('a' <= c && c <= 'z')
-            hash += c - 'a' + 26;
-        else
-            return UINT64_MAX;
-    }
-
-    return hash;
-}
-
-day_enum parse_day_short(const char *str, size_t from, size_t to) {
-    switch (date_hash_short(str, from, to)) {
-    case date_hash_short("Mon"):
-        return DAY_MON;
-    case date_hash_short("Tue"):
-        return DAY_TUE;
-    case date_hash_short("Wed"):
-        return DAY_WED;
-    case date_hash_short("Thu"):
-        return DAY_THU;
-    case date_hash_short("Fri"):
-        return DAY_FRI;
-    case date_hash_short("Sat"):
-        return DAY_SAT;
-    case date_hash_short("Sun"):
-        return DAY_SUN;
-    default:
-        return DAY_INVALID;
-    }
-}
-
-day_enum parse_day_long(const char *str, size_t from, size_t to) {
-    switch (date_hash_long(str, from, to)) {
-    case date_hash_long("Monday"):
-        return DAY_MON;
-    case date_hash_long("Tuesday"):
-        return DAY_TUE;
-    case date_hash_long("Wednesday"):
-        return DAY_WED;
-    case date_hash_long("Thursday"):
-        return DAY_THU;
-    case date_hash_long("Friday"):
-        return DAY_FRI;
-    case date_hash_long("Saturday"):
-        return DAY_SAT;
-    case date_hash_long("Sunday"):
-        return DAY_SUN;
-    default:
-        return DAY_INVALID;
-    }
-}
-
-month_enum parse_month(const char *str, size_t from, size_t to) {
+static month_enum parse_month(const char *str, size_t from, size_t to) {
     switch (date_hash_short(str, from, to)) {
     case date_hash_short("Jan"):
         return MONTH_JAN;
@@ -640,61 +563,7 @@ month_enum parse_month(const char *str, size_t from, size_t to) {
     }
 }
 
-const char* day_to_str(day_enum day) {
-    switch (day) {
-    case DAY_MON:
-        return "Mon";
-    case DAY_TUE:
-        return "Tue";
-    case DAY_WED:
-        return "Wed";
-    case DAY_THU:
-        return "Thu";
-    case DAY_FRI:
-        return "Fri";
-    case DAY_SAT:
-        return "Sat";
-    case DAY_SUN:
-        return "Sun";
-    case DAY_INVALID:
-    default:
-        return "Invalid";
-    }
-}
-
-const char* month_to_str(month_enum month) {
-    switch (month) {
-    case MONTH_JAN:
-        return "Jan";
-    case MONTH_FEB:
-        return "Feb";
-    case MONTH_MAR:
-        return "Mar";
-    case MONTH_APR:
-        return "Apr";
-    case MONTH_MAY:
-        return "May";
-    case MONTH_JUN:
-        return "Jun";
-    case MONTH_JUL:
-        return "Jul";
-    case MONTH_AUG:
-        return "Aug";
-    case MONTH_SEP:
-        return "Sep";
-    case MONTH_OCT:
-        return "Oct";
-    case MONTH_NOV:
-        return "Nov";
-    case MONTH_DEC:
-        return "Dec";
-    case MONTH_INVALID:
-    default:
-        return "Invalid";
-    }
-}
-
-parser_ret parse_time_of_day(const char *str, size_t from, size_t to, date_parser_inner_ret &ret) {
+static parser_ret parse_time_of_day(const char *str, size_t from, size_t to, date_parser_inner_ret &ret) {
     size_t pos = from;
 
     // hour
@@ -725,16 +594,13 @@ parser_ret parse_time_of_day(const char *str, size_t from, size_t to, date_parse
     return {pos, true};
 }
 
-date_parser_inner_ret parse_date_imf(const char *str, size_t from, size_t to) {
+static date_parser_inner_ret parse_date_imf(const char *str, size_t from, size_t to) {
     date_parser_inner_ret ret;
     size_t pos = from, pos_next = from;
 
     // day of week,
     pos_next = find_char(str, pos, to, ',');
-    if (pos_next == to) // no comma
-        return {};
-    ret.day_of_week = parse_day_short(str, pos, pos_next);
-    if (ret.day_of_week == DAY_INVALID)
+    if (pos_next == to)     // no comma
         return {};
     pos = pos_next + 1;
 
@@ -791,16 +657,13 @@ date_parser_inner_ret parse_date_imf(const char *str, size_t from, size_t to) {
     return ret;
 }
 
-date_parser_inner_ret parse_date_rfc850(const char *str, size_t from, size_t to) {
+static date_parser_inner_ret parse_date_rfc850(const char *str, size_t from, size_t to) {
     size_t pos = from, pos_next = from;
     date_parser_inner_ret ret;
 
     // day of week,
     pos_next = find_char(str, pos, to, ',');
-    if (pos_next == to) // no comma
-        return {};
-    ret.day_of_week = parse_day_long(str, pos, pos_next);
-    if (ret.day_of_week == DAY_INVALID)
+    if (pos_next == to)     // no comma
         return {};
     pos = pos_next + 1;
 
@@ -868,16 +731,13 @@ date_parser_inner_ret parse_date_rfc850(const char *str, size_t from, size_t to)
     return ret;
 }
 
-date_parser_inner_ret parse_date_asctime(const char *str, size_t from, size_t to) {
+static date_parser_inner_ret parse_date_asctime(const char *str, size_t from, size_t to) {
     date_parser_inner_ret ret;
     size_t pos = from, pos_next = from;
 
     // day of week space
     pos_next = find_char(str, pos, to, ' ');
-    if (pos_next == to) // no comma
-        return {};
-    ret.day_of_week = parse_day_short(str, pos, pos_next);
-    if (ret.day_of_week == DAY_INVALID)
+    if (pos_next == to)     // no space
         return {};
     pos = pos_next + 1;
 
@@ -924,6 +784,15 @@ date_parser_inner_ret parse_date_asctime(const char *str, size_t from, size_t to
 
     ret.valid = true;
     return ret;
+}
+
+time_t parse_date(const std::string &str) {
+    return parse_date(str.data(), 0, str.length());
+}
+
+time_t parse_date(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_date(str.data(), from, to);
 }
 
 time_t parse_date(const char *str, size_t from, size_t to) {

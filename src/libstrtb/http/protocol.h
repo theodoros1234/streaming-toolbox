@@ -28,34 +28,6 @@ typedef enum request_target_form_enum {
     TARGET_FORM_ASTERISK
 } request_target_form_enum;
 
-// this might be useless, Apache doesn't give a crap about the day of week, even if it's invalid
-typedef enum day_enum {
-    DAY_INVALID,
-    DAY_MON,
-    DAY_TUE,
-    DAY_WED,
-    DAY_THU,
-    DAY_FRI,
-    DAY_SAT,
-    DAY_SUN
-} day_enum;
-
-typedef enum month_enum {
-    MONTH_INVALID,
-    MONTH_JAN,
-    MONTH_FEB,
-    MONTH_MAR,
-    MONTH_APR,
-    MONTH_MAY,
-    MONTH_JUN,
-    MONTH_JUL,
-    MONTH_AUG,
-    MONTH_SEP,
-    MONTH_OCT,
-    MONTH_NOV,
-    MONTH_DEC
-} month_enum;
-
 typedef struct request_line_ret {
     bool valid = false;
     std::string method, target;
@@ -79,24 +51,14 @@ http_version_ret parse_http_version(const std::string &str);
 http_version_ret parse_http_version(const std::string &str, size_t from, size_t to);
 request_line_ret parse_request_line(const std::string &line);
 status_line_ret parse_status_line(const std::string &line);
-day_enum parse_day_short(const std::string &str, size_t from, size_t to);
-day_enum parse_day_short(const std::string &str);
-day_enum parse_day_long(const std::string &str, size_t from, size_t to);
-day_enum parse_day_long(const std::string &str);
-month_enum parse_month(const std::string &str, size_t from, size_t to);
-month_enum parse_month(const std::string &str);
-// TODO: std::string variants for full date and to_XXXXX
+time_t parse_date(const std::string &str);
+time_t parse_date(const std::string &str, size_t from, size_t to);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 http_version_ret parse_http_version(const char *str, size_t from, size_t to);
 request_line_ret parse_request_line(const char *line, size_t length);
 status_line_ret parse_status_line(const char *line, size_t length);
 const char* get_status_code_phrase(int status_code);
-day_enum parse_day_short(const char *str, size_t from, size_t to);
-day_enum parse_day_long(const char *str, size_t from, size_t to);
-month_enum parse_month(const char *str, size_t from, size_t to);
-const char* day_to_str(day_enum day);
-const char* month_to_str(month_enum month);
 time_t parse_date(const char *str, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
