@@ -1,9 +1,7 @@
 #include "protocol.h"
 
-#include <cstdint>
 #include <stdexcept>
 #include <map>
-#include <ctime>
 #include "../logging/logging.h"
 
 namespace strtb::http {
@@ -61,7 +59,7 @@ static std::map<unsigned int, const char*> status_code_phrases = {
 };
 
 typedef struct date_parser_inner_ret {
-    uint64_t year = 0, day = 0, hour = 0, minute = 0, second = 0;
+    int year = 0, day = 0, hour = 0, minute = 0, second = 0;
     month_enum month = MONTH_INVALID;
     day_enum day_of_week = DAY_INVALID;
     bool valid = false;
@@ -861,9 +859,9 @@ date_parser_inner_ret parse_date_rfc850(const char *str, size_t from, size_t to)
     if (!gmtime_r(&current_time, &current_time_tm))
         return {};
     // limit timestamp to no more than 50 years in the future (ignoring month/day differences)
-    uint64_t year_in_50y = current_time_tm.tm_year + 1950;
-    uint64_t YY_in_50y = year_in_50y % 100;
-    uint64_t century_in_50y = year_in_50y - YY_in_50y;
+    int year_in_50y = current_time_tm.tm_year + 1950;
+    int YY_in_50y = year_in_50y % 100;
+    int century_in_50y = year_in_50y - YY_in_50y;
     ret.year += century_in_50y - (ret.year > YY_in_50y) * 100;
 
     ret.valid = true;
@@ -928,7 +926,7 @@ date_parser_inner_ret parse_date_asctime(const char *str, size_t from, size_t to
     return ret;
 }
 
-uint64_t parse_date(const char *str, size_t from, size_t to) {
+time_t parse_date(const char *str, size_t from, size_t to) {
     date_parser_inner_ret inner_ret;
 
     // try parsing all 3 date formats
@@ -938,18 +936,51 @@ uint64_t parse_date(const char *str, size_t from, size_t to) {
         if (!inner_ret.valid) {
             inner_ret = parse_date_asctime(str, from, to);
             if (!inner_ret.valid)
-                return UINT64_MAX;  // all invalid
+                return -1L;     // all invalid
         }
     }
 
-    logging::source l("HTTP DATE TEST");
-    l.critical({'(', day_to_str(inner_ret.day_of_week), ") ", inner_ret.year, '-', month_to_str(inner_ret.month), '-', inner_ret.day, ' ',
-                inner_ret.hour, ':', inner_ret.minute, ':', inner_ret.second});
+    if (inner_ret.second == 60) // leap second
+        inner_ret.second--;
+    if (inner_ret.day == 0)
+        return -1L;
+    if (inner_ret.year < 1970)  // limit the year to >= 1970 to simplify error handling,
+        return -1L;             // and because _mkgmtime on Windows doesn't seem to support pre-epoch time
 
-    // TODO: verify that the date is actually valid
+    // convert to seconds since epoch
+    struct tm time_split, validate;
+    time_split.tm_sec  = inner_ret.second;
+    time_split.tm_min  = inner_ret.minute;
+    time_split.tm_hour = inner_ret.hour;
+    time_split.tm_mday = inner_ret.day;
+    time_split.tm_mon  = inner_ret.month - MONTH_JAN;
+    time_split.tm_year = inner_ret.year - 1900;
+    time_split.tm_wday   = 0;   // ignored by timegm()
+    time_split.tm_yday   = 0;
+    time_split.tm_isdst  = 0;
+    time_split.tm_gmtoff = 0;
+    time_split.tm_zone   = NULL;
+    validate = time_split;
+    time_t timestamp;
+#ifdef _WIN32
+    // TODO: test this in Windows
+    timestamp = _mkgmtime(&time_split);
+#else
+    timestamp = timegm(&time_split);
+#endif
+    if (timestamp < 0)  // error or <1970
+        return -1L;
 
-    // TODO: convert to seconds since epoch
-    return 0;
+    // make sure the original date was valid
+    if (time_split.tm_sec  != validate.tm_sec  ||
+        time_split.tm_min  != validate.tm_min  ||
+        time_split.tm_hour != validate.tm_hour ||
+        time_split.tm_mday != validate.tm_mday ||
+        time_split.tm_mon  != validate.tm_mon  ||
+        time_split.tm_year != validate.tm_year)
+        return -1L;
+
+    return timestamp;
 }
 
 }

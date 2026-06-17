@@ -1,10 +1,11 @@
 #ifndef STRTB_HTTP_PROTOCOL_H
 #define STRTB_HTTP_PROTOCOL_H
 
-#include <cstdint>
 #include <string>
 #include <vector>
 #include <map>
+#include <ctime>
+#include <limits>   // IWYU pragma: keep
 #include "../uri.h"
 
 // NOTE: currently targetting HTTP/1.1 compatibility
@@ -27,6 +28,7 @@ typedef enum request_target_form_enum {
     TARGET_FORM_ASTERISK
 } request_target_form_enum;
 
+// this might be useless, Apache doesn't give a crap about the day of week, even if it's invalid
 typedef enum day_enum {
     DAY_INVALID,
     DAY_MON,
@@ -95,7 +97,7 @@ day_enum parse_day_long(const char *str, size_t from, size_t to);
 month_enum parse_month(const char *str, size_t from, size_t to);
 const char* day_to_str(day_enum day);
 const char* month_to_str(month_enum month);
-uint64_t parse_date(const char *str, size_t from, size_t to);
+time_t parse_date(const char *str, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
