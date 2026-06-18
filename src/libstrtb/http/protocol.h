@@ -58,7 +58,6 @@ parser_ret parse_token(const char *str, size_t from, size_t to);
 http_version_ret parse_http_version(const char *str, size_t from, size_t to);
 request_line_ret parse_request_line(const char *line, size_t length);
 status_line_ret parse_status_line(const char *line, size_t length);
-const char* get_status_code_phrase(int status_code);
 time_t parse_date(const char *str, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
@@ -78,6 +77,9 @@ public:
 
     bool process_line(const std::string &line);
 };
+
+const char* get_status_code_phrase(int status_code);
+std::string timestamp_to_string(time_t timestamp);
 
 }
 

@@ -1,6 +1,7 @@
 #include "protocol.h"
 
 #include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #include <map>
 
@@ -73,6 +74,31 @@ typedef enum month_enum {
     MONTH_NOV,
     MONTH_DEC
 } month_enum;
+
+static const char* month_names[] = {
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec"
+};
+
+static const char* day_names[] = {
+    "Sun",
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat"
+};
 
 typedef struct date_parser_inner_ret {
     int year = 0, day = 0, hour = 0, minute = 0, second = 0;
@@ -824,7 +850,7 @@ time_t parse_date(const char *str, size_t from, size_t to) {
     time_split.tm_mday = inner_ret.day;
     time_split.tm_mon  = inner_ret.month - MONTH_JAN;
     time_split.tm_year = inner_ret.year - 1900;
-    time_split.tm_wday   = 0;   // ignored by timegm()
+    time_split.tm_wday   = 0;
     time_split.tm_yday   = 0;
     time_split.tm_isdst  = 0;
     time_split.tm_gmtoff = 0;
@@ -850,6 +876,46 @@ time_t parse_date(const char *str, size_t from, size_t to) {
         return -1L;
 
     return timestamp;
+}
+
+std::string timestamp_to_string(time_t timestamp) {
+    // returns emtpy string on error
+    // no dates pre-epoch
+    if (timestamp < 0)
+        return "";
+
+    // convert to split-type
+    struct tm t;
+#ifdef _WIN32
+    // TODO: test this on Windows
+    if (gmtime_s(&t, &timestamp))
+        return "";
+#else
+    if (!gmtime_r(&timestamp, &t))
+        return "";
+#endif
+
+    // only 4-digit years
+    if (t.tm_year > (9999 - 1900))
+        return "";
+
+    // sanity check, even though these checks will theoretically never fail
+    if ((size_t)t.tm_wday >= sizeof(day_names) || (size_t)t.tm_mon > sizeof(month_names))
+        return "";
+
+    // print the formatted date into the internal buffer of a std::string
+    const size_t date_buffer_size = 30;
+    std::string date_buffer(30, 0);
+    int date_len = std::snprintf(date_buffer.data(), date_buffer_size,
+                                "%s, %02d %s %04d %02d:%02d:%02d GMT",
+                                day_names[t.tm_wday], t.tm_mday, month_names[t.tm_mon], t.tm_year + 1900,
+                                t.tm_hour, t.tm_min, t.tm_sec);
+    if ((size_t) date_len >= date_buffer_size)  // sanity check snprintf errors, should never happen
+        return "";
+    // TODO: log error if sanity checks fail
+
+    date_buffer.resize(date_len, ' ');
+    return date_buffer;
 }
 
 }
