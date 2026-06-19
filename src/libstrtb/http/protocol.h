@@ -44,6 +44,11 @@ typedef struct status_line_ret {
     std::string reason_phrase;
 } status_line_ret;
 
+typedef struct parameters_ret {
+    size_t to = 0;
+    std::map<std::string, std::string> params;
+} parameters_ret;
+
 // all line parsers need CRLF pre-stripped from the end of the string
 
 parser_ret parse_token(const std::string &str);
@@ -58,6 +63,8 @@ request_line_ret parse_request_line(const std::string &line);
 status_line_ret parse_status_line(const std::string &line);
 time_t parse_date(const std::string &str);
 time_t parse_date(const std::string &str, size_t from, size_t to);
+parameters_ret parse_parameters(const std::string &str);
+parameters_ret parse_parameters(const std::string &str, size_t from, size_t to);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
@@ -66,6 +73,7 @@ http_version_ret parse_http_version(const char *str, size_t from, size_t to);
 request_line_ret parse_request_line(const char *line, size_t length);
 status_line_ret parse_status_line(const char *line, size_t length);
 time_t parse_date(const char *str, size_t from, size_t to);
+parameters_ret parse_parameters(const char *str, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {

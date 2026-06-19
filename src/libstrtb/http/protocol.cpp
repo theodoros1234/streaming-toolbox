@@ -114,6 +114,7 @@ static parser_ret parse_required_whitespace(const char *str, size_t from, size_t
 static parser_ret parse_word(const char *str, size_t from, size_t to, const char *word);
 static size_t find_char(const char *str, size_t from, size_t to, char c);
 static std::tuple<size_t, bool, unsigned int> parse_digits(const char *str, size_t from, size_t to, size_t digits);
+static std::string parse_token_tolower(const char *str, size_t from, size_t to);
 static constexpr size_t strlen_constexpr(const char *str);
 static constexpr uint64_t date_hash_short(const char *str);
 static constexpr uint64_t date_hash_short(const char *str, size_t from, size_t to);
@@ -150,6 +151,10 @@ static inline bool is_obs_text(unsigned char c) {
 
 static inline bool is_qdtext(unsigned char c) {
     return (0x20 <= c && c <= 0x7E && c != 0x22 && c != 0x5C) || c == '\t' || is_obs_text(c);
+}
+
+static inline char to_lower(char c) {
+    return 'A' <= c && c <= 'Z' ? c + ('a' - 'A') : c;
 }
 
 // makes sure the range params of parser functions is in string's bounds
@@ -269,6 +274,19 @@ parser_ret parse_token(const char *str, size_t from, size_t to) {
 
     // token must have at least 1 character
     return std::make_pair(pos, pos > from);
+}
+
+static std::string parse_token_tolower(const char *str, size_t from, size_t to) {
+    std::string token;
+
+    for (const char *c = str + from; c < str + to; c++) {
+        if (is_tchar(*c))
+            token.push_back(to_lower(*c));
+        else
+            return token;
+    }
+
+    return token;
 }
 
 // parse strings such as 'HTTP/1.1'
@@ -444,14 +462,9 @@ bool field_parser::process_line(const char *line, size_t length) {
     std::string field_name, field_value;
 
     // parse field-name
-    auto [field_name_size, field_name_valid] = parse_token(line, 0, length);
-    if (field_name_valid) {
-        field_name.reserve(field_name_size);
-        // copy field-name in lowercase
-        for (const char *c = line; c < line + field_name_size; c++)
-            field_name.push_back('A' <= *c && *c <= 'Z' ? *c + ('a' - 'A') : *c);
-
-        pos = field_name_size;
+    field_name = parse_token_tolower(line, 0, length);
+    if (!field_name.empty()) {
+        pos += field_name.length();
         // check for semicolon
         if (!parse_char(line, pos, length, ':'))
             return false;
@@ -990,6 +1003,60 @@ parser_ret parse_comment(const char *str, size_t from, size_t to) {
 
     // no closing )
     return {to, false};
+}
+
+parameters_ret parse_parameters(const std::string &str) {
+    return parse_parameters(str.data(), 0, str.length());
+}
+
+parameters_ret parse_parameters(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_parameters(str.data(), from, to);
+}
+
+parameters_ret parse_parameters(const char *str, size_t from, size_t to) {
+    parameters_ret ret;
+    ret.to = from;
+    size_t pos = from;
+
+    while (true) {
+        // optional whitespace ; optional whitespace
+        pos = parse_optional_whitespace(str, pos, to);
+        if (!parse_char(str, pos, to, ';'))
+            return ret;
+        pos++;
+        pos = parse_optional_whitespace(str, pos, to);
+        ret.to = pos;
+
+        // optional param specification
+        // parameter-name
+        std::string param_name = parse_token_tolower(str, pos, to);
+        if (param_name.empty())
+            continue;
+        pos += param_name.length();
+
+        // =
+        if (!parse_char(str, pos, to, '='))
+            return ret;
+        pos++;
+
+        // parameter-value (token or quoted-string)
+        std::string param_value;
+        auto [param_value_to, param_value_valid] = parse_token(str, pos, to);
+        if (param_value_valid) {    // token
+            param_value.assign(str + pos, param_value_to - pos);
+            pos = param_value_to;
+        } else {    // quoted-string
+            std::tie(param_value_to, param_value_valid, param_value) = parse_quoted_str(str, pos, to);
+            if (param_value_valid)
+                pos = param_value_to;
+            else    // invalid
+                return ret;
+        }
+
+        ret.params[std::move(param_name)] = std::move(param_value);
+        ret.to = pos;
+    }
 }
 
 }
