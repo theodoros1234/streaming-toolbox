@@ -913,4 +913,42 @@ std::string timestamp_to_string(time_t timestamp) {
     return date_buffer;
 }
 
+quoted_ret parse_quoted_str(const std::string &str) {
+    return parse_quoted_str(str.data(), 0, str.length());
+}
+
+quoted_ret parse_quoted_str(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_quoted_str(str.data(), from, to);
+}
+
+quoted_ret parse_quoted_str(const char *str, size_t from, size_t to) {
+    std::string parsed;
+
+    // opening "
+    if (!parse_char(str, from, to, '"'))
+        return {0, false, ""};
+
+    for (size_t i = from+1; i < to; i++) {
+        char c = str[i];
+        if (is_qdtext(c)) {     // regular char
+            parsed.push_back(c);
+        } else if (c == '\\') { // escape sequence (quoted-pair)
+            // get next char
+            if (++i >= to)
+                return {to, false, ""};
+            char c2 = str[i];
+            if (is_vchar(c2) || c2 == ' ' || c2 == '\t' || is_obs_text(c2))
+                parsed.push_back(c2);
+            else    // invalid char
+                return {i, false, ""};
+        } else if (c == '"') {  // closing "
+            return {i+1, true, parsed};
+        } else return {i, false, ""};   // invalid char
+    }
+
+    // no closing "
+    return {to, false, ""};
+}
+
 }
