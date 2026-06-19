@@ -50,6 +50,8 @@ parser_ret parse_token(const std::string &str);
 parser_ret parse_token(const std::string &str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const std::string &str);
 quoted_ret parse_quoted_str(const std::string &str, size_t from, size_t to);
+parser_ret parse_comment(const std::string &str);
+parser_ret parse_comment(const std::string &str, size_t from, size_t to);
 http_version_ret parse_http_version(const std::string &str);
 http_version_ret parse_http_version(const std::string &str, size_t from, size_t to);
 request_line_ret parse_request_line(const std::string &line);
@@ -59,6 +61,7 @@ time_t parse_date(const std::string &str, size_t from, size_t to);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
+parser_ret parse_comment(const char *str, size_t from, size_t to);
 http_version_ret parse_http_version(const char *str, size_t from, size_t to);
 request_line_ret parse_request_line(const char *line, size_t length);
 status_line_ret parse_status_line(const char *line, size_t length);

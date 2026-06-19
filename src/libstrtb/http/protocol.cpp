@@ -929,7 +929,7 @@ quoted_ret parse_quoted_str(const char *str, size_t from, size_t to) {
     if (!parse_char(str, from, to, '"'))
         return {0, false, ""};
 
-    for (size_t i = from+1; i < to; i++) {
+    for (size_t i = from + 1; i < to; i++) {
         char c = str[i];
         if (is_qdtext(c)) {     // regular char
             parsed.push_back(c);
@@ -949,6 +949,47 @@ quoted_ret parse_quoted_str(const char *str, size_t from, size_t to) {
 
     // no closing "
     return {to, false, ""};
+}
+
+parser_ret parse_comment(const std::string &str) {
+    return parse_comment(str.data(), 0, str.length());
+}
+
+parser_ret parse_comment(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_comment(str.data(), from, to);
+}
+
+parser_ret parse_comment(const char *str, size_t from, size_t to) {
+    // opening (
+    if (!parse_char(str, from, to, '('))
+        return {};
+
+    for (size_t i = from + 1; i < to;) {
+        char c = str[i];
+        if (c == '\\') {        // escape sequence (quoted-pair)
+            // get next char
+            if (++i >= to)
+                return {to, false};
+            char c2 = str[i];
+            if (is_vchar(c2) || c2 == ' ' || c2 == '\t' || is_obs_text(c2))
+                i++;
+            else
+                return {i, false};
+        } else if (c == '(') {  // nested comment
+            bool valid;
+            std::tie(i, valid) = parse_comment(str, i, to);
+            if (!valid)
+                return {i, false};
+        } else if (c == ')') {  // closing )
+            return {i+1, true};
+        } else if (!(is_vchar(c) || c == ' ' || c == '\t' || is_obs_text(c))) {  // invalid char
+            return {i, false};
+        } else i++;
+    }
+
+    // no closing )
+    return {to, false};
 }
 
 }
