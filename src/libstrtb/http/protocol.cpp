@@ -1059,4 +1059,52 @@ parameters_ret parse_parameters(const char *str, size_t from, size_t to) {
     }
 }
 
+parser_ret parse_list(const std::string &str,
+                      const std::function<parser_ret(const char*, size_t, size_t)> &element_parser) {
+    return parse_list(str.data(), 0, str.length(), element_parser);
+}
+
+parser_ret parse_list(const std::string &str, size_t from, size_t to,
+                      const std::function<parser_ret(const char*, size_t, size_t)> &element_parser) {
+    verify_range(str, from, to);
+    return parse_list(str.data(), from, to, element_parser);
+}
+
+parser_ret parse_list(const char *str, size_t from, size_t to,
+                      const std::function<parser_ret(const char*, size_t, size_t)> &element_parser) {
+    /* NOTE: element_parser should try to parse until it finds the first invalid character
+     *       (possibly a comma or space) and return its position, along with valid=true.
+     *       When it returns invalid, it SHOULDN'T store/use its last element. The caller
+     *       of parse_list should ignore any saved results if parse_list returns invalid,
+     *       and confirm whether it reached end-of-line if that's required.
+     */
+
+    size_t pos = from, empty_count = 0;
+
+    while (true) {
+        // list element
+        auto [pos_next, valid] = element_parser(str, pos, to);
+        if (valid)  // if invalid, check if it's just an empty element and skip it
+            pos = pos_next;
+
+        // [whitespace] , [whitespace]
+        pos = parse_optional_whitespace(str, pos, to);
+        size_t pos_comma = pos;
+        if (!parse_char(str, pos, to, ',')) {
+            if (valid)      // last element was valid => possible end of list
+                return {pos_next, true};
+            else if (pos >= to)     // ending with an empty element => valid
+                return {to, true};
+            else            // last element invalid => probably invalid list
+                return {pos, false};
+        }
+        pos++;
+        pos = parse_optional_whitespace(str, pos, to);
+
+        // skip a reasonable amount of empty elements, as specified by the RFC
+        if (!valid && (++empty_count >= STRTB_HTTP_PARSE_LIST_MAX_EMPTY_ELEMENTS))
+            return {pos_comma, valid};
+    }
+}
+
 }

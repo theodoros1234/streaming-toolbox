@@ -6,7 +6,10 @@
 #include <map>
 #include <ctime>
 #include <limits>   // IWYU pragma: keep
+#include <functional>
 #include "../uri.h"
+
+#define STRTB_HTTP_PARSE_LIST_MAX_EMPTY_ELEMENTS 16
 
 // NOTE: currently targetting HTTP/1.1 compatibility
 
@@ -65,6 +68,10 @@ time_t parse_date(const std::string &str);
 time_t parse_date(const std::string &str, size_t from, size_t to);
 parameters_ret parse_parameters(const std::string &str);
 parameters_ret parse_parameters(const std::string &str, size_t from, size_t to);
+parser_ret parse_list(const std::string &str,
+                      const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
+parser_ret parse_list(const std::string &str, size_t from, size_t to,
+                      const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
@@ -74,6 +81,8 @@ request_line_ret parse_request_line(const char *line, size_t length);
 status_line_ret parse_status_line(const char *line, size_t length);
 time_t parse_date(const char *str, size_t from, size_t to);
 parameters_ret parse_parameters(const char *str, size_t from, size_t to);
+parser_ret parse_list(const char *str, size_t from, size_t to,
+                      const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
