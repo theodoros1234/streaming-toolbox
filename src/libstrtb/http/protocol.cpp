@@ -1194,4 +1194,44 @@ product_list_ret parse_field_upgrade(const char* str, size_t from, size_t to) {
         return {};
 }
 
+content_type_ret parse_field_content_type(const std::string &str) {
+    return parse_field_content_type(str.data(), 0, str.length());
+}
+
+content_type_ret parse_field_content_type(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_field_content_type(str.data(), from, to);
+}
+
+content_type_ret parse_field_content_type(const char *str, size_t from, size_t to) {
+    std::string type, subtype;
+    size_t pos = from;
+
+    // type
+    auto [pos_next, valid] = parse_token(str, pos, to);
+    if (!valid)
+        return {};
+    type.assign(str + pos, pos_next - pos);
+    pos = pos_next;
+
+    // /
+    if (!parse_char(str, pos, to, '/'))
+        return {};
+    pos++;
+
+    // subtype
+    std::tie(pos_next, valid) = parse_token(str, pos, to);
+    if (!valid)
+        return {};
+    subtype.assign(str + pos, pos_next - pos);
+    pos = pos_next;
+
+    // params
+    auto [pos_after_params, params] = parse_parameters(str, pos, to);
+    if (pos_after_params != to)
+        return {};
+
+    return {true, std::move(type), std::move(subtype), std::move(params)};
+}
+
 }
