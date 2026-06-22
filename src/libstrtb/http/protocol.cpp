@@ -1107,4 +1107,30 @@ parser_ret parse_list(const char *str, size_t from, size_t to,
     }
 }
 
+token_list_ret parse_field_token_list(const std::string &field_value) {
+    return parse_field_token_list(field_value.data(), 0, field_value.length());
+}
+
+token_list_ret parse_field_token_list(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_token_list(field_value.data(), from, to);
+}
+
+// simple token list, used by headers such as: Connection, Allow, Trailer
+token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to) {
+    std::vector<std::string> list;
+    auto [list_to, valid] = parse_list(field_value, from, to,
+        [&list](const char *s, size_t f, size_t t) -> parser_ret {
+        auto r = parse_token(s, f, t);
+        if (r.second)
+            list.emplace_back(s + f, r.first - f);
+        return r;
+    });
+
+    if (valid && list_to == to)
+        return {true, std::move(list)};
+    else
+        return {};
+}
+
 }

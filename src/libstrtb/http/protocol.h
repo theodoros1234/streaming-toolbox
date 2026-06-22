@@ -52,6 +52,11 @@ typedef struct parameters_ret {
     std::map<std::string, std::string> params;
 } parameters_ret;
 
+typedef struct token_list_ret {
+    bool valid = false;
+    std::vector<std::string> list;
+} token_list_ret;
+
 // all line parsers need CRLF pre-stripped from the end of the string
 
 parser_ret parse_token(const std::string &str);
@@ -72,6 +77,8 @@ parser_ret parse_list(const std::string &str,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 parser_ret parse_list(const std::string &str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
+token_list_ret parse_field_token_list(const std::string &field_value);
+token_list_ret parse_field_token_list(const std::string &field_value, size_t from, size_t to);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
@@ -83,6 +90,7 @@ time_t parse_date(const char *str, size_t from, size_t to);
 parameters_ret parse_parameters(const char *str, size_t from, size_t to);
 parser_ret parse_list(const char *str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
+token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
