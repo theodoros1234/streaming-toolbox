@@ -1,6 +1,7 @@
 #include "protocol.h"
 
 #include <cstdint>
+#include <climits>
 #include <cstring>
 #include <stdexcept>
 #include <map>
@@ -1248,6 +1249,52 @@ content_type_ret parse_field_content_type(const char *field_value, size_t from, 
         return {};
 
     return {true, std::move(type), std::move(subtype), std::move(params)};
+}
+
+integer_ret parse_integer(const std::string &str) {
+    return parse_integer(str.data(), 0, str.length());
+}
+
+integer_ret parse_integer(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_integer(str.data(), from, to);
+}
+
+integer_ret parse_integer(const char *str, size_t from, size_t to) {
+    unsigned long long number = 0;
+    size_t i;
+
+    for (i = from; i < to; i++) {
+        char c = str[i];
+        if (!is_digit(c))
+            break;
+        unsigned int n = c - '0';
+
+        // overflow check
+        if (number > (ULONG_LONG_MAX - n) / 10)
+            return {i, false, true, 0};
+
+        number = number * 10 + n;
+    }
+
+    return {i, i > from, false, number};
+}
+
+integer_field_ret parse_field_integer(const std::string &field_value) {
+    return parse_field_integer(field_value.data(), 0, field_value.length());
+}
+
+integer_field_ret parse_field_integer(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_integer(field_value.data(), from, to);
+}
+
+// field that only contains a non-negative integer number, used by: Content-Length, Max-Forwards
+integer_field_ret parse_field_integer(const char *field_value, size_t from, size_t to) {
+    auto ret = parse_integer(field_value, from, to);
+    if (!ret.valid || ret.to != to)     // invalid/overflown, or extra stuff after number
+        return {false, ret.overflow, 0};
+    return {true, false, ret.number};
 }
 
 }
