@@ -1121,7 +1121,7 @@ token_list_ret parse_field_token_list(const std::string &field_value, size_t fro
     return parse_field_token_list(field_value.data(), from, to, tolower);
 }
 
-// simple token list, used by headers such as: Connection, Allow, Trailer
+// simple token list, used by headers such as: Connection, Content-Encoding, Content-Language, Allow, Trailer
 token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool tolower) {
     std::vector<std::string> list;
     size_t list_to = 0;
@@ -1185,19 +1185,19 @@ product_ret parse_product_or_protocol(const char *str, size_t from, size_t to) {
     return {pos_after_version, true, std::move(name), std::move(version)};
 }
 
-product_list_ret parse_field_upgrade(const std::string &str) {
-    return parse_field_upgrade(str.data(), 0, str.length());
+product_list_ret parse_field_upgrade(const std::string &field_value) {
+    return parse_field_upgrade(field_value.data(), 0, field_value.length());
 }
 
-product_list_ret parse_field_upgrade(const std::string &str, size_t from, size_t to) {
-    verify_range(str, from, to);
-    return parse_field_upgrade(str.data(), from, to);
+product_list_ret parse_field_upgrade(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_upgrade(field_value.data(), from, to);
 }
 
-product_list_ret parse_field_upgrade(const char* str, size_t from, size_t to) {
+product_list_ret parse_field_upgrade(const char* field_value, size_t from, size_t to) {
     std::vector< std::pair<std::string, std::string> > list;
 
-    auto [list_to, valid] = parse_list(str, from, to,
+    auto [list_to, valid] = parse_list(field_value, from, to,
         [&list](const char* str, size_t from, size_t to) -> parser_ret {
         auto ret = parse_product_or_protocol(str, from, to);
         // NOTE: The protocol name should be case insensitive, but protocols have a preferred case
@@ -1213,37 +1213,37 @@ product_list_ret parse_field_upgrade(const char* str, size_t from, size_t to) {
         return {};
 }
 
-content_type_ret parse_field_content_type(const std::string &str) {
-    return parse_field_content_type(str.data(), 0, str.length());
+content_type_ret parse_field_content_type(const std::string &field_value) {
+    return parse_field_content_type(field_value.data(), 0, field_value.length());
 }
 
-content_type_ret parse_field_content_type(const std::string &str, size_t from, size_t to) {
-    verify_range(str, from, to);
-    return parse_field_content_type(str.data(), from, to);
+content_type_ret parse_field_content_type(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_content_type(field_value.data(), from, to);
 }
 
-content_type_ret parse_field_content_type(const char *str, size_t from, size_t to) {
+content_type_ret parse_field_content_type(const char *field_value, size_t from, size_t to) {
     size_t pos = from;
 
     // type
-    std::string type = parse_token_tolower(str, pos, to);
+    std::string type = parse_token_tolower(field_value, pos, to);
     if (type.empty())
         return {};
     pos += type.length();
 
     // /
-    if (!parse_char(str, pos, to, '/'))
+    if (!parse_char(field_value, pos, to, '/'))
         return {};
     pos++;
 
     // subtype
-    std::string subtype = parse_token_tolower(str, pos, to);
+    std::string subtype = parse_token_tolower(field_value, pos, to);
     if (subtype.empty())
         return {};
     pos += subtype.length();
 
     // params
-    auto [pos_next, params] = parse_parameters(str, pos, to);
+    auto [pos_next, params] = parse_parameters(field_value, pos, to);
     if (pos_next != to)
         return {};
 

@@ -98,10 +98,10 @@ parser_ret parse_list(const std::string &str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 token_list_ret parse_field_token_list(const std::string &field_value, bool tolower=false);
 token_list_ret parse_field_token_list(const std::string &field_value, size_t from, size_t to, bool tolower=false);
-product_list_ret parse_field_upgrade(const std::string &str);
-product_list_ret parse_field_upgrade(const std::string &str, size_t from, size_t to);
-content_type_ret parse_field_content_type(const std::string &str);
-content_type_ret parse_field_content_type(const std::string &str, size_t from, size_t to);
+product_list_ret parse_field_upgrade(const std::string &field_value);
+product_list_ret parse_field_upgrade(const std::string &field_value, size_t from, size_t to);
+content_type_ret parse_field_content_type(const std::string &field_value);
+content_type_ret parse_field_content_type(const std::string &field_value, size_t from, size_t to);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
@@ -115,8 +115,8 @@ product_ret parse_product_or_protocol(const char *str, size_t from, size_t to);
 parser_ret parse_list(const char *str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool tolower=false);
-product_list_ret parse_field_upgrade(const char* str, size_t from, size_t to);
-content_type_ret parse_field_content_type(const char *str, size_t from, size_t to);
+product_list_ret parse_field_upgrade(const char *field_value, size_t from, size_t to);
+content_type_ret parse_field_content_type(const char *field_value, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
