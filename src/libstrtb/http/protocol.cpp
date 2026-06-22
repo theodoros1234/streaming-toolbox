@@ -1055,6 +1055,10 @@ parameters_ret parse_parameters(const char *str, size_t from, size_t to) {
                 return ret;
         }
 
+        /* NOTE: The charset param's value is supposed to be case-insensitive (e.g. "utf-8"="UTF-8").
+         *       Make sure to use case-insensitive comparisons when checking it.
+         */
+
         ret.params[std::move(param_name)] = std::move(param_value);
         ret.to = pos;
     }
@@ -1108,26 +1112,39 @@ parser_ret parse_list(const char *str, size_t from, size_t to,
     }
 }
 
-token_list_ret parse_field_token_list(const std::string &field_value) {
-    return parse_field_token_list(field_value.data(), 0, field_value.length());
+token_list_ret parse_field_token_list(const std::string &field_value, bool tolower) {
+    return parse_field_token_list(field_value.data(), 0, field_value.length(), tolower);
 }
 
-token_list_ret parse_field_token_list(const std::string &field_value, size_t from, size_t to) {
+token_list_ret parse_field_token_list(const std::string &field_value, size_t from, size_t to, bool tolower) {
     verify_range(field_value, from, to);
-    return parse_field_token_list(field_value.data(), from, to);
+    return parse_field_token_list(field_value.data(), from, to, tolower);
 }
 
 // simple token list, used by headers such as: Connection, Allow, Trailer
-token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to) {
+token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool tolower) {
     std::vector<std::string> list;
+    size_t list_to = 0;
+    bool valid = false;
 
-    auto [list_to, valid] = parse_list(field_value, from, to,
-        [&list](const char *str, size_t from, size_t to) -> parser_ret {
-        auto r = parse_token(str, from, to);
-        if (r.second)
-            list.emplace_back(str + from, r.first - from);
-        return r;
-    });
+    if (tolower) {
+        std::tie(list_to, valid) = parse_list(field_value, from, to,
+            [&list](const char *str, size_t from, size_t to) -> parser_ret {
+            std::string element = parse_token_tolower(str, from, to);
+            parser_ret ret = {from + element.length(), !element.empty()};
+            if (!element.empty())
+                list.emplace_back(std::move(element));
+            return ret;
+        });
+    } else {
+        std::tie(list_to, valid) = parse_list(field_value, from, to,
+            [&list](const char *str, size_t from, size_t to) -> parser_ret {
+            auto r = parse_token(str, from, to);
+            if (r.second)
+                list.emplace_back(str + from, r.first - from);
+            return r;
+        });
+    }
 
     if (valid && list_to == to)
         return {true, std::move(list)};
@@ -1183,6 +1200,8 @@ product_list_ret parse_field_upgrade(const char* str, size_t from, size_t to) {
     auto [list_to, valid] = parse_list(str, from, to,
         [&list](const char* str, size_t from, size_t to) -> parser_ret {
         auto ret = parse_product_or_protocol(str, from, to);
+        // NOTE: The protocol name should be case insensitive, but protocols have a preferred case
+        // TODO: think about how to handle this
         if (ret.valid)
             list.emplace_back(std::move(ret.name), std::move(ret.version));
         return {ret.to, ret.valid};
@@ -1204,15 +1223,13 @@ content_type_ret parse_field_content_type(const std::string &str, size_t from, s
 }
 
 content_type_ret parse_field_content_type(const char *str, size_t from, size_t to) {
-    std::string type, subtype;
     size_t pos = from;
 
     // type
-    auto [pos_next, valid] = parse_token(str, pos, to);
-    if (!valid)
+    std::string type = parse_token_tolower(str, pos, to);
+    if (type.empty())
         return {};
-    type.assign(str + pos, pos_next - pos);
-    pos = pos_next;
+    pos += type.length();
 
     // /
     if (!parse_char(str, pos, to, '/'))
@@ -1220,15 +1237,14 @@ content_type_ret parse_field_content_type(const char *str, size_t from, size_t t
     pos++;
 
     // subtype
-    std::tie(pos_next, valid) = parse_token(str, pos, to);
-    if (!valid)
+    std::string subtype = parse_token_tolower(str, pos, to);
+    if (subtype.empty())
         return {};
-    subtype.assign(str + pos, pos_next - pos);
-    pos = pos_next;
+    pos += subtype.length();
 
     // params
-    auto [pos_after_params, params] = parse_parameters(str, pos, to);
-    if (pos_after_params != to)
+    auto [pos_next, params] = parse_parameters(str, pos, to);
+    if (pos_next != to)
         return {};
 
     return {true, std::move(type), std::move(subtype), std::move(params)};
