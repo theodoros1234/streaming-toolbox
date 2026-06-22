@@ -1120,12 +1120,72 @@ token_list_ret parse_field_token_list(const std::string &field_value, size_t fro
 // simple token list, used by headers such as: Connection, Allow, Trailer
 token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to) {
     std::vector<std::string> list;
+
     auto [list_to, valid] = parse_list(field_value, from, to,
-        [&list](const char *s, size_t f, size_t t) -> parser_ret {
-        auto r = parse_token(s, f, t);
+        [&list](const char *str, size_t from, size_t to) -> parser_ret {
+        auto r = parse_token(str, from, to);
         if (r.second)
-            list.emplace_back(s + f, r.first - f);
+            list.emplace_back(str + from, r.first - from);
         return r;
+    });
+
+    if (valid && list_to == to)
+        return {true, std::move(list)};
+    else
+        return {};
+}
+
+product_ret parse_product_or_protocol(const std::string &str) {
+    return parse_product_or_protocol(str.data(), 0, str.length());
+}
+
+product_ret parse_product_or_protocol(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_product_or_protocol(str.data(), from, to);
+}
+
+product_ret parse_product_or_protocol(const char *str, size_t from, size_t to) {
+    size_t pos = from;
+    std::string name, version;
+
+    // name
+    auto [pos_after_name, valid] = parse_token(str, pos, to);
+    if (!valid)
+        return {pos_after_name, false, std::string(), std::string()};
+    name.assign(str + pos, pos_after_name - pos);
+    pos = pos_after_name;
+
+    // /version (optional)
+    if (!parse_char(str, pos, to, '/'))
+        return {pos_after_name, true, std::move(name), std::move(version)};
+    pos++;
+    size_t pos_after_version;
+    std::tie(pos_after_version, valid) = parse_token(str, pos, to);
+    if (!valid)
+        return {pos_after_name, true, std::move(name), std::move(version)};
+    version.assign(str + pos, pos_after_version - pos);
+
+    return {pos_after_version, true, std::move(name), std::move(version)};
+}
+
+product_list_ret parse_field_upgrade(const std::string &str) {
+    return parse_field_upgrade(str.data(), 0, str.length());
+}
+
+product_list_ret parse_field_upgrade(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_field_upgrade(str.data(), from, to);
+}
+
+product_list_ret parse_field_upgrade(const char* str, size_t from, size_t to) {
+    std::vector< std::pair<std::string, std::string> > list;
+
+    auto [list_to, valid] = parse_list(str, from, to,
+        [&list](const char* str, size_t from, size_t to) -> parser_ret {
+        auto ret = parse_product_or_protocol(str, from, to);
+        if (ret.valid)
+            list.emplace_back(std::move(ret.name), std::move(ret.version));
+        return {ret.to, ret.valid};
     });
 
     if (valid && list_to == to)
