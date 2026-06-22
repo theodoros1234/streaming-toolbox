@@ -485,6 +485,7 @@ bool field_parser::process_line(const char *line, size_t length) {
 
     // parse field-value
     field_value_from = pos;
+    field_value_to = pos;
     for (size_t i = pos; i < length; i++) {
         // mark last non-whitespace character as end of value
         char c = line[i];
