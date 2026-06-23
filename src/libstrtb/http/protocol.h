@@ -18,77 +18,77 @@ namespace strtb::http {
 typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is valid
 typedef std::tuple<size_t, bool, std::string> quoted_ret;   // ends at, is valid, unescaped string
 
-typedef struct http_version_ret {
+struct http_version_ret {
     size_t to = 0;
     bool valid = false; // make sure to check this
     int v_major = 0, v_minor = 0;
-} http_version_ret;
+};
 
-typedef enum request_target_form_enum {
+enum request_target_form_enum {
     TARGET_FORM_INVALID,
     TARGET_FORM_ORIGIN,
     TARGET_FORM_ABSOLUTE,
     TARGET_FORM_AUTHORITY,
     TARGET_FORM_ASTERISK
-} request_target_form_enum;
+};
 
-typedef struct request_line_ret {
+struct request_line_ret {
     bool valid = false;
     std::string method, target;
     request_target_form_enum target_form = TARGET_FORM_INVALID;
     uri::parser target_segments;
     int http_version_major = 0, http_version_minor = 0;
-} request_line_ret;
+};
 
-typedef struct status_line_ret {
+struct status_line_ret {
     bool valid = false;
     int http_version_major = 0, http_version_minor = 0,
         status_code = 0;
     std::string reason_phrase;
-} status_line_ret;
+};
 
-typedef struct parameters_ret {
+struct parameters_ret {
     size_t to = 0;
     std::map<std::string, std::string> params;
-} parameters_ret;
+};
 
-typedef struct product_ret {
+struct product_ret {
     size_t to = 0;
     bool valid = false;
     std::string name, version;  // version may be empty if not specified
-} product_ret;
+};
 
-typedef struct integer_ret {
+struct integer_ret {
     size_t to = 0;
     bool valid = false, overflow = false;
     unsigned long long number = 0;
-} integer_ret;
+};
 
-typedef struct token_list_ret {
+struct token_list_ret {
     bool valid = false;
     std::vector<std::string> list;
-} token_list_ret;
+};
 
-typedef struct product_list_ret {
+struct product_list_ret {
     bool valid = false;
     std::vector< std::pair<std::string, std::string> > list;    // .first=name, .second=version (may be empty)
-} product_list_ret;
+};
 
-typedef struct content_type_ret {
+struct content_type_ret {
     bool valid = false;
     std::string type, subtype;
     std::map<std::string, std::string> params;
-} content_type_ret;
+};
 
-typedef struct integer_field_ret {
+struct integer_field_ret {
     bool valid = false, overflow = false;
     unsigned long long number = 0;
-} integer_field_ret;
+};
 
-typedef struct abs_or_part_uri_field_ret {
+struct abs_or_part_uri_field_ret {
     bool valid = false, is_partial = false;
     uri::parser segments;
-} abs_or_part_uri_field_ret;
+};
 
 // all line parsers need CRLF pre-stripped from the end of the string
 
