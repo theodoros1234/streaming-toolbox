@@ -1361,4 +1361,21 @@ entity_tag_ret parse_etag(const char *str, size_t from, size_t to) {
     return {to, false, false, std::string()};           // invalid
 }
 
+etag_field_ret parse_field_etag(const std::string &field_value) {
+    return parse_field_etag(field_value.data(), 0, field_value.length());
+}
+
+etag_field_ret parse_field_etag(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_etag(field_value.data(), from, to);
+}
+
+etag_field_ret parse_field_etag(const char *field_value, size_t from, size_t to) {
+    entity_tag_ret ret = parse_etag(field_value, from, to);
+    if (ret.valid && ret.to == to)
+        return {ret.valid, ret.is_weak, std::move(ret.tag)};
+    else
+        return {};
+}
+
 }
