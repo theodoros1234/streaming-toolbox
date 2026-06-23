@@ -64,6 +64,17 @@ struct integer_ret {
     unsigned long long number = 0;
 };
 
+struct entity_tag {
+    bool is_weak = false;
+    std::string tag;
+};
+
+struct entity_tag_ret {
+    size_t to = 0;
+    bool valid = false, is_weak = false;
+    std::string tag;
+};
+
 struct token_list_ret {
     bool valid = false;
     std::vector<std::string> list;
@@ -110,6 +121,8 @@ product_ret parse_product_or_protocol(const std::string &str);
 product_ret parse_product_or_protocol(const std::string &str, size_t from, size_t to);
 integer_ret parse_integer(const std::string &str);
 integer_ret parse_integer(const std::string &str, size_t from, size_t to);
+entity_tag_ret parse_etag(const std::string &str);
+entity_tag_ret parse_etag(const std::string &str, size_t from, size_t to);
 parser_ret parse_list(const std::string &str,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 parser_ret parse_list(const std::string &str, size_t from, size_t to,
@@ -135,6 +148,7 @@ time_t parse_date(const char *str, size_t from, size_t to);
 parameters_ret parse_parameters(const char *str, size_t from, size_t to);
 product_ret parse_product_or_protocol(const char *str, size_t from, size_t to);
 integer_ret parse_integer(const char *str, size_t from, size_t to);
+entity_tag_ret parse_etag(const char *str, size_t from, size_t to);
 parser_ret parse_list(const char *str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool tolower=false);

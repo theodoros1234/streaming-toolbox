@@ -831,6 +831,7 @@ time_t parse_date(const std::string &str, size_t from, size_t to) {
     return parse_date(str.data(), from, to);
 }
 
+// used directly for fields such as: Date, If-(Un)modified-Since, Last-Modified, and indirectly for others
 time_t parse_date(const char *str, size_t from, size_t to) {
     date_parser_inner_ret inner_ret;
 
@@ -1322,6 +1323,42 @@ abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const char *field_value, s
         return {};
 
     return {true, is_partial, uri};
+}
+
+entity_tag_ret parse_etag(const std::string &str) {
+    return parse_etag(str.data(), 0, str.length());
+}
+
+entity_tag_ret parse_etag(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_etag(str.data(), from, to);
+}
+
+entity_tag_ret parse_etag(const char *str, size_t from, size_t to) {
+    bool is_weak = false;
+    size_t pos = from, pos_next = from;
+
+    // optional weak indicator
+    std::tie(pos_next, is_weak) = parse_word(str, pos, to, "W/");
+    if (is_weak)
+        pos = pos_next;
+
+    // opening quote
+    if (!parse_char(str, pos, to, '"'))
+        return {pos, false, false, std::string()};      // invalid
+    pos++;
+
+    // check the rest of the characters
+    for (size_t i = pos; i < to; i++) {
+        char c = str[i];
+        if (c == '"')   // closing quote
+            return {i+1, true, is_weak, std::string(str + pos, i - pos)};
+        else if (!(is_vchar(c) || is_obs_text(c)))
+            return {i, false, false, std::string()};    // invalid
+    }
+
+    // closing quote not found
+    return {to, false, false, std::string()};           // invalid
 }
 
 }
