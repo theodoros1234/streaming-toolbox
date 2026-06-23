@@ -71,8 +71,8 @@ struct entity_tag {
 
 struct entity_tag_ret {
     size_t to = 0;
-    bool valid = false, is_weak = false;
-    std::string tag;
+    bool valid = false;
+    entity_tag etag;
 };
 
 struct token_list_ret {
@@ -102,8 +102,8 @@ struct abs_or_part_uri_field_ret {
 };
 
 struct etag_field_ret {
-    bool valid = false, is_weak = false;
-    std::string tag;
+    bool valid = false;
+    entity_tag etag;
 };
 
 // all line parsers need CRLF pre-stripped from the end of the string
@@ -185,6 +185,8 @@ public:
 
 const char* get_status_code_phrase(int status_code);
 std::string timestamp_to_string(time_t timestamp);
+bool etag_compare(const entity_tag &a, const entity_tag &b, bool strong);
+std::string etag_to_string(const entity_tag &etag);
 
 }
 

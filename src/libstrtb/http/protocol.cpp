@@ -1,4 +1,5 @@
 #include "protocol.h"
+#include "common/strescape.h"
 
 #include <cstdint>
 #include <climits>  // IWYU pragma: keep
@@ -1345,20 +1346,20 @@ entity_tag_ret parse_etag(const char *str, size_t from, size_t to) {
 
     // opening quote
     if (!parse_char(str, pos, to, '"'))
-        return {pos, false, false, std::string()};      // invalid
+        return {pos, false, {}};    // invalid
     pos++;
 
     // check the rest of the characters
     for (size_t i = pos; i < to; i++) {
         char c = str[i];
         if (c == '"')   // closing quote
-            return {i+1, true, is_weak, std::string(str + pos, i - pos)};
+            return {i+1, true, {is_weak, std::string(str + pos, i - pos)}};
         else if (!(is_vchar(c) || is_obs_text(c)))
-            return {i, false, false, std::string()};    // invalid
+            return {i, false, {}};  // invalid
     }
 
     // closing quote not found
-    return {to, false, false, std::string()};           // invalid
+    return {to, false, {}};         // invalid
 }
 
 etag_field_ret parse_field_etag(const std::string &field_value) {
@@ -1373,9 +1374,43 @@ etag_field_ret parse_field_etag(const std::string &field_value, size_t from, siz
 etag_field_ret parse_field_etag(const char *field_value, size_t from, size_t to) {
     entity_tag_ret ret = parse_etag(field_value, from, to);
     if (ret.valid && ret.to == to)
-        return {ret.valid, ret.is_weak, std::move(ret.tag)};
+        return {true, std::move(ret.etag)};
     else
         return {};
+}
+
+bool etag_compare(const entity_tag &a, const entity_tag &b, bool strong) {
+    // strong comparison requires both tags to not be weak
+    if (strong && (a.is_weak || b.is_weak))
+        return false;
+
+    // contents must match
+    if (a.tag.length() != b.tag.length())
+        return false;
+    for (size_t i = 0; i < a.tag.length(); i++)
+        if (a.tag[i] != b.tag[i])
+            return false;
+
+    return true;
+}
+
+std::string etag_to_string(const entity_tag &etag) {
+    using namespace std::string_literals;
+
+    std::string str;
+    if (etag.is_weak)
+        str += "W/";
+
+    str.push_back('"');     // opening quote
+    for (char c : etag.tag) {   // check for invalid characters
+        if ((is_vchar(c) && c != '"') || is_obs_text(c))
+            str.push_back(c);
+        else
+            throw std::invalid_argument("found invalid character "s + strtb::common::char_escape(c) + " in tag");
+    }
+    str.push_back('"');     // closing quote
+
+    return str;
 }
 
 }
