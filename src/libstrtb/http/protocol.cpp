@@ -822,17 +822,17 @@ static date_parser_inner_ret parse_date_asctime(const char *str, size_t from, si
     return ret;
 }
 
-time_t parse_date(const std::string &str) {
-    return parse_date(str.data(), 0, str.length());
+time_t parse_field_date(const std::string &str) {
+    return parse_field_date(str.data(), 0, str.length());
 }
 
-time_t parse_date(const std::string &str, size_t from, size_t to) {
+time_t parse_field_date(const std::string &str, size_t from, size_t to) {
     verify_range(str, from, to);
-    return parse_date(str.data(), from, to);
+    return parse_field_date(str.data(), from, to);
 }
 
 // used directly for fields such as: Date, If-(Un)modified-Since, Last-Modified, and indirectly for others
-time_t parse_date(const char *str, size_t from, size_t to) {
+time_t parse_field_date(const char *str, size_t from, size_t to) {
     date_parser_inner_ret inner_ret;
 
     // try parsing all 3 date formats

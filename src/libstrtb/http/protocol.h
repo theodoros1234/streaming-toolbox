@@ -118,8 +118,6 @@ http_version_ret parse_http_version(const std::string &str);
 http_version_ret parse_http_version(const std::string &str, size_t from, size_t to);
 request_line_ret parse_request_line(const std::string &line);
 status_line_ret parse_status_line(const std::string &line);
-time_t parse_date(const std::string &str);
-time_t parse_date(const std::string &str, size_t from, size_t to);
 parameters_ret parse_parameters(const std::string &str);
 parameters_ret parse_parameters(const std::string &str, size_t from, size_t to);
 product_ret parse_product_or_protocol(const std::string &str);
@@ -132,6 +130,8 @@ parser_ret parse_list(const std::string &str,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 parser_ret parse_list(const std::string &str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
+time_t parse_field_date(const std::string &str);
+time_t parse_field_date(const std::string &str, size_t from, size_t to);
 token_list_ret parse_field_token_list(const std::string &field_value, bool tolower=false);
 token_list_ret parse_field_token_list(const std::string &field_value, size_t from, size_t to, bool tolower=false);
 product_list_ret parse_field_upgrade(const std::string &field_value);
@@ -151,13 +151,13 @@ parser_ret parse_comment(const char *str, size_t from, size_t to);
 http_version_ret parse_http_version(const char *str, size_t from, size_t to);
 request_line_ret parse_request_line(const char *line, size_t length);
 status_line_ret parse_status_line(const char *line, size_t length);
-time_t parse_date(const char *str, size_t from, size_t to);
 parameters_ret parse_parameters(const char *str, size_t from, size_t to);
 product_ret parse_product_or_protocol(const char *str, size_t from, size_t to);
 integer_ret parse_integer(const char *str, size_t from, size_t to);
 entity_tag_ret parse_etag(const char *str, size_t from, size_t to);
 parser_ret parse_list(const char *str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
+time_t parse_field_date(const char *str, size_t from, size_t to);
 token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool tolower=false);
 product_list_ret parse_field_upgrade(const char *field_value, size_t from, size_t to);
 content_type_ret parse_field_content_type(const char *field_value, size_t from, size_t to);
