@@ -1,7 +1,7 @@
 #include "protocol.h"
 
 #include <cstdint>
-#include <climits>
+#include <climits>  // IWYU pragma: keep
 #include <cstring>
 #include <stdexcept>
 #include <map>
@@ -1295,6 +1295,33 @@ integer_field_ret parse_field_integer(const char *field_value, size_t from, size
     if (!ret.valid || ret.to != to)     // invalid/overflown, or extra stuff after number
         return {false, ret.overflow, 0};
     return {true, false, ret.number};
+}
+
+abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const std::string &field_value) {
+    return parse_field_abs_or_part_uri(field_value.data(), 0, field_value.length());
+}
+
+abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_abs_or_part_uri(field_value.data(), from, to);
+}
+
+// used for headers such as: Content-Location, Referer
+abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const char *field_value, size_t from, size_t to) {
+    uri::parser uri;
+    bool is_partial = false;
+
+    if (!uri.parse_uri(field_value, from, to).second) { // try parsing as absolute
+        if (!uri.parse_relative_ref(field_value, from, to).second)  // try parsing as partial
+            return {};  // fully invalid
+        is_partial = true;
+    }
+
+    // no fragment allowed
+    if (uri.fragment_to)
+        return {};
+
+    return {true, is_partial, uri};
 }
 
 }

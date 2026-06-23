@@ -85,6 +85,11 @@ typedef struct integer_field_ret {
     unsigned long long number = 0;
 } integer_field_ret;
 
+typedef struct abs_or_part_uri_field_ret {
+    bool valid = false, is_partial = false;
+    uri::parser segments;
+} abs_or_part_uri_field_ret;
+
 // all line parsers need CRLF pre-stripped from the end of the string
 
 parser_ret parse_token(const std::string &str);
@@ -117,6 +122,8 @@ content_type_ret parse_field_content_type(const std::string &field_value);
 content_type_ret parse_field_content_type(const std::string &field_value, size_t from, size_t to);
 integer_field_ret parse_field_integer(const std::string &field_value);
 integer_field_ret parse_field_integer(const std::string &field_value, size_t from, size_t to);
+abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const std::string &field_value);
+abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const std::string &field_value, size_t from, size_t to);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
@@ -134,6 +141,7 @@ token_list_ret parse_field_token_list(const char *field_value, size_t from, size
 product_list_ret parse_field_upgrade(const char *field_value, size_t from, size_t to);
 content_type_ret parse_field_content_type(const char *field_value, size_t from, size_t to);
 integer_field_ret parse_field_integer(const char *field_value, size_t from, size_t to);
+abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const char *field_value, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
