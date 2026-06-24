@@ -1413,4 +1413,64 @@ std::string etag_to_string(const entity_tag &etag) {
     return str;
 }
 
+expect_field_ret parse_field_expect(const std::string &field_value) {
+    return parse_field_expect(field_value.data(), 0, field_value.length());
+}
+
+expect_field_ret parse_field_expect(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_expect(field_value.data(), from, to);
+}
+
+expect_field_ret parse_field_expect(const char *field_value, size_t from, size_t to) {
+    std::vector<expectation> list;
+
+    auto [list_to, valid] = parse_list(field_value, from, to,
+        [&list](const char *str, size_t from, size_t to) -> parser_ret {
+        std::string name;
+        size_t pos = from, pos_next = from;
+        bool valid = false;
+
+        // name
+        name = parse_token_tolower(str, pos, to);
+        if (name.empty())
+            return {pos, false};
+        pos += name.size();
+        size_t pos_after_name = pos;
+
+        // =
+        if (!parse_char(str, pos, to, '=')) {
+            list.push_back({std::move(name), std::string()});
+            return {pos_after_name, true};
+        }
+        pos++;
+
+        // value
+        std::string value = parse_token_tolower(str, pos, to);  // try token
+        if (value.empty()) {
+            std::tie(pos_next, valid, value) = parse_quoted_str(str, pos, to);  // try quoted str
+            if (!valid)
+                return {pos, false};
+
+            // to lowercase
+            for (char &c : value)
+                c = to_lower(c);
+            pos = pos_next;
+        } else {
+            pos += value.size();
+        }
+
+        // parameters
+        auto [pos_last, params] = parse_parameters(str, pos, to);
+
+        list.push_back({std::move(name), std::move(value), std::move(params)});
+        return {pos_last, true};
+    });
+
+    if (valid && list_to == to)
+        return {true, std::move(list)};
+    else
+        return {};
+}
+
 }

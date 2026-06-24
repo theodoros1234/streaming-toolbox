@@ -106,6 +106,16 @@ struct etag_field_ret {
     entity_tag etag;
 };
 
+struct expectation {
+    std::string name, value;
+    std::map<std::string, std::string> params = {};
+};
+
+struct expect_field_ret {
+    bool valid = false;
+    std::vector<expectation> list;
+};
+
 // all line parsers need CRLF pre-stripped from the end of the string
 
 parser_ret parse_token(const std::string &str);
@@ -144,6 +154,8 @@ abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const std::string &field_v
 abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const std::string &field_value, size_t from, size_t to);
 etag_field_ret parse_field_etag(const std::string &field_value);
 etag_field_ret parse_field_etag(const std::string &field_value, size_t from, size_t to);
+expect_field_ret parse_field_expect(const std::string &field_value);
+expect_field_ret parse_field_expect(const std::string &field_value, size_t from, size_t to);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
@@ -164,6 +176,7 @@ content_type_ret parse_field_content_type(const char *field_value, size_t from, 
 integer_field_ret parse_field_integer(const char *field_value, size_t from, size_t to);
 abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const char *field_value, size_t from, size_t to);
 etag_field_ret parse_field_etag(const char *field_value, size_t from, size_t to);
+expect_field_ret parse_field_expect(const char *field_value, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
