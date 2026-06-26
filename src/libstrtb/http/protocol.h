@@ -116,6 +116,16 @@ struct expect_field_ret {
     std::vector<expectation> list;
 };
 
+struct token_params {
+    std::string token;
+    std::map<std::string, std::string> params;
+};
+
+struct token_params_list_ret {
+    bool valid = false;
+    std::vector<token_params> list;
+};
+
 // all line parsers need CRLF pre-stripped from the end of the string
 
 parser_ret parse_token(const std::string &str);
@@ -128,8 +138,8 @@ http_version_ret parse_http_version(const std::string &str);
 http_version_ret parse_http_version(const std::string &str, size_t from, size_t to);
 request_line_ret parse_request_line(const std::string &line);
 status_line_ret parse_status_line(const std::string &line);
-parameters_ret parse_parameters(const std::string &str);
-parameters_ret parse_parameters(const std::string &str, size_t from, size_t to);
+parameters_ret parse_parameters(const std::string &str, bool allow_bad_whitespace=false);
+parameters_ret parse_parameters(const std::string &str, size_t from, size_t to, bool allow_bad_whitespace=false);
 product_ret parse_product_or_protocol(const std::string &str);
 product_ret parse_product_or_protocol(const std::string &str, size_t from, size_t to);
 integer_ret parse_integer(const std::string &str);
@@ -156,6 +166,10 @@ etag_field_ret parse_field_etag(const std::string &field_value);
 etag_field_ret parse_field_etag(const std::string &field_value, size_t from, size_t to);
 expect_field_ret parse_field_expect(const std::string &field_value);
 expect_field_ret parse_field_expect(const std::string &field_value, size_t from, size_t to);
+token_params_list_ret parse_field_token_params_list(const std::string &field_value,
+                                                    bool token_case_sensitive=false, bool allow_bad_whitespace=false);
+token_params_list_ret parse_field_token_params_list(const std::string &field_value, size_t from, size_t to,
+                                                    bool token_case_sensitive=false, bool allow_bad_whitespace=false);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
@@ -163,7 +177,7 @@ parser_ret parse_comment(const char *str, size_t from, size_t to);
 http_version_ret parse_http_version(const char *str, size_t from, size_t to);
 request_line_ret parse_request_line(const char *line, size_t length);
 status_line_ret parse_status_line(const char *line, size_t length);
-parameters_ret parse_parameters(const char *str, size_t from, size_t to);
+parameters_ret parse_parameters(const char *str, size_t from, size_t to, bool allow_bad_whitespace=false);
 product_ret parse_product_or_protocol(const char *str, size_t from, size_t to);
 integer_ret parse_integer(const char *str, size_t from, size_t to);
 entity_tag_ret parse_etag(const char *str, size_t from, size_t to);
@@ -177,6 +191,8 @@ integer_field_ret parse_field_integer(const char *field_value, size_t from, size
 abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const char *field_value, size_t from, size_t to);
 etag_field_ret parse_field_etag(const char *field_value, size_t from, size_t to);
 expect_field_ret parse_field_expect(const char *field_value, size_t from, size_t to);
+token_params_list_ret parse_field_token_params_list(const char *field_value, size_t from, size_t to,
+                                                    bool token_case_sensitive=false, bool allow_bad_whitespace=false);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {

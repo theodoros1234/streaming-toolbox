@@ -1009,16 +1009,16 @@ parser_ret parse_comment(const char *str, size_t from, size_t to) {
     return {to, false};
 }
 
-parameters_ret parse_parameters(const std::string &str) {
-    return parse_parameters(str.data(), 0, str.length());
+parameters_ret parse_parameters(const std::string &str, bool allow_bad_whitespace) {
+    return parse_parameters(str.data(), 0, str.length(), allow_bad_whitespace);
 }
 
-parameters_ret parse_parameters(const std::string &str, size_t from, size_t to) {
+parameters_ret parse_parameters(const std::string &str, size_t from, size_t to, bool allow_bad_whitespace) {
     verify_range(str, from, to);
-    return parse_parameters(str.data(), from, to);
+    return parse_parameters(str.data(), from, to, allow_bad_whitespace);
 }
 
-parameters_ret parse_parameters(const char *str, size_t from, size_t to) {
+parameters_ret parse_parameters(const char *str, size_t from, size_t to, bool allow_bad_whitespace) {
     parameters_ret ret;
     ret.to = from;
     size_t pos = from;
@@ -1039,10 +1039,16 @@ parameters_ret parse_parameters(const char *str, size_t from, size_t to) {
             continue;
         pos += param_name.length();
 
+        if (allow_bad_whitespace)   // bad whitespace
+            pos = parse_optional_whitespace(str, pos, to);
+
         // =
         if (!parse_char(str, pos, to, '='))
             return ret;
         pos++;
+
+        if (allow_bad_whitespace)   // bad whitespace
+            pos = parse_optional_whitespace(str, pos, to);
 
         // parameter-value (token or quoted-string)
         std::string param_value;
@@ -1465,6 +1471,54 @@ expect_field_ret parse_field_expect(const char *field_value, size_t from, size_t
 
         list.push_back({std::move(name), std::move(value), std::move(params)});
         return {pos_last, true};
+    });
+
+    if (valid && list_to == to)
+        return {true, std::move(list)};
+    else
+        return {};
+}
+
+token_params_list_ret parse_field_token_params_list(const std::string &field_value,
+                                                    bool token_case_sensitive, bool allow_bad_whitespace) {
+    return parse_field_token_params_list(field_value.data(), 0, field_value.length(), token_case_sensitive, allow_bad_whitespace);
+}
+
+token_params_list_ret parse_field_token_params_list(const std::string &field_value, size_t from, size_t to,
+                                                    bool token_case_sensitive, bool allow_bad_whitespace) {
+    verify_range(field_value, from, to);
+    return parse_field_token_params_list(field_value.data(), from, to, token_case_sensitive, allow_bad_whitespace);
+}
+
+// used in fields such as: TE, Accept-Charset, Accept-Encoding, Accept-Language
+token_params_list_ret parse_field_token_params_list(const char *field_value, size_t from, size_t to,
+                                                    bool token_case_sensitive, bool allow_bad_whitespace) {
+    std::vector<token_params> list;
+
+    auto [list_to, valid] = parse_list(field_value, from, to,
+        [&list, token_case_sensitive, allow_bad_whitespace](const char *str, size_t from, size_t to) -> parser_ret {
+        size_t pos = from;
+        std::string token;
+
+        // token
+        if (token_case_sensitive) {
+            auto [pos_next, valid] = parse_token(str, pos, to);
+            if (!valid)
+                return {pos, false};
+            token.assign(str + pos, pos_next - pos);
+            pos = pos_next;
+        } else {
+            token = parse_token_tolower(str, pos, to);
+            if (token.empty())
+                return {pos, false};
+            pos += token.size();
+        }
+
+        // parameters
+        auto [pos_final, params] = parse_parameters(str, pos, to, allow_bad_whitespace);
+
+        list.push_back({std::move(token), std::move(params)});
+        return {pos_final, true};
     });
 
     if (valid && list_to == to)
