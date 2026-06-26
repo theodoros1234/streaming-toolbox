@@ -152,8 +152,8 @@ parser_ret parse_list(const std::string &str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 time_t parse_field_date(const std::string &str);
 time_t parse_field_date(const std::string &str, size_t from, size_t to);
-token_list_ret parse_field_token_list(const std::string &field_value, bool tolower=false);
-token_list_ret parse_field_token_list(const std::string &field_value, size_t from, size_t to, bool tolower=false);
+token_list_ret parse_field_token_list(const std::string &field_value, bool case_sensitive);
+token_list_ret parse_field_token_list(const std::string &field_value, size_t from, size_t to, bool case_sensitive);
 product_list_ret parse_field_upgrade(const std::string &field_value);
 product_list_ret parse_field_upgrade(const std::string &field_value, size_t from, size_t to);
 content_type_ret parse_field_content_type(const std::string &field_value);
@@ -167,9 +167,9 @@ etag_field_ret parse_field_etag(const std::string &field_value, size_t from, siz
 expect_field_ret parse_field_expect(const std::string &field_value);
 expect_field_ret parse_field_expect(const std::string &field_value, size_t from, size_t to);
 token_params_list_ret parse_field_token_params_list(const std::string &field_value,
-                                                    bool token_case_sensitive=false, bool allow_bad_whitespace=false);
+                                                    bool token_case_sensitive, bool allow_bad_whitespace);
 token_params_list_ret parse_field_token_params_list(const std::string &field_value, size_t from, size_t to,
-                                                    bool token_case_sensitive=false, bool allow_bad_whitespace=false);
+                                                    bool token_case_sensitive, bool allow_bad_whitespace);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
@@ -177,14 +177,14 @@ parser_ret parse_comment(const char *str, size_t from, size_t to);
 http_version_ret parse_http_version(const char *str, size_t from, size_t to);
 request_line_ret parse_request_line(const char *line, size_t length);
 status_line_ret parse_status_line(const char *line, size_t length);
-parameters_ret parse_parameters(const char *str, size_t from, size_t to, bool allow_bad_whitespace=false);
+parameters_ret parse_parameters(const char *str, size_t from, size_t to, bool allow_bad_whitespace);
 product_ret parse_product_or_protocol(const char *str, size_t from, size_t to);
 integer_ret parse_integer(const char *str, size_t from, size_t to);
 entity_tag_ret parse_etag(const char *str, size_t from, size_t to);
 parser_ret parse_list(const char *str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 time_t parse_field_date(const char *str, size_t from, size_t to);
-token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool tolower=false);
+token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool case_sensitive);
 product_list_ret parse_field_upgrade(const char *field_value, size_t from, size_t to);
 content_type_ret parse_field_content_type(const char *field_value, size_t from, size_t to);
 integer_field_ret parse_field_integer(const char *field_value, size_t from, size_t to);
@@ -192,7 +192,7 @@ abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const char *field_value, s
 etag_field_ret parse_field_etag(const char *field_value, size_t from, size_t to);
 expect_field_ret parse_field_expect(const char *field_value, size_t from, size_t to);
 token_params_list_ret parse_field_token_params_list(const char *field_value, size_t from, size_t to,
-                                                    bool token_case_sensitive=false, bool allow_bad_whitespace=false);
+                                                    bool token_case_sensitive, bool allow_bad_whitespace);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {

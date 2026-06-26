@@ -1121,22 +1121,22 @@ parser_ret parse_list(const char *str, size_t from, size_t to,
     }
 }
 
-token_list_ret parse_field_token_list(const std::string &field_value, bool tolower) {
-    return parse_field_token_list(field_value.data(), 0, field_value.length(), tolower);
+token_list_ret parse_field_token_list(const std::string &field_value, bool case_sensitive) {
+    return parse_field_token_list(field_value.data(), 0, field_value.length(), case_sensitive);
 }
 
-token_list_ret parse_field_token_list(const std::string &field_value, size_t from, size_t to, bool tolower) {
+token_list_ret parse_field_token_list(const std::string &field_value, size_t from, size_t to, bool case_sensitive) {
     verify_range(field_value, from, to);
-    return parse_field_token_list(field_value.data(), from, to, tolower);
+    return parse_field_token_list(field_value.data(), from, to, case_sensitive);
 }
 
 // simple token list, used by headers such as: Connection, Content-Encoding, Content-Language, Allow, Trailer
-token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool tolower) {
+token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool case_sensitive) {
     std::vector<std::string> list;
     size_t list_to = 0;
     bool valid = false;
 
-    if (tolower) {
+    if (!case_sensitive) {
         std::tie(list_to, valid) = parse_list(field_value, from, to,
             [&list](const char *str, size_t from, size_t to) -> parser_ret {
             std::string element = parse_token_tolower(str, from, to);
