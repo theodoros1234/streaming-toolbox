@@ -21,7 +21,7 @@ const char* get_status_code_phrase(int status_code) {
     case 205: return "Reset Content";
     case 206: return "Partial Content";
     case 300: return "Multiple Choices";
-    case 301: return "Moved Permamently";
+    case 301: return "Moved Permanently";
     case 302: return "Found";
     case 303: return "See Other";
     case 304: return "Not Modified";
