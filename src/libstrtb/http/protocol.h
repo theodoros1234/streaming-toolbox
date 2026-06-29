@@ -7,6 +7,7 @@
 #include <ctime>
 #include <limits>   // IWYU pragma: keep
 #include <functional>
+#include <variant>
 #include "../uri.h"
 
 #define STRTB_HTTP_PARSE_LIST_MAX_EMPTY_ELEMENTS 16
@@ -52,10 +53,14 @@ struct parameters_ret {
     std::map<std::string, std::string> params;
 };
 
+struct product {
+    std::string name, version;  // version may be empty if not specified
+};
+
 struct product_ret {
     size_t to = 0;
     bool valid = false;
-    std::string name, version;  // version may be empty if not specified
+    product pr;
 };
 
 struct integer_ret {
@@ -82,7 +87,7 @@ struct token_list_ret {
 
 struct product_list_ret {
     bool valid = false;
-    std::vector< std::pair<std::string, std::string> > list;    // .first=name, .second=version (may be empty)
+    std::vector<product> list;
 };
 
 struct content_type_ret {
@@ -124,6 +129,11 @@ struct token_params {
 struct token_params_list_ret {
     bool valid = false;
     std::vector<token_params> list;
+};
+
+struct product_field_ret {  // User-Agent, Server
+    bool valid = false;
+    std::vector< std::variant<product, std::string> > list; // product or comment, use std::variant::index()
 };
 
 // all line parsers need CRLF pre-stripped from the end of the string
@@ -170,6 +180,8 @@ token_params_list_ret parse_field_token_params_list(const std::string &field_val
                                                     bool token_case_sensitive, bool allow_bad_whitespace);
 token_params_list_ret parse_field_token_params_list(const std::string &field_value, size_t from, size_t to,
                                                     bool token_case_sensitive, bool allow_bad_whitespace);
+product_field_ret parse_field_product_info(const std::string &field_value);
+product_field_ret parse_field_product_info(const std::string &field_value, size_t from, size_t to);
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
@@ -193,6 +205,7 @@ etag_field_ret parse_field_etag(const char *field_value, size_t from, size_t to)
 expect_field_ret parse_field_expect(const char *field_value, size_t from, size_t to);
 token_params_list_ret parse_field_token_params_list(const char *field_value, size_t from, size_t to,
                                                     bool token_case_sensitive, bool allow_bad_whitespace);
+product_field_ret parse_field_product_info(const char *field_value, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {

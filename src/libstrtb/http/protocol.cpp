@@ -1177,21 +1177,21 @@ product_ret parse_product_or_protocol(const char *str, size_t from, size_t to) {
     // name
     auto [pos_after_name, valid] = parse_token(str, pos, to);
     if (!valid)
-        return {pos_after_name, false, std::string(), std::string()};
+        return {pos_after_name, false, {}};
     name.assign(str + pos, pos_after_name - pos);
     pos = pos_after_name;
 
     // /version (optional)
     if (!parse_char(str, pos, to, '/'))
-        return {pos_after_name, true, std::move(name), std::move(version)};
+        return {pos_after_name, true, {std::move(name), std::move(version)}};
     pos++;
     size_t pos_after_version;
     std::tie(pos_after_version, valid) = parse_token(str, pos, to);
     if (!valid)
-        return {pos_after_name, true, std::move(name), std::move(version)};
+        return {pos_after_name, true, {std::move(name), std::move(version)}};
     version.assign(str + pos, pos_after_version - pos);
 
-    return {pos_after_version, true, std::move(name), std::move(version)};
+    return {pos_after_version, true, {std::move(name), std::move(version)}};
 }
 
 product_list_ret parse_field_upgrade(const std::string &field_value) {
@@ -1204,7 +1204,7 @@ product_list_ret parse_field_upgrade(const std::string &field_value, size_t from
 }
 
 product_list_ret parse_field_upgrade(const char* field_value, size_t from, size_t to) {
-    std::vector< std::pair<std::string, std::string> > list;
+    std::vector<product> list;
 
     auto [list_to, valid] = parse_list(field_value, from, to,
         [&list](const char* str, size_t from, size_t to) -> parser_ret {
@@ -1212,7 +1212,7 @@ product_list_ret parse_field_upgrade(const char* field_value, size_t from, size_
         // NOTE: The protocol name should be case insensitive, but protocols have a preferred case
         // TODO: think about how to handle this
         if (ret.valid)
-            list.emplace_back(std::move(ret.name), std::move(ret.version));
+            list.push_back(std::move(ret.pr));
         return {ret.to, ret.valid};
     });
 
@@ -1525,6 +1525,48 @@ token_params_list_ret parse_field_token_params_list(const char *field_value, siz
         return {true, std::move(list)};
     else
         return {};
+}
+
+product_field_ret parse_field_product_info(const std::string &field_value) {
+    return parse_field_product_info(field_value.data(), 0, field_value.length());
+}
+
+product_field_ret parse_field_product_info(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_product_info(field_value.data(), from, to);
+}
+
+product_field_ret parse_field_product_info(const char *field_value, size_t from, size_t to) {
+    std::vector< std::variant<product, std::string> > list;
+
+    // first item must be a product
+    auto [pos, valid, product] = parse_product_or_protocol(field_value, from, to);
+    if (!valid)
+        return {};
+    list.push_back(std::move(product));
+
+    // all other products and comments
+    while (pos < to) {
+        std::tie(pos, valid) = parse_required_whitespace(field_value, pos, to);
+        if (!valid) // no space between parts
+            return {};
+
+        if (field_value[pos] == '(') {  // comment
+            auto [pos_next, valid] = parse_comment(field_value, pos, to);
+            if (!valid)
+                return {};
+            list.emplace_back(std::string(field_value + pos, pos_next - pos));
+            pos = pos_next;
+        } else {    // product info
+            auto [pos_next, valid, product] = parse_product_or_protocol(field_value, pos, to);
+            if (!valid)
+                return {};
+            list.emplace_back(std::move(product));
+            pos = pos_next;
+        }
+    }
+
+    return {true, std::move(list)};
 }
 
 }
