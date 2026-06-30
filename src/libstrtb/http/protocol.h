@@ -18,6 +18,7 @@ namespace strtb::http {
 
 typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is valid
 typedef std::tuple<size_t, bool, std::string> quoted_ret;   // ends at, is valid, unescaped string
+typedef std::map<std::string, std::string> parameter_map;
 
 struct http_version_ret {
     size_t to = 0;
@@ -50,7 +51,7 @@ struct status_line_ret {
 
 struct parameters_ret {
     size_t to = 0;
-    std::map<std::string, std::string> params;
+    parameter_map params;
 };
 
 struct product {
@@ -80,6 +81,23 @@ struct entity_tag_ret {
     entity_tag etag;
 };
 
+struct auth_params_ret {
+    size_t to = 0;
+    bool valid = false, duplicate = false;  // should reject the entire filed if duplicate=true for security
+    parameter_map params;
+};
+
+struct credentials {    // or challenge
+    std::string auth_scheme;
+    std::variant<bool, std::string, parameter_map> value = false;   // no value, token68, #auth_param
+};
+
+struct credentials_ret {
+    size_t to = 0;
+    bool valid = false;
+    credentials creds;
+};
+
 struct token_list_ret {
     bool valid = false;
     std::vector<std::string> list;
@@ -93,7 +111,7 @@ struct product_list_ret {
 struct content_type_ret {
     bool valid = false;
     std::string type, subtype;
-    std::map<std::string, std::string> params;
+    parameter_map params;
 };
 
 struct integer_field_ret {
@@ -113,7 +131,7 @@ struct etag_field_ret {
 
 struct expectation {
     std::string name, value;
-    std::map<std::string, std::string> params = {};
+    parameter_map params = {};
 };
 
 struct expect_field_ret {
@@ -123,7 +141,7 @@ struct expect_field_ret {
 
 struct token_params {
     std::string token;
-    std::map<std::string, std::string> params;
+    parameter_map params;
 };
 
 struct token_params_list_ret {
@@ -134,6 +152,21 @@ struct token_params_list_ret {
 struct product_field_ret {  // User-Agent, Server
     bool valid = false;
     std::vector< std::variant<product, std::string> > list; // product or comment, use std::variant::index()
+};
+
+struct authorization_field_ret {
+    bool valid = false;
+    credentials creds;
+};
+
+struct authenticate_field_ret {
+    bool valid = false;
+    std::vector<credentials> challenges;
+};
+
+struct auth_params_field_ret {
+    bool valid = false;
+    parameter_map params;
 };
 
 // all line parsers need CRLF pre-stripped from the end of the string
@@ -160,6 +193,11 @@ parser_ret parse_list(const std::string &str,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 parser_ret parse_list(const std::string &str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
+credentials_ret parse_credentials_or_challenge(const std::string &str);
+credentials_ret parse_credentials_or_challenge(const std::string &str, size_t from, size_t to);
+auth_params_ret parse_auth_params(const std::string &str);
+auth_params_ret parse_auth_params(const std::string &str, size_t from, size_t to);
+
 time_t parse_field_date(const std::string &str);
 time_t parse_field_date(const std::string &str, size_t from, size_t to);
 token_list_ret parse_field_token_list(const std::string &field_value, bool case_sensitive);
@@ -182,6 +220,13 @@ token_params_list_ret parse_field_token_params_list(const std::string &field_val
                                                     bool token_case_sensitive, bool allow_bad_whitespace);
 product_field_ret parse_field_product_info(const std::string &field_value);
 product_field_ret parse_field_product_info(const std::string &field_value, size_t from, size_t to);
+authenticate_field_ret parse_field_authenticate(const std::string &field_value);
+authenticate_field_ret parse_field_authenticate(const std::string &field_value, size_t from, size_t to);
+authorization_field_ret parse_field_authorization(const std::string &field_value);
+authorization_field_ret parse_field_authorization(const std::string &field_value, size_t from, size_t to);
+auth_params_field_ret parse_field_authentication_info(const std::string &field_value);
+auth_params_field_ret parse_field_authentication_info(const std::string &field_value, size_t from, size_t to);
+
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
@@ -189,12 +234,15 @@ parser_ret parse_comment(const char *str, size_t from, size_t to);
 http_version_ret parse_http_version(const char *str, size_t from, size_t to);
 request_line_ret parse_request_line(const char *line, size_t length);
 status_line_ret parse_status_line(const char *line, size_t length);
-parameters_ret parse_parameters(const char *str, size_t from, size_t to, bool allow_bad_whitespace);
+parameters_ret parse_parameters(const char *str, size_t from, size_t to, bool allow_bad_whitespace=false);
 product_ret parse_product_or_protocol(const char *str, size_t from, size_t to);
 integer_ret parse_integer(const char *str, size_t from, size_t to);
 entity_tag_ret parse_etag(const char *str, size_t from, size_t to);
 parser_ret parse_list(const char *str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
+credentials_ret parse_credentials_or_challenge(const char *str, size_t from, size_t to);
+auth_params_ret parse_auth_params(const char *str, size_t from, size_t to);
+
 time_t parse_field_date(const char *str, size_t from, size_t to);
 token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool case_sensitive);
 product_list_ret parse_field_upgrade(const char *field_value, size_t from, size_t to);
@@ -206,6 +254,9 @@ expect_field_ret parse_field_expect(const char *field_value, size_t from, size_t
 token_params_list_ret parse_field_token_params_list(const char *field_value, size_t from, size_t to,
                                                     bool token_case_sensitive, bool allow_bad_whitespace);
 product_field_ret parse_field_product_info(const char *field_value, size_t from, size_t to);
+authenticate_field_ret parse_field_authenticate(const char *field_value, size_t from, size_t to);
+authorization_field_ret parse_field_authorization(const char *field_value, size_t from, size_t to);
+auth_params_field_ret parse_field_authentication_info(const char *field_value, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {

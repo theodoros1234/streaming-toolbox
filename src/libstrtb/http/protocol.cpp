@@ -117,6 +117,7 @@ static parser_ret parse_word(const char *str, size_t from, size_t to, const char
 static size_t find_char(const char *str, size_t from, size_t to, char c);
 static std::tuple<size_t, bool, unsigned int> parse_digits(const char *str, size_t from, size_t to, size_t digits);
 static std::string parse_token_tolower(const char *str, size_t from, size_t to);
+static parser_ret parse_token68(const char *str, size_t from, size_t to);
 static constexpr size_t strlen_constexpr(const char *str);
 static constexpr uint64_t date_hash_short(const char *str);
 static constexpr uint64_t date_hash_short(const char *str, size_t from, size_t to);
@@ -289,6 +290,27 @@ static std::string parse_token_tolower(const char *str, size_t from, size_t to) 
     }
 
     return token;
+}
+
+static parser_ret parse_token68(const char *str, size_t from, size_t to) {
+    size_t pos;
+
+    for (pos = from; pos < to; pos++) {
+        char c = str[pos];
+        if (!(is_alpha(c) || is_digit(c) || c == '-' || c == '.' ||
+                    c == '_' || c == '~' || c == '+' || c == '/'))
+            break;
+    }
+
+    // must have at least 1 char of those above
+    if (pos <= from)
+        return {pos, false};
+
+    // = must only appear in the end
+    while (str[pos] == '=')
+        pos++;
+
+    return {pos, true};
 }
 
 // parse strings such as 'HTTP/1.1'
@@ -832,7 +854,7 @@ time_t parse_field_date(const std::string &str, size_t from, size_t to) {
     return parse_field_date(str.data(), from, to);
 }
 
-// used directly for fields such as: Date, If-(Un)modified-Since, Last-Modified, and indirectly for others
+// used directly for fields such as: Date, If-(Un)modified-Since, Last-Modified, and indirectly for others (e.g. Retry-After)
 time_t parse_field_date(const char *str, size_t from, size_t to) {
     date_parser_inner_ret inner_ret;
 
@@ -1093,13 +1115,15 @@ parser_ret parse_list(const char *str, size_t from, size_t to,
      *       and confirm whether it reached end-of-line if that's required.
      */
 
-    size_t pos = from, empty_count = 0;
+    size_t pos = from, empty_count = 0, last_valid = from;
 
     while (true) {
         // list element
         auto [pos_next, valid] = element_parser(str, pos, to);
-        if (valid)  // if invalid, check if it's just an empty element and skip it
+        if (valid) {    // if invalid, check if it's just an empty element and skip it
             pos = pos_next;
+            last_valid = pos;
+        }
 
         // [whitespace] , [whitespace]
         pos = parse_optional_whitespace(str, pos, to);
@@ -1109,15 +1133,15 @@ parser_ret parse_list(const char *str, size_t from, size_t to,
                 return {pos_next, true};
             else if (pos >= to)     // ending with an empty element => valid
                 return {to, true};
-            else            // last element invalid => probably invalid list
-                return {pos, false};
+            else            // last element invalid => return upto last valid spot in list
+                return {last_valid, true};
         }
         pos++;
         pos = parse_optional_whitespace(str, pos, to);
 
         // skip a reasonable amount of empty elements, as specified by the RFC
         if (!valid && (++empty_count >= STRTB_HTTP_PARSE_LIST_MAX_EMPTY_ELEMENTS))
-            return {pos_comma, valid};
+            return {pos_comma, false};  // only returns valid=false when too many empty elements
     }
 }
 
@@ -1297,7 +1321,7 @@ integer_field_ret parse_field_integer(const std::string &field_value, size_t fro
     return parse_field_integer(field_value.data(), from, to);
 }
 
-// field that only contains a non-negative integer number, used by: Content-Length, Max-Forwards
+// field that only contains a non-negative integer number, used by: Content-Length, Max-Forwards, possibly for Retry-After
 integer_field_ret parse_field_integer(const char *field_value, size_t from, size_t to) {
     auto ret = parse_integer(field_value, from, to);
     if (!ret.valid || ret.to != to)     // invalid/overflown, or extra stuff after number
@@ -1567,6 +1591,177 @@ product_field_ret parse_field_product_info(const char *field_value, size_t from,
     }
 
     return {true, std::move(list)};
+}
+
+auth_params_ret parse_auth_params(const std::string &str) {
+    return parse_auth_params(str.data(), 0, str.length());
+}
+
+auth_params_ret parse_auth_params(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_auth_params(str.data(), from, to);
+}
+
+auth_params_ret parse_auth_params(const char *str, size_t from, size_t to) {
+    parameter_map params;
+    bool params_duplicate = false;
+
+    auto [list_to, valid] = parse_list(str, from, to,
+        [&params, &params_duplicate](const char *str, size_t from, size_t to) -> parser_ret {
+        size_t pos = from;
+        if (params_duplicate)
+            return {from, false};
+
+        // key
+        std::string key = parse_token_tolower(str, pos, to);
+        if (key.empty())
+            return {from, false};
+        pos += key.length();
+
+        // bad whitespace
+        pos = parse_optional_whitespace(str, pos, to);
+
+        // =
+        if (!parse_char(str, pos, to, '='))
+            return {pos, false};
+        pos++;
+
+        // bad whitespace
+        pos = parse_optional_whitespace(str, pos, to);
+
+        // value (token or quoted string)
+        std::string value;
+        auto [pos_next, valid] = parse_token(str, pos, to);     // try token
+        if (valid) {
+            value.assign(str + pos, pos_next - pos);
+        } else {
+            std::tie(pos_next, valid, value) = parse_quoted_str(str, pos, to);  // try quoted-string
+            if (!valid)
+                return {pos, false};
+        }
+        pos = pos_next;
+
+        size_t params_size = params.size();
+        params[std::move(key)] = std::move(value);
+
+        // deny duplicates for security (checked here to prevent confusion with token68)
+        if (params.size() == params_size) {
+            params_duplicate = true;
+            return {pos, false};
+        }
+
+        return {pos, true};
+    });
+
+    if (valid)
+        return {list_to, true, params_duplicate, std::move(params)};
+    else
+        return {list_to, false, params_duplicate, {}};
+}
+
+credentials_ret parse_credentials_or_challenge(const std::string &str) {
+    return parse_credentials_or_challenge(str.data(), 0, str.length());
+}
+
+credentials_ret parse_credentials_or_challenge(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_credentials_or_challenge(str.data(), from, to);
+}
+
+credentials_ret parse_credentials_or_challenge(const char *str, size_t from, size_t to) {
+    size_t pos = from;
+
+    // auth-scheme
+    std::string auth_scheme = parse_token_tolower(str, pos, to);
+    if (auth_scheme.empty())
+        return {};
+    pos += auth_scheme.length();
+
+    // optional parts
+    size_t pos_pre_space = pos;
+    // space
+    if (!parse_char(str, pos, to, ' '))
+        return {pos, true, {std::move(auth_scheme), false}};
+    pos++;
+
+    // try both token68 and #auth-param
+    auto [token68_to, token68_valid] = parse_token68(str, pos, to);
+    auto [params_to, params_valid, params_duplicate, params] = parse_auth_params(str, pos, to);
+
+    if (params_duplicate)   // instantly reject duplicate params for security
+        return {};
+    else if (token68_valid && (!params_valid || token68_to > params_to))    // return token68
+        return {token68_to, true, {std::move(auth_scheme), std::string(str + pos, token68_to - pos)}};
+    else if (params_valid && !params.empty())   // return params
+        return {params_to, true, {std::move(auth_scheme), std::move(params)}};
+    else
+        return {pos_pre_space, true, {std::move(auth_scheme), false}};
+}
+
+authenticate_field_ret parse_field_authenticate(const std::string &field_value) {
+    return parse_field_authenticate(field_value.data(), 0, field_value.length());
+}
+
+authenticate_field_ret parse_field_authenticate(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_authenticate(field_value.data(), from, to);
+}
+
+// Used by fields: WWW-Authenticate, Proxy-Authenticate
+authenticate_field_ret parse_field_authenticate(const char *field_value, size_t from, size_t to) {
+    std::vector<credentials> list;
+
+    auto [list_to, valid] = parse_list(field_value, from, to,
+        [&list](const char *str, size_t from, size_t to) -> parser_ret {
+        auto ret = parse_credentials_or_challenge(str, from, to);
+
+        if (!ret.valid)
+            return {ret.to, false};
+
+        list.push_back(std::move(ret.creds));
+        return {ret.to, true};
+    });
+
+    if (valid && list_to == to)
+        return {true, std::move(list)};
+    else
+        return {};
+}
+
+authorization_field_ret parse_field_authorization(const std::string &field_value) {
+    return parse_field_authorization(field_value.data(), 0, field_value.length());
+}
+
+authorization_field_ret parse_field_authorization(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_authorization(field_value.data(), from, to);
+}
+
+// Used by fields: Authorization, Proxy-Authorization
+authorization_field_ret parse_field_authorization(const char *field_value, size_t from, size_t to) {
+    auto ret = parse_credentials_or_challenge(field_value, from, to);
+    if (ret.valid && ret.to == to)
+        return {true, std::move(ret.creds)};
+    else
+        return {};
+}
+
+auth_params_field_ret parse_field_authentication_info(const std::string &field_value) {
+    return parse_field_authentication_info(field_value.data(), 0, field_value.length());
+}
+
+auth_params_field_ret parse_field_authentication_info(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_authentication_info(field_value.data(), from, to);
+}
+
+// Used by fields: Authentication-Info, Proxy-Authentication-Info
+auth_params_field_ret parse_field_authentication_info(const char *field_value, size_t from, size_t to) {
+    auto ret = parse_auth_params(field_value, from, to);
+    if (ret.valid && !ret.duplicate && ret.to == to)
+        return {ret.valid, std::move(ret.params)};
+    else
+        return {};
 }
 
 }
