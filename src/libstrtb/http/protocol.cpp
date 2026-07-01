@@ -1807,4 +1807,38 @@ accept_field_ret parse_field_accept(const char *field_value, size_t from, size_t
         return {};
 }
 
+if_match_field_ret parse_field_if_match(const std::string &field_value) {
+    return parse_field_if_match(field_value.data(), 0, field_value.length());
+}
+
+if_match_field_ret parse_field_if_match(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_if_match(field_value.data(), from, to);
+}
+
+// If-Match, If-None-Match
+if_match_field_ret parse_field_if_match(const char *field_value, size_t from, size_t to) {
+    // check for *
+    if (to - from == 1 && field_value[from] == '*')
+        return {true, true, {}};
+
+    std::vector<entity_tag> list;
+
+    // parse etag list
+    auto [list_to, valid] = parse_list(field_value, from, to,
+        [&list](const char *str, size_t from, size_t to) -> parser_ret {
+        auto [e_to, valid, etag] = parse_etag(str, from, to);
+        if (!valid)
+            return {e_to, false};
+
+        list.push_back(std::move(etag));
+        return {e_to, true};
+    });
+
+    if (valid && list_to == to)
+        return {true, false, std::move(list)};
+    else
+        return {};
+}
+
 }
