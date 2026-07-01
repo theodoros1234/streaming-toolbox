@@ -1779,4 +1779,32 @@ auth_params_field_ret parse_field_authentication_info(const char *field_value, s
         return {};
 }
 
+accept_field_ret parse_field_accept(const std::string &field_value) {
+    return parse_field_accept(field_value.data(), 0, field_value.length());
+}
+
+accept_field_ret parse_field_accept(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_accept(field_value.data(), from, to);
+}
+
+accept_field_ret parse_field_accept(const char *field_value, size_t from, size_t to) {
+    std::vector<media_type> list;
+
+    auto [list_to, valid] = parse_list(field_value, from, to,
+        [&list](const char *str, size_t from, size_t to) -> parser_ret {
+        auto ret = parse_media_type(str, from, to);
+        if (!ret.valid)
+            return {ret.to, false};
+
+        list.push_back(std::move(ret.m));
+        return {ret.to, true};
+    });
+
+    if (valid && list_to == to)
+        return {true, std::move(list)};
+    else
+        return {};
+}
+
 }

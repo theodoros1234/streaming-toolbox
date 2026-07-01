@@ -179,6 +179,11 @@ struct auth_params_field_ret {
     parameter_map params;
 };
 
+struct accept_field_ret {
+    bool valid = false;
+    std::vector<media_type> list;
+};
+
 // all line parsers need CRLF pre-stripped from the end of the string
 
 parser_ret parse_token(const std::string &str);
@@ -238,6 +243,8 @@ authorization_field_ret parse_field_authorization(const std::string &field_value
 authorization_field_ret parse_field_authorization(const std::string &field_value, size_t from, size_t to);
 auth_params_field_ret parse_field_authentication_info(const std::string &field_value);
 auth_params_field_ret parse_field_authentication_info(const std::string &field_value, size_t from, size_t to);
+accept_field_ret parse_field_accept(const std::string &field_value);
+accept_field_ret parse_field_accept(const std::string &field_value, size_t from, size_t to);
 
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
@@ -270,6 +277,7 @@ product_field_ret parse_field_product_info(const char *field_value, size_t from,
 authenticate_field_ret parse_field_authenticate(const char *field_value, size_t from, size_t to);
 authorization_field_ret parse_field_authorization(const char *field_value, size_t from, size_t to);
 auth_params_field_ret parse_field_authentication_info(const char *field_value, size_t from, size_t to);
+accept_field_ret parse_field_accept(const char *field_value, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
