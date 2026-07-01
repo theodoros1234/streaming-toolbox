@@ -1246,6 +1246,41 @@ product_list_ret parse_field_upgrade(const char* field_value, size_t from, size_
         return {};
 }
 
+media_type_ret parse_media_type(const std::string &str) {
+    return parse_media_type(str.data(), 0, str.length());
+}
+
+media_type_ret parse_media_type(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_media_type(str.data(), from, to);
+}
+
+media_type_ret parse_media_type(const char *str, size_t from, size_t to) {
+    size_t pos = from;
+
+    // type
+    std::string type = parse_token_tolower(str, pos, to);
+    if (type.empty())
+        return {pos, false, {}};
+    pos += type.length();
+
+    // /
+    if (!parse_char(str, pos, to, '/'))
+        return {pos, false, {}};
+    pos++;
+
+    // subtype
+    std::string subtype = parse_token_tolower(str, pos, to);
+    if (subtype.empty())
+        return {pos, false, {}};
+    pos += subtype.length();
+
+    // params
+    auto [pos_next, params] = parse_parameters(str, pos, to);
+
+    return {pos_next, true, {std::move(type), std::move(subtype), std::move(params)}};
+}
+
 content_type_ret parse_field_content_type(const std::string &field_value) {
     return parse_field_content_type(field_value.data(), 0, field_value.length());
 }
@@ -1256,31 +1291,11 @@ content_type_ret parse_field_content_type(const std::string &field_value, size_t
 }
 
 content_type_ret parse_field_content_type(const char *field_value, size_t from, size_t to) {
-    size_t pos = from;
-
-    // type
-    std::string type = parse_token_tolower(field_value, pos, to);
-    if (type.empty())
-        return {};
-    pos += type.length();
-
-    // /
-    if (!parse_char(field_value, pos, to, '/'))
-        return {};
-    pos++;
-
-    // subtype
-    std::string subtype = parse_token_tolower(field_value, pos, to);
-    if (subtype.empty())
-        return {};
-    pos += subtype.length();
-
-    // params
-    auto [pos_next, params] = parse_parameters(field_value, pos, to);
-    if (pos_next != to)
+    auto [mt_to, valid, media_type] = parse_media_type(field_value, from, to);
+    if (mt_to != to)
         return {};
 
-    return {true, std::move(type), std::move(subtype), std::move(params)};
+    return {true, std::move(media_type)};
 }
 
 integer_ret parse_integer(const std::string &str) {

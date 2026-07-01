@@ -98,6 +98,17 @@ struct credentials_ret {
     credentials creds;
 };
 
+struct media_type {
+    std::string type, subtype;
+    parameter_map params;
+};
+
+struct media_type_ret {
+    size_t to = 0;
+    bool valid = false;
+    media_type m;
+};
+
 struct token_list_ret {
     bool valid = false;
     std::vector<std::string> list;
@@ -110,8 +121,7 @@ struct product_list_ret {
 
 struct content_type_ret {
     bool valid = false;
-    std::string type, subtype;
-    parameter_map params;
+    media_type m;
 };
 
 struct integer_field_ret {
@@ -197,6 +207,8 @@ credentials_ret parse_credentials_or_challenge(const std::string &str);
 credentials_ret parse_credentials_or_challenge(const std::string &str, size_t from, size_t to);
 auth_params_ret parse_auth_params(const std::string &str);
 auth_params_ret parse_auth_params(const std::string &str, size_t from, size_t to);
+media_type_ret parse_media_type(const std::string &str);
+media_type_ret parse_media_type(const std::string &str, size_t from, size_t to);
 
 time_t parse_field_date(const std::string &str);
 time_t parse_field_date(const std::string &str, size_t from, size_t to);
@@ -242,6 +254,7 @@ parser_ret parse_list(const char *str, size_t from, size_t to,
                       const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
 credentials_ret parse_credentials_or_challenge(const char *str, size_t from, size_t to);
 auth_params_ret parse_auth_params(const char *str, size_t from, size_t to);
+media_type_ret parse_media_type(const char *str, size_t from, size_t to);
 
 time_t parse_field_date(const char *str, size_t from, size_t to);
 token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool case_sensitive);
