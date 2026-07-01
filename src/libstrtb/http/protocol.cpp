@@ -1841,4 +1841,28 @@ if_match_field_ret parse_field_if_match(const char *field_value, size_t from, si
         return {};
 }
 
+if_range_field_ret parse_field_if_range(const std::string &field_value) {
+    return parse_field_if_range(field_value.data(), 0, field_value.length());
+}
+
+if_range_field_ret parse_field_if_range(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_if_range(field_value.data(), from, to);
+}
+
+if_range_field_ret parse_field_if_range(const char *field_value, size_t from, size_t to) {
+    // try parsing etag
+    auto [valid, etag] = parse_field_etag(field_value, from, to);
+    if (valid) {
+        return {true, std::move(etag)};
+    } else {
+        // try parsing date
+        time_t t = parse_field_date(field_value, from, to);
+        if (t < 0)  // both invalid
+            return {};
+        else
+            return {true, t};
+    }
+}
+
 }
