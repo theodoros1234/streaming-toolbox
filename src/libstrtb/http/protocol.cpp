@@ -1154,7 +1154,7 @@ token_list_ret parse_field_token_list(const std::string &field_value, size_t fro
     return parse_field_token_list(field_value.data(), from, to, case_sensitive);
 }
 
-// simple token list, used by headers such as: Connection, Content-Encoding, Content-Language, Allow, Trailer
+// simple token list, used by headers such as: Connection, Content-Encoding, Content-Language, Allow, Trailer, Vary
 token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool case_sensitive) {
     std::vector<std::string> list;
     size_t list_to = 0;
