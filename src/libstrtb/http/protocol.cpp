@@ -1973,4 +1973,83 @@ range_field_ret parse_field_range(const char *field_value, size_t from, size_t t
         return {};
 }
 
+content_range_field_ret parse_field_content_range(const std::string &field_value) {
+    return parse_field_content_range(field_value.data(), 0, field_value.length());
+}
+
+content_range_field_ret parse_field_content_range(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_content_range(field_value.data(), from, to);
+}
+
+content_range_field_ret parse_field_content_range(const char *field_value, size_t from, size_t to) {
+    size_t pos = from;
+
+    // range-unit
+    std::string unit = parse_token_tolower(field_value, pos, to);
+    if (unit.empty())
+        return {};
+    pos += unit.length();
+
+    // space
+    if (!parse_char(field_value, pos, to, ' '))
+        return {};
+    pos++;
+
+    // decide which format this is
+    auto [pos_next, unsatisfied] = parse_word(field_value, pos, to, "*/");
+
+    if (unsatisfied) {  // unsatisfied-range
+        pos = pos_next;
+
+        // complete-length
+        auto [pos_final, valid, overflow, complete] = parse_integer(field_value, pos, to);
+        if (valid && pos_final == to)
+            return {true, std::move(unit), 0, 0, complete, false, true};
+        else
+            return {};
+
+    } else {            // range-resp
+        // first-pos
+        auto [first_pos, first_valid, first_overflow, first] = parse_integer(field_value, pos, to);
+        if (!first_valid)
+            return {};
+        pos = first_pos;    // NOTE: first_pos is just the string pos, the actual number is in first
+
+        // -
+        if (!parse_char(field_value, pos, to, '-'))
+            return {};
+        pos++;
+
+        // last-pos
+        auto [last_pos, last_valid, last_overflow, last] = parse_integer(field_value, pos, to);
+        if (!last_valid)
+            return {};
+        pos = last_pos;     // NOTE: same as above for first_pos
+
+        // last-pos cannot be smaller than first-pos
+        if (last < first)
+            return {};
+
+        // /
+        if (!parse_char(field_value, pos, to, '/'))
+            return {};
+        pos++;
+
+        // decide between complete-length or *
+        if (parse_char(field_value, pos, to, '*')) {    // * (unknown length)
+            if (pos + 1 == to)
+                return {true, std::move(unit), first, last, 0, true, false};
+            else
+                return {};
+        } else {    // complete-length
+            auto [complete_pos, complete_valid, complete_overflow, complete] = parse_integer(field_value, pos, to);
+            if (complete_valid && complete > last && complete_pos == to)
+                return {true, std::move(unit), first, last, complete, true, true};
+            else
+                return {};
+        }
+    }
+}
+
 }
