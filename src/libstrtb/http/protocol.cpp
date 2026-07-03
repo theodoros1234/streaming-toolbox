@@ -2056,4 +2056,90 @@ content_range_field_ret parse_field_content_range(const char *field_value, size_
     }
 }
 
+via_field_ret parse_field_via(const std::string &field_value) {
+    return parse_field_via(field_value.data(), 0, field_value.length());
+}
+
+via_field_ret parse_field_via(const std::string &field_value, size_t from, size_t to) {
+    verify_range(field_value, from, to);
+    return parse_field_via(field_value.data(), from, to);
+}
+
+via_field_ret parse_field_via(const char *field_value, size_t from, size_t to) {
+    std::vector<via_part> list;
+
+    auto [list_to, valid] = parse_list(field_value, from, to,
+        [&list](const char *str, size_t from, size_t to) -> parser_ret {
+        size_t pos = from;
+        via_part part;
+
+        // protocol-name (optional, may be protocol-version)
+        auto [pos_next, valid] = parse_token(str, pos, to);
+        if (!valid)
+            return {pos, false};
+
+        // / (optional, with protocol-name)
+        if (parse_char(str, pos_next, to, '/')) {
+            // protocol-name is case-insensitive
+            part.protocol.name.reserve(pos_next - pos);
+            for (size_t i = pos; i < pos_next; i++)
+                part.protocol.name.push_back(to_lower(str[i]));
+            pos = pos_next + 1;
+
+            // protocol-version
+            std::tie(pos_next, valid) = parse_token(str, pos, to);
+            if (!valid)
+                return {pos, false};
+            part.protocol.version.assign(str + pos, pos_next - pos);
+            pos = pos_next;
+        } else {
+            // protocol-name is omitted, previous thing was protocol-version
+            part.protocol.version.assign(str + pos, pos_next - pos);
+            pos = pos_next;
+        }
+
+        // required whitespace
+        std::tie(pos, valid) = parse_required_whitespace(str, pos, to);
+        if (!valid)
+            return {pos, false};
+
+        // pseudonym
+        std::tie(pos_next, valid) = parse_token(str, pos, to);
+        if (!valid)
+            return {pos, false};
+        part.pseudonym.assign(str + pos, pos_next - pos);
+        pos = pos_next;
+
+        // :port (optional)
+        if (parse_char(str, pos, to, ':')) {
+            pos++;
+            auto int_ret = parse_integer(str, pos, to);
+            if (!int_ret.valid)
+                return {pos, false};
+            pos = int_ret.to;
+            part.port_set = true;
+            part.port = int_ret.number;
+        }
+
+        // comment (optional)
+        std::tie(pos_next, valid) = parse_required_whitespace(str, pos, to);
+        if (valid) {
+            size_t pos_between = pos_next;
+            std::tie(pos_next, valid) = parse_comment(str, pos_between, to);
+            if (valid) {
+                part.comment.assign(str + pos_between, pos_next - pos_between);
+                pos = pos_next;
+            }
+        }
+
+        list.push_back(std::move(part));
+        return {pos, true};
+    });
+
+    if (valid && list_to == to)
+        return {true, std::move(list)};
+    else
+        return {};
+}
+
 }

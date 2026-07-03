@@ -212,6 +212,19 @@ struct content_range_field_ret {
     bool satisfied = false, complete_known = false;
 };
 
+struct via_part {
+    product protocol;
+    std::string pseudonym;
+    unsigned long long port = 0;
+    bool port_set = false;
+    std::string comment;
+};
+
+struct via_field_ret {
+    bool valid = false;
+    std::vector<via_part> list;
+};
+
 // all line parsers need CRLF pre-stripped from the end of the string
 
 parser_ret parse_token(const std::string &str);
@@ -281,6 +294,8 @@ range_field_ret parse_field_range(const std::string &field_value, bool ignore_ot
 range_field_ret parse_field_range(const std::string &field_value, size_t from, size_t to, bool ignore_other_range=true);
 content_range_field_ret parse_field_content_range(const std::string &field_value);
 content_range_field_ret parse_field_content_range(const std::string &field_value, size_t from, size_t to);
+via_field_ret parse_field_via(const std::string &field_value);
+via_field_ret parse_field_via(const std::string &field_value, size_t from, size_t to);
 
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
@@ -318,6 +333,7 @@ if_match_field_ret parse_field_if_match(const char *field_value, size_t from, si
 if_range_field_ret parse_field_if_range(const char *field_value, size_t from, size_t to);
 range_field_ret parse_field_range(const char *field_value, size_t from, size_t to, bool ignore_other_range=true);
 content_range_field_ret parse_field_content_range(const char *field_value, size_t from, size_t to);
+via_field_ret parse_field_via(const char *field_value, size_t from, size_t to);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
