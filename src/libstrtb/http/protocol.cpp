@@ -1117,6 +1117,9 @@ parser_ret parse_list(const char *str, size_t from, size_t to,
 
     size_t pos = from, empty_count = 0, last_valid = from;
 
+    // skip any accidental whitespace
+    pos = parse_optional_whitespace(str, from, to);
+
     while (true) {
         // list element
         auto [pos_next, valid] = element_parser(str, pos, to);
@@ -1129,12 +1132,13 @@ parser_ret parse_list(const char *str, size_t from, size_t to,
         pos = parse_optional_whitespace(str, pos, to);
         size_t pos_comma = pos;
         if (!parse_char(str, pos, to, ',')) {
+            // skip any remaining whitespace
             if (valid)      // last element was valid => possible end of list
-                return {pos_next, true};
+                return {parse_optional_whitespace(str, pos_next, to), true};
             else if (pos >= to)     // ending with an empty element => valid
                 return {to, true};
             else            // last element invalid => return upto last valid spot in list
-                return {last_valid, true};
+                return {parse_optional_whitespace(str, last_valid, to), true};
         }
         pos++;
         pos = parse_optional_whitespace(str, pos, to);
@@ -1154,7 +1158,8 @@ token_list_ret parse_field_token_list(const std::string &field_value, size_t fro
     return parse_field_token_list(field_value.data(), from, to, case_sensitive);
 }
 
-// simple token list, used by headers such as: Connection, Content-Encoding, Content-Language, Allow, Trailer, Vary
+// simple token list, used by headers such as: Connection, Content-Encoding, Content-Language, Allow, Trailer,
+//                                             Vary, Accept-Ranges (not empty)
 token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool case_sensitive) {
     std::vector<std::string> list;
     size_t list_to = 0;
@@ -1863,6 +1868,109 @@ if_range_field_ret parse_field_if_range(const char *field_value, size_t from, si
         else
             return {true, t};
     }
+}
+
+range_field_ret parse_field_range(const std::string &field_value, bool ignore_other_range) {
+    return parse_field_range(field_value.data(), 0, field_value.length(), ignore_other_range);
+}
+
+range_field_ret parse_field_range(const std::string &field_value, size_t from, size_t to, bool ignore_other_range) {
+    verify_range(field_value, from, to);
+    return parse_field_range(field_value.data(), from, to, ignore_other_range);
+}
+
+static inline std::tuple<size_t, bool, numerical_range> parse_numerical_range(const char *str, size_t from, size_t to) {
+    size_t pos = from;
+
+    // first-pos
+    auto [pos_next, first_set, first_overflow, first] = parse_integer(str, pos, to);
+    if (first_overflow)     // overflow
+        return {pos_next, false, {}};
+    if (first_set)
+        pos = pos_next;
+
+    // -
+    if (!parse_char(str, pos, to, '-'))
+        return {pos, false, {}};
+    pos++;
+
+    // last-pos
+    auto [pos_final, last_set, last_overflow, last] = parse_integer(str, pos, to);
+    if (last_overflow)      // overflow
+        return {pos_final, false, {}};
+
+
+    if (first_set && last_set && first > last)  // last-pos cannot be smaller than first-pos
+        return {pos_final, false, {}};
+    else if (first_set || last_set)             // at least one number must be set
+        return {pos_final, true, {first, last, first_set, last_set}};
+    else
+        return {pos_final, false, {}};
+}
+
+static inline parser_ret parse_other_range(const char *str, size_t from, size_t to) {
+    for (size_t i = from; i < to; i++) {
+        char c = str[i];
+        if (c == ',' || !is_vchar(c))
+            return {i, i > from};   // must not be empty to be valid
+    }
+
+    return {to, to > from};
+}
+
+range_field_ret parse_field_range(const char *field_value, size_t from, size_t to, bool ignore_other_range) {
+    size_t pos = from;
+
+    // range-unit
+    std::string unit = parse_token_tolower(field_value, pos, to);
+    if (unit.empty())
+        return {};
+    pos += unit.length();
+
+    // =
+    if (!parse_char(field_value, pos, to, '='))
+        return {};
+    pos++;
+
+    // range-set
+    std::vector< std::variant<numerical_range, std::string> > range_set;
+
+    auto [list_to, valid] = parse_list(field_value, pos, to,
+        [&range_set, ignore_other_range](const char *str, size_t from, size_t to) -> parser_ret {
+        // try int-range/suffix-range
+        auto [nr_to, nr_valid, nr] = parse_numerical_range(str, from, to);
+
+        if (ignore_other_range) {
+            if (nr_valid)
+                range_set.push_back(std::move(nr));
+            return {nr_to, nr_valid};
+        } else {
+            // try other-range
+            auto [or_to, or_valid] = parse_other_range(str, from, to);
+
+            // use the longest valid one (first one prioritized)
+            if (nr_valid && (nr_to >= or_to || !or_valid)) {
+                range_set.push_back(std::move(nr));
+                return {nr_to, true};
+            } else if (or_valid) {
+                range_set.emplace_back(std::string(str + from, or_to - from));
+                return {or_to, true};
+            } else {
+                return {from, false};
+            }
+        }
+
+        // NOTE: other-range will be selected for overflown/invalid numerical ranges
+    });
+
+    // must have at least one range-spec
+    if (range_set.empty())
+        return {};
+
+    if (valid && list_to == to && !range_set.empty())
+        return {true, std::move(unit), std::move(range_set)};
+    else
+        return {};
 }
 
 }

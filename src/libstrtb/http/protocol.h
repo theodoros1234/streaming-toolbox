@@ -194,6 +194,17 @@ struct if_range_field_ret {
     std::variant<entity_tag, time_t> value = 0;
 };
 
+struct numerical_range {    // range-spec: int-range and suffix-range
+    unsigned long long first = 0, last = 0;
+    bool first_set = false, last_set = false;
+};
+
+struct range_field_ret {
+    bool valid = false;
+    std::string unit;
+    std::vector< std::variant<numerical_range, std::string> > range_set;    // std::string for other-range
+};
+
 // all line parsers need CRLF pre-stripped from the end of the string
 
 parser_ret parse_token(const std::string &str);
@@ -259,6 +270,8 @@ if_match_field_ret parse_field_if_match(const std::string &field_value);
 if_match_field_ret parse_field_if_match(const std::string &field_value, size_t from, size_t to);
 if_range_field_ret parse_field_if_range(const std::string &field_value);
 if_range_field_ret parse_field_if_range(const std::string &field_value, size_t from, size_t to);
+range_field_ret parse_field_range(const std::string &field_value, bool ignore_other_range=true);
+range_field_ret parse_field_range(const std::string &field_value, size_t from, size_t to, bool ignore_other_range=true);
 
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
@@ -294,6 +307,7 @@ auth_params_field_ret parse_field_authentication_info(const char *field_value, s
 accept_field_ret parse_field_accept(const char *field_value, size_t from, size_t to);
 if_match_field_ret parse_field_if_match(const char *field_value, size_t from, size_t to);
 if_range_field_ret parse_field_if_range(const char *field_value, size_t from, size_t to);
+range_field_ret parse_field_range(const char *field_value, size_t from, size_t to, bool ignore_other_range=true);
 
 // WARNING: MUST run clear() before processing another HTTP message
 class field_parser {
