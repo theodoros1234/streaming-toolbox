@@ -1238,10 +1238,14 @@ product_list_ret parse_field_upgrade(const char* field_value, size_t from, size_
     auto [list_to, valid] = parse_list(field_value, from, to,
         [&list](const char* str, size_t from, size_t to) -> parser_ret {
         auto ret = parse_product_or_protocol(str, from, to);
-        // NOTE: The protocol name should be case insensitive, but protocols have a preferred case
-        // TODO: think about how to handle this
-        if (ret.valid)
+
+        if (ret.valid) {
+            // make lowercase for case-insensitivity
+            for (char &c : ret.pr.name)
+                c = to_lower(c);
+
             list.push_back(std::move(ret.pr));
+        }
         return {ret.to, ret.valid};
     });
 
