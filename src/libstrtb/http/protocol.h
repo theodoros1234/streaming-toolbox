@@ -297,6 +297,43 @@ content_range_field_ret parse_field_content_range(const std::string &field_value
 via_field_ret parse_field_via(const std::string &field_value);
 via_field_ret parse_field_via(const std::string &field_value, size_t from, size_t to);
 
+parser_ret parse_token(std::string_view str);
+quoted_ret parse_quoted_str(std::string_view str);
+parser_ret parse_comment(std::string_view str);
+http_version_ret parse_http_version(std::string_view str);
+request_line_ret parse_request_line(std::string_view line);
+status_line_ret parse_status_line(std::string_view line);
+parameters_ret parse_parameters(std::string_view str, bool allow_bad_whitespace=false);
+product_ret parse_product_or_protocol(std::string_view str);
+integer_ret parse_integer(std::string_view str);
+entity_tag_ret parse_etag(std::string_view str);
+parser_ret parse_list(std::string_view str,
+                      const std::function<parser_ret(const char*, size_t, size_t)> &element_parser);
+credentials_ret parse_credentials_or_challenge(std::string_view str);
+auth_params_ret parse_auth_params(std::string_view str);
+media_type_ret parse_media_type(std::string_view str);
+
+time_t parse_field_date(std::string_view str);
+token_list_ret parse_field_token_list(std::string_view field_value, bool case_sensitive);
+product_list_ret parse_field_upgrade(std::string_view field_value);
+content_type_ret parse_field_content_type(std::string_view field_value);
+integer_field_ret parse_field_integer(std::string_view field_value);
+abs_or_part_uri_field_ret parse_field_abs_or_part_uri(std::string_view field_value);
+etag_field_ret parse_field_etag(std::string_view field_value);
+expect_field_ret parse_field_expect(std::string_view field_value);
+token_params_list_ret parse_field_token_params_list(std::string_view field_value,
+                                                    bool token_case_sensitive, bool allow_bad_whitespace);
+product_field_ret parse_field_product_info(std::string_view field_value);
+authenticate_field_ret parse_field_authenticate(std::string_view field_value);
+authorization_field_ret parse_field_authorization(std::string_view field_value);
+auth_params_field_ret parse_field_authentication_info(std::string_view field_value);
+accept_field_ret parse_field_accept(std::string_view field_value);
+if_match_field_ret parse_field_if_match(std::string_view field_value);
+if_range_field_ret parse_field_if_range(std::string_view field_value);
+range_field_ret parse_field_range(std::string_view field_value, bool ignore_other_range=true);
+content_range_field_ret parse_field_content_range(std::string_view field_value);
+via_field_ret parse_field_via(std::string_view field_value);
+
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);

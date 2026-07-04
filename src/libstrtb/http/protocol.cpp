@@ -2142,4 +2142,139 @@ via_field_ret parse_field_via(const char *field_value, size_t from, size_t to) {
         return {};
 }
 
+parser_ret parse_token(std::string_view str) {
+    return parse_token(str.data(), 0, str.length());
+}
+
+quoted_ret parse_quoted_str(std::string_view str) {
+    return parse_quoted_str(str.data(), 0, str.length());
+}
+
+parser_ret parse_comment(std::string_view str) {
+    return parse_comment(str.data(), 0, str.length());
+}
+
+http_version_ret parse_http_version(std::string_view str) {
+    return parse_http_version(str.data(), 0, str.length());
+}
+
+request_line_ret parse_request_line(std::string_view line) {
+    return parse_request_line(line.data(), line.length());
+}
+
+status_line_ret parse_status_line(std::string_view line) {
+    return parse_status_line(line.data(), line.length());
+}
+
+parameters_ret parse_parameters(std::string_view str, bool allow_bad_whitespace) {
+    return parse_parameters(str.data(), 0, str.length(), allow_bad_whitespace);
+}
+
+product_ret parse_product_or_protocol(std::string_view str) {
+    return parse_product_or_protocol(str.data(), 0, str.length());
+}
+
+integer_ret parse_integer(std::string_view str) {
+    return parse_integer(str.data(), 0, str.length());
+}
+
+entity_tag_ret parse_etag(std::string_view str) {
+    return parse_etag(str.data(), 0, str.length());
+}
+
+parser_ret parse_list(std::string_view str,
+                      const std::function<parser_ret(const char*, size_t, size_t)> &element_parser) {
+    return parse_list(str.data(), 0, str.length(), element_parser);
+}
+
+credentials_ret parse_credentials_or_challenge(std::string_view str) {
+    return parse_credentials_or_challenge(str.data(), 0, str.length());
+}
+
+auth_params_ret parse_auth_params(std::string_view str) {
+    return parse_auth_params(str.data(), 0, str.length());
+}
+
+media_type_ret parse_media_type(std::string_view str) {
+    return parse_media_type(str.data(), 0, str.length());
+}
+
+time_t parse_field_date(std::string_view str) {
+    return parse_field_date(str.data(), 0, str.length());
+}
+
+token_list_ret parse_field_token_list(std::string_view field_value, bool case_sensitive) {
+    return parse_field_token_list(field_value.data(), 0, field_value.length(), case_sensitive);
+}
+
+product_list_ret parse_field_upgrade(std::string_view field_value) {
+    return parse_field_upgrade(field_value.data(), 0, field_value.length());
+}
+
+content_type_ret parse_field_content_type(std::string_view field_value) {
+    return parse_field_content_type(field_value.data(), 0, field_value.length());
+}
+
+integer_field_ret parse_field_integer(std::string_view field_value) {
+    return parse_field_integer(field_value.data(), 0, field_value.length());
+}
+
+abs_or_part_uri_field_ret parse_field_abs_or_part_uri(std::string_view field_value) {
+    return parse_field_abs_or_part_uri(field_value.data(), 0, field_value.length());
+}
+
+etag_field_ret parse_field_etag(std::string_view field_value) {
+    return parse_field_etag(field_value.data(), 0, field_value.length());
+}
+
+expect_field_ret parse_field_expect(std::string_view field_value) {
+    return parse_field_expect(field_value.data(), 0, field_value.length());
+}
+
+token_params_list_ret parse_field_token_params_list(std::string_view field_value,
+                                                    bool token_case_sensitive, bool allow_bad_whitespace) {
+    return parse_field_token_params_list(field_value.data(), 0, field_value.length(),
+                                         token_case_sensitive, allow_bad_whitespace);
+}
+
+product_field_ret parse_field_product_info(std::string_view field_value) {
+    return parse_field_product_info(field_value.data(), 0, field_value.length());
+}
+
+authenticate_field_ret parse_field_authenticate(std::string_view field_value) {
+    return parse_field_authenticate(field_value.data(), 0, field_value.length());
+}
+
+authorization_field_ret parse_field_authorization(std::string_view field_value) {
+    return parse_field_authorization(field_value.data(), 0, field_value.length());
+}
+
+auth_params_field_ret parse_field_authentication_info(std::string_view field_value) {
+    return parse_field_authentication_info(field_value.data(), 0, field_value.length());
+}
+
+accept_field_ret parse_field_accept(std::string_view field_value) {
+    return parse_field_accept(field_value.data(), 0, field_value.length());
+}
+
+if_match_field_ret parse_field_if_match(std::string_view field_value) {
+    return parse_field_if_match(field_value.data(), 0, field_value.length());
+}
+
+if_range_field_ret parse_field_if_range(std::string_view field_value) {
+    return parse_field_if_range(field_value.data(), 0, field_value.length());
+}
+
+range_field_ret parse_field_range(std::string_view field_value, bool ignore_other_range) {
+    return parse_field_range(field_value.data(), 0, field_value.length(), ignore_other_range);
+}
+
+content_range_field_ret parse_field_content_range(std::string_view field_value) {
+    return parse_field_content_range(field_value.data(), 0, field_value.length());
+}
+
+via_field_ret parse_field_via(std::string_view field_value) {
+    return parse_field_via(field_value.data(), 0, field_value.length());
+}
+
 }
