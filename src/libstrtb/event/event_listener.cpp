@@ -2,7 +2,7 @@
 #include "system.h"
 #include "item.h"
 #include "../logging/logging.h"
-#include "../common/strescape.h"
+#include "../strescape.h"
 #include <cassert>
 
 using namespace strtb::event;
@@ -87,7 +87,7 @@ uint64_t event_listener_base::subscribe(const item_path& event_source, const jso
 
 event_listener_queued::~event_listener_queued() {
     if (_active)
-        log_s.warning({"Destroying queued listener ", common::string_escape(_name), " while it's still active"});
+        log_s.warning({"Destroying queued listener ", string_escape(_name), " while it's still active"});
 
     stop();
 }
@@ -191,7 +191,7 @@ void event_listener_queued::push_event(uint64_t sub_id, const json::value* event
 
 event_listener_qt_signal::~event_listener_qt_signal() {
     if (!_subs.empty()) {
-        log_s.warning({"Destroying Qt signal listener ", common::string_escape(_name), " while it still has active subscriptions"});
+        log_s.warning({"Destroying Qt signal listener ", string_escape(_name), " while it still has active subscriptions"});
         stop();
     }
 }

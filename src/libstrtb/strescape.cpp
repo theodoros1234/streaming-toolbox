@@ -4,10 +4,9 @@
 #include <iomanip>
 #include <sstream>
 
-using namespace strtb;
-using namespace strtb::common;
+namespace strtb {
 
-std::string common::char_escape(char c, char escape_quote_char, bool quoted) {
+std::string char_escape(char c, char escape_quote_char, bool quoted) {
     std::string escaped;
 
     // Opening quote
@@ -56,7 +55,7 @@ std::string common::char_escape(char c, char escape_quote_char, bool quoted) {
     return escaped;
 }
 
-std::string common::string_escape(const char* str, char escape_quote_char, bool quoted) {
+std::string string_escape(const char* str, char escape_quote_char, bool quoted) {
     std::string escaped;
 
     // Opening quote
@@ -76,7 +75,7 @@ std::string common::string_escape(const char* str, char escape_quote_char, bool 
     return escaped;
 }
 
-std::string common::string_escape(const std::string &str, char escape_quote_char, bool quoted) {
+std::string string_escape(const std::string &str, char escape_quote_char, bool quoted) {
     std::string escaped;
 
     // Opening quote
@@ -94,7 +93,7 @@ std::string common::string_escape(const std::string &str, char escape_quote_char
     return escaped;
 }
 
-QString common::char_escape(QChar c, QChar escape_quote_char, bool quoted) {
+QString char_escape(QChar c, QChar escape_quote_char, bool quoted) {
     QString escaped;
 
     // Opening quote
@@ -144,7 +143,7 @@ QString common::char_escape(QChar c, QChar escape_quote_char, bool quoted) {
     return escaped;
 }
 
-QString common::string_escape(const QString &str, QChar escape_quote_char, bool quoted) {
+QString string_escape(const QString &str, QChar escape_quote_char, bool quoted) {
     QString escaped;
 
     // Opening quote
@@ -162,3 +161,4 @@ QString common::string_escape(const QString &str, QChar escape_quote_char, bool 
     return escaped;
 }
 
+}

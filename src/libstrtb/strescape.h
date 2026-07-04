@@ -1,10 +1,10 @@
-#ifndef STRTB_COMMON_STRESCAPE_H
-#define STRTB_COMMON_STRESCAPE_H
+#ifndef STRTB_STRESCAPE_H
+#define STRTB_STRESCAPE_H
 
 #include <string>
 #include <QString>
 
-namespace strtb::common {
+namespace strtb {
 
 std::string char_escape(char c, char escape_quote_char = '\'', bool quoted = true);
 std::string string_escape(const char* str, char escape_quote_char = '"', bool quoted = true);
@@ -15,4 +15,4 @@ QString string_escape(const QString &str, QChar escape_quote_char = '"', bool qu
 
 }
 
-#endif // STRTB_COMMON_STRESCAPE_H
+#endif // STRTB_STRESCAPE_H

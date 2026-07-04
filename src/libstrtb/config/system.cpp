@@ -1,7 +1,7 @@
 #include "system.h"
 #include "../json/all_value_types.h"
 #include "../json/parser.h"
-#include "../common/strescape.h"
+#include "../strescape.h"
 
 #include <fstream>
 
@@ -12,15 +12,15 @@ config::system *config::main = nullptr;
 
 invalid_category_name::invalid_category_name(const std::string &invalid_name, char invalid_char) {
     _what = "Invalid category name ";
-    _what.append(common::string_escape(invalid_name));
+    _what.append(string_escape(invalid_name));
     _what.append("; character ");
-    _what.append(common::char_escape(invalid_char));
+    _what.append(char_escape(invalid_char));
     _what.append(" cannot be part of a file name on at least one supported operating system.");
 }
 
 invalid_category_name::invalid_category_name(const std::string &invalid_name) {
     _what = "Invalid category name ";
-    _what.append(common::string_escape(invalid_name));
+    _what.append(string_escape(invalid_name));
     _what = "; it's a reserved or disallowed file name on at least one supported operating system.";
 }
 
@@ -28,7 +28,7 @@ const char* invalid_category_name::what() const noexcept {return _what.c_str();}
 
 category_not_found::category_not_found(const std::string &category_name) {
     _what = "Couldn't find category ";
-    _what.append(common::string_escape(category_name));
+    _what.append(string_escape(category_name));
     _what = "; it isn't loaded or doesn't exist.";
 }
 
@@ -41,12 +41,12 @@ const char* category_filesystem_error::what() const noexcept {return _what.c_str
 broken_path::broken_path(const std::string &category_name, const path_type &path_until_break)
     : _category_name(category_name), _path_until_break(path_until_break) {
     _what = "Broken path; the last piece wasn't found or is of wrong type: ";
-    _what.append(common::string_escape(category_name));
+    _what.append(string_escape(category_name));
     for (auto &item : _path_until_break) {
         _what.push_back('/');
         switch (item.type()) {
         case json::VAL_OBJECT:
-            _what.append(common::string_escape(item.key()));
+            _what.append(string_escape(item.key()));
             break;
         case json::VAL_ARRAY:
             _what.append(std::to_string(item.pos()));
@@ -66,12 +66,12 @@ broken_path::broken_path(const std::string &category_name, const path_type &path
 
     // Message
     _what = "Broken path; the last piece wasn't found or is of wrong type: ";
-    _what.append(common::string_escape(category_name));
+    _what.append(string_escape(category_name));
     for (auto &item : _path_until_break) {
         _what.push_back('/');
         switch (item.type()) {
         case json::VAL_OBJECT:
-            _what.append(common::string_escape(item.key()));
+            _what.append(string_escape(item.key()));
             break;
         case json::VAL_ARRAY:
             _what.append(std::to_string(item.pos()));
@@ -119,13 +119,13 @@ invalid_target::invalid_target(const std::string &action, json::val_type type) {
         _what.append("(unknown)");
     }
     _what.append("\" for config action ");
-    _what.append(common::string_escape(action));
+    _what.append(string_escape(action));
     _what.append(" with given arguments");
 }
 
 invalid_target::invalid_target(const std::string &action) {
     _what = "invalid target for config action ";
-    _what.append(common::string_escape(action));
+    _what.append(string_escape(action));
     _what.append("; target was not specified");
 }
 
@@ -202,7 +202,7 @@ json::value* system::follow_path(const std::string &category_name, const path_ty
 }
 
 system::system(const std::filesystem::path &config_dir) : log("Config System", false), _config_dir(config_dir) {
-    log.put(logging::DEBUG, {"Initialized with config dir ", common::string_escape(config_dir)});
+    log.put(logging::DEBUG, {"Initialized with config dir ", string_escape(config_dir)});
 }
 
 system::~system() {
@@ -256,10 +256,10 @@ void system::load_category(const std::string &category_name) {
                 // Config file exists, load it.
                 try {
                     instance.root = json::parser::from_file(instance.path.c_str());
-                    log.put(logging::INFO, {"Loaded category ", common::string_escape(cat_lower)});
+                    log.put(logging::INFO, {"Loaded category ", string_escape(cat_lower)});
                     break;
                 } catch (json::parser::invalid_json &e) {
-                    log.put(logging::WARNING, {"Failed to load category ", common::string_escape(cat_lower), ": ", e.what(),
+                    log.put(logging::WARNING, {"Failed to load category ", string_escape(cat_lower), ": ", e.what(),
                                                ". Backing up config file and trying to load previous backup."});
                     std::filesystem::rename(instance.path, std::string(instance.path) + "-invalid.bak");
                 }
@@ -269,10 +269,10 @@ void system::load_category(const std::string &category_name) {
                 if (std::filesystem::status(instance.path_bak).type() == std::filesystem::file_type::regular) {
                     try {
                         instance.root = json::parser::from_file(instance.path_bak.c_str());
-                        log.put(logging::WARNING, {"Loaded category ", common::string_escape(cat_lower), " from backup"});
+                        log.put(logging::WARNING, {"Loaded category ", string_escape(cat_lower), " from backup"});
                         break;
                     } catch (json::parser::invalid_json &e) {
-                        log.put(logging::WARNING, {"Failed to load category ", common::string_escape(cat_lower), " from backup: ",
+                        log.put(logging::WARNING, {"Failed to load category ", string_escape(cat_lower), " from backup: ",
                                                    e.what(), ". Creating a new config file."});
                     }
                 }
@@ -287,17 +287,17 @@ void system::load_category(const std::string &category_name) {
                     test_out.close();
                 }
                 instance.root = new json::value_object();
-                log.put(logging::DEBUG, {"Created category ", common::string_escape(cat_lower)});
+                log.put(logging::DEBUG, {"Created category ", string_escape(cat_lower)});
                 break;
 
             default:
                 // Something else exists (e.g. directory) in the place of this config file.
-                std::string error_msg = "path " + common::string_escape(instance.path) + " exists, but doesn't lead to a file";
-                log.put(logging::ERROR, {"Failed to load category ", common::string_escape(cat_lower), ": ", error_msg});
+                std::string error_msg = "path " + string_escape(instance.path) + " exists, but doesn't lead to a file";
+                log.put(logging::ERROR, {"Failed to load category ", string_escape(cat_lower), ": ", error_msg});
                 throw category_filesystem_error(error_msg);
             }
         } catch (std::iostream::failure &e) {
-            log.put(logging::ERROR, {"Failed to load category ", common::string_escape(cat_lower), " due to filesystem error: ", e.what()});
+            log.put(logging::ERROR, {"Failed to load category ", string_escape(cat_lower), " due to filesystem error: ", e.what()});
             throw category_filesystem_error(e.what());
         }
 
@@ -307,7 +307,7 @@ void system::load_category(const std::string &category_name) {
 }
 
 void system::save_category(const std::string &category_name, bool force) {
-    log.put(logging::DEBUG, {"Saving category ", common::string_escape(category_name)});
+    log.put(logging::DEBUG, {"Saving category ", string_escape(category_name)});
     std::lock_guard<std::mutex> guard(_lock);
     category_instance &cat = find_category(category_name);
     // Only save if there are changes or if force=true
@@ -317,14 +317,14 @@ void system::save_category(const std::string &category_name, bool force) {
             try {
                 std::filesystem::rename(cat.path, cat.path_bak);
             } catch (std::exception &e) {
-                log.put(logging::WARNING, {"Failed to make backup of category ", common::string_escape(category_name), " before saving it: ", e.what()});
+                log.put(logging::WARNING, {"Failed to make backup of category ", string_escape(category_name), " before saving it: ", e.what()});
             }
         }
         try {
             std::filesystem::create_directories(_config_dir);
             cat.root->write_to_file(cat.path.c_str(), 4);
         } catch (std::exception &e) {
-            log.put(logging::ERROR, {"Failed to save category ", common::string_escape(category_name), ": ", e.what()});
+            log.put(logging::ERROR, {"Failed to save category ", string_escape(category_name), ": ", e.what()});
         }
     }
     cat.changed = false;

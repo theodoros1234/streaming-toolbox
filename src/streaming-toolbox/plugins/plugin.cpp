@@ -1,7 +1,7 @@
 #include "plugin.h"
 #include "../libstrtb/plugins/link.h"
 #include "../libstrtb/logging/logging.h"
-#include "../libstrtb/common/strescape.h"
+#include "../libstrtb/strescape.h"
 
 #include <filesystem>
 #include <stdexcept>
@@ -35,8 +35,8 @@ plugin::plugin(fs::path path) {
         dlclose(this->library);
         throw std::runtime_error("Couldn't check libstrtb version due to missing functions");
     }
-    this->functions.get_libstrtb_version = reinterpret_cast<common::version (*)()>(ptr_get_libstrtb_version);
-    if (!common::versions_equal(this->functions.get_libstrtb_version(), common::get_libstrtb_version())) {
+    this->functions.get_libstrtb_version = reinterpret_cast<struct version_t (*)()>(ptr_get_libstrtb_version);
+    if (!versions_equal(this->functions.get_libstrtb_version(), get_libstrtb_version())) {
         // Streaming Toolbox doesn't support plugin's API version
         log.put(logging::ERROR, {"Failed loading ", path.filename(), ": Mismatched libstrtb versions between plugin and Streaming Toolbox"});
         dlclose(this->library);
@@ -70,7 +70,7 @@ plugin::plugin(fs::path path) {
         throw;
     }
 
-    log.put(logging::DEBUG, {"Loaded ", common::string_escape(this->_info.name)});
+    log.put(logging::DEBUG, {"Loaded ", string_escape(this->_info.name)});
     try {
         this->activate();
     } catch (...) {
@@ -81,13 +81,13 @@ plugin::plugin(fs::path path) {
 
 plugin::~plugin() {
     // Unload plugin
-    log.put(logging::DEBUG, {"Deactivating and unloading ", common::string_escape(this->_info.name)});
+    log.put(logging::DEBUG, {"Deactivating and unloading ", string_escape(this->_info.name)});
     try {
         this->functions.deactivate();
     } catch (std::exception &e) {
-        log.put(logging::ERROR, {"Unhandled exception while deactivating ", common::string_escape(this->_info.name), ": ", e.what()});
+        log.put(logging::ERROR, {"Unhandled exception while deactivating ", string_escape(this->_info.name), ": ", e.what()});
     } catch (...) {
-        log.put(logging::ERROR, {"Unhandled exception while deactivating ", common::string_escape(this->_info.name)});
+        log.put(logging::ERROR, {"Unhandled exception while deactivating ", string_escape(this->_info.name)});
     }
     dlclose(this->library);
 }
@@ -97,15 +97,15 @@ void plugin::activate() {
     try {
         result = this->functions.activate();
     } catch (std::exception &e) {
-        log.put(logging::ERROR, {"Unhandled exception while activating ", common::string_escape(this->_info.name), ": ", e.what()});
+        log.put(logging::ERROR, {"Unhandled exception while activating ", string_escape(this->_info.name), ": ", e.what()});
         throw;
     } catch (...) {
-        log.put(logging::ERROR, {"Unhandled exception while activating ", common::string_escape(this->_info.name)});
+        log.put(logging::ERROR, {"Unhandled exception while activating ", string_escape(this->_info.name)});
         throw;
     }
     if (!result) {
-        log.put(logging::ERROR, {"Couldn't activate ", common::string_escape(this->_info.name)});
-        throw std::runtime_error("Couldn't activate " + common::string_escape(this->_info.name));
+        log.put(logging::ERROR, {"Couldn't activate ", string_escape(this->_info.name)});
+        throw std::runtime_error("Couldn't activate " + string_escape(this->_info.name));
     }
 }
 

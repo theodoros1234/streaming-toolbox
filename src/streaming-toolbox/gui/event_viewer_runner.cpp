@@ -1,7 +1,7 @@
 #include "event_viewer_runner.h"
 #include "ui_event_viewer_runner.h"
 #include "../../libstrtb/json/parser.h"
-#include "../../libstrtb/common/strescape.h"
+#include "../../libstrtb/strescape.h"
 #include <QGridLayout>
 #include <QCheckBox>
 #include <QLabel>
@@ -227,7 +227,7 @@ void event_viewer_runner::run_or_cancel() {
                                 json::parser::from_string(textbox->text().toStdString()));
                         } catch (json::parser::invalid_json& e) {
                             _error.setText("Parameter " +
-                                           QString::fromStdString(common::string_escape(def.name)) +
+                                           QString::fromStdString(string_escape(def.name)) +
                                            ": " + e.what());
                             _error.exec();
                             return;

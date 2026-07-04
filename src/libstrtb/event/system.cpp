@@ -6,7 +6,7 @@
 #include "action_handler.h"
 #include "action_requester.h"
 #include "../logging/logging.h"
-#include "../common/strescape.h"
+#include "../strescape.h"
 #include "../json/cast.h"
 
 using namespace strtb;
@@ -320,7 +320,7 @@ static void _verify_params(const param_definition& param) {
             if (param.array_definition != nullptr)
                 _verify_params(*param.array_definition);
         } catch (bad_definition& e) {
-            throw bad_definition("in " + common::string_escape(param.name) + ": " + e.what());
+            throw bad_definition("in " + string_escape(param.name) + ": " + e.what());
         }
     }
     break;
@@ -330,15 +330,15 @@ static void _verify_params(const param_definition& param) {
 
         for (const param_definition* subparam : param.object_definition)
             if (!names.insert(subparam->name).second)
-                throw bad_definition("in " + common::string_escape(param.name) +
-                                     ": duplicate parameter " + common::string_escape(subparam->name));
+                throw bad_definition("in " + string_escape(param.name) +
+                                     ": duplicate parameter " + string_escape(subparam->name));
         names.clear();
 
         for (const param_definition* subparam : param.object_definition) {
             try {
                 _verify_params(*subparam);
             } catch (bad_definition& e) {
-                throw bad_definition("in " + common::string_escape(param.name) + ": " + e.what());
+                throw bad_definition("in " + string_escape(param.name) + ": " + e.what());
             }
         }
     }
@@ -354,7 +354,7 @@ static void _verify_params(const std::vector<param_definition>& params) {
 
     for (const param_definition& subparam : params)
         if (!names.insert(subparam.name).second)
-            throw bad_definition("duplicate parameter " + common::string_escape(subparam.name));
+            throw bad_definition("duplicate parameter " + string_escape(subparam.name));
     names.clear();
 
     for (const param_definition& subparam : params)
@@ -560,23 +560,23 @@ system::~system() {
 
     // Providers
     for (const auto& provider : _items.at(STRTB_EVENT_ROOT).as_category()->list)
-        log_s.warning({"Abandoned provider: ", common::string_escape(provider.first), ", rid=", provider.second});
+        log_s.warning({"Abandoned provider: ", string_escape(provider.first), ", rid=", provider.second});
 
     // Items
     for (const auto& item : _items)
         if (item.first != STRTB_EVENT_ROOT)
             log_s.warning({"Abandoned item: rid=", item.first,
-                           ", type=", common::string_escape(item_type_to_string_display(item.second.type()))});
+                           ", type=", string_escape(item_type_to_string_display(item.second.type()))});
 
     // Event subs
     for (const auto& sub : _event_subs)
-        log_s.warning({"Abandoned even sub: ", common::string_escape(sub.second->path.owner_name),
+        log_s.warning({"Abandoned even sub: ", string_escape(sub.second->path.owner_name),
                        ", sub_rid=", sub.first, ", target_rid=", sub.second->path.target_rid});
 
     // Action requesters
     for (const auto& rq : _action_requesters)
         log_s.warning({"Abandoned action requester's path follower: ",
-                       common::string_escape(rq.second->owner_name), ", follower_rid=", rq.first,
+                       string_escape(rq.second->owner_name), ", follower_rid=", rq.first,
                        ", target_rid=", rq.second->target_rid});
 }
 
@@ -600,7 +600,7 @@ uint64_t system::_follow_path(uint64_t start, const item_path& path) {
             try {
                 current_pos = cat->list.at(next_piece);
             } catch (std::out_of_range&) {
-                throw not_found(common::string_escape(next_piece) + " was not found");
+                throw not_found(string_escape(next_piece) + " was not found");
             }
         } catch (std::out_of_range&) {
             if (current_pos == start)
@@ -608,7 +608,7 @@ uint64_t system::_follow_path(uint64_t start, const item_path& path) {
             else // if a category holds an invalid ID, it's very likely our bug, thus throwing internal_error
                 throw internal_error("resource id " + std::to_string(current_pos) + " not found", log_s, __FILE__, __LINE__, __func__);
         } catch (wrong_type&) {
-            throw wrong_type(common::string_escape(next_piece) + " is not a category");
+            throw wrong_type(string_escape(next_piece) + " is not a category");
         }
     }
 
@@ -653,11 +653,11 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
                                     const std::string& name,
                                     const item_info& item) {
     if (!item_path::validate_segment(name))
-        throw invalid_path("name " + common::string_escape(name) + " is invalid", -1);
+        throw invalid_path("name " + string_escape(name) + " is invalid", -1);
 
     uint64_t& new_entry = location->list[name];
     if (new_entry != 0)
-        throw already_exists("target location already has an item named " + common::string_escape(name));
+        throw already_exists("target location already has an item named " + string_escape(name));
     uint64_t new_res_id = _resid_new();
     new_entry = new_res_id;
 
@@ -679,9 +679,9 @@ std::pair<uint64_t, system::res_cnt &> system::_provider_item_add(uint64_t provi
             item.examples
         );
         } catch (wrong_type& e) {
-            throw wrong_type("in item " + common::string_escape(name) + ": " + e.what());
+            throw wrong_type("in item " + string_escape(name) + ": " + e.what());
         } catch (bad_definition& e) {
-            throw wrong_type("in item " + common::string_escape(name) + ": " + e.what());
+            throw wrong_type("in item " + string_escape(name) + ": " + e.what());
         }
 
         // Forward any path followers to the new item
@@ -828,12 +828,12 @@ void system::_provider_item_remove(uint64_t location_rid, res_item_category* loc
     uint64_t rid = 0;
 
     if (!item_path::validate_segment(name))
-        throw invalid_path("name " + common::string_escape(name) + " is invalid", -1);
+        throw invalid_path("name " + string_escape(name) + " is invalid", -1);
 
     // Delete entry in category
     auto cat_entry = location->list.find(name);
     if (cat_entry == location->list.end())
-        throw not_found("target item " + common::string_escape(name) + " not found in this location");
+        throw not_found("target item " + string_escape(name) + " not found in this location");
     rid = cat_entry->second;
     location->list.erase(cat_entry);
 
@@ -841,7 +841,7 @@ void system::_provider_item_remove(uint64_t location_rid, res_item_category* loc
     auto item = _items.find(rid);
 
     if (item == _items.end()) {
-        log_s.put(logging::WARNING, {"Deleting entry ", common::string_escape(name),
+        log_s.put(logging::WARNING, {"Deleting entry ", string_escape(name),
                                    " that refers to an invalid resource ID of ", rid});
         return;
     }
@@ -904,7 +904,7 @@ void system::_provider_category_clear(uint64_t location_rid, res_item_category* 
 
         // Make sure the item actually exists
         if (item == _items.end()) {
-            log_s.put(logging::WARNING, {"Deleting entry ", common::string_escape(entry.first),
+            log_s.put(logging::WARNING, {"Deleting entry ", string_escape(entry.first),
                                        " that refers to an invalid resource ID of ", entry.second});
             continue;
         }
@@ -1077,7 +1077,7 @@ void system::_provider_import(uint64_t provider_id,
                     throw parsing_error("item definition must be an object");
                 }
             } catch (parsing_error& e) {
-                throw parsing_error("item " + common::string_escape(name) + ": " + e.what());
+                throw parsing_error("item " + string_escape(name) + ": " + e.what());
             }
         } catch (...) {     // Remove all added entries on exception
             // Removes all entries from first to last added (NOT the current one, as this caused the exception)
@@ -1718,11 +1718,11 @@ json::value_object* system::export_items(uint64_t target_location, const std::ve
 
     for (const std::string& entry : entries) {
         if (!item_path::validate_segment(entry))
-            throw invalid_path("entry name " + common::string_escape(entry) + " is invalid", -1);
+            throw invalid_path("entry name " + string_escape(entry) + " is invalid", -1);
 
         const auto itr = location->list.find(entry);
         if (itr == location->list.end())
-            throw not_found("entry " + common::string_escape(entry) + " not found");
+            throw not_found("entry " + string_escape(entry) + " not found");
 
         _export_item(def, itr->first, itr->second);
     }
@@ -1738,11 +1738,11 @@ json::value_object* system::export_items(const item_path& target_location, const
 
     for (const std::string& entry : entries) {
         if (!item_path::validate_segment(entry))
-            throw invalid_path("entry name " + common::string_escape(entry) + " is invalid", -1);
+            throw invalid_path("entry name " + string_escape(entry) + " is invalid", -1);
 
         const auto itr = location->list.find(entry);
         if (itr == location->list.end())
-            throw not_found("entry " + common::string_escape(entry) + " not found");
+            throw not_found("entry " + string_escape(entry) + " not found");
 
         _export_item(def, itr->first, itr->second);
     }

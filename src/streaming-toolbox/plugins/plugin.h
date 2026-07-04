@@ -2,7 +2,7 @@
 #define STRTB_PLUGINS_PLUGIN_H
 
 #include "../libstrtb/plugins/link.h"
-#include "../libstrtb/common/version.h"
+#include "../libstrtb/version.h"
 #include <filesystem>
 #include <QWidget>
 
@@ -19,7 +19,7 @@ private:
     plugin_info _info;
     std::filesystem::path _path;
     struct {
-        common::version (*get_libstrtb_version)();
+        version_t (*get_libstrtb_version)();
         plugins::plugin_info (*exchange_info)();
         bool (*activate)();
         void (*deactivate)();

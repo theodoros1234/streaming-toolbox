@@ -1,5 +1,5 @@
 #include "protocol.h"
-#include "common/strescape.h"
+#include "strescape.h"
 
 #include <cstdint>
 #include <climits>  // IWYU pragma: keep
@@ -1460,7 +1460,7 @@ std::string etag_to_string(const entity_tag &etag) {
         if ((is_vchar(c) && c != '"') || is_obs_text(c))
             str.push_back(c);
         else
-            throw std::invalid_argument("found invalid character "s + strtb::common::char_escape(c) + " in tag");
+            throw std::invalid_argument("found invalid character "s + strtb::char_escape(c) + " in tag");
     }
     str.push_back('"');     // closing quote
 

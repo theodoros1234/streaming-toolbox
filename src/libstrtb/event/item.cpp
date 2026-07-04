@@ -1,6 +1,6 @@
 #include "item.h"
 #include "../json/cast.h"
-#include "../common/strescape.h"
+#include "../strescape.h"
 
 using namespace strtb::event;
 
@@ -98,7 +98,7 @@ param_definition::param_definition(const json::value_object* from) {
             type = json::type_from_string(type_str);
             // DON'T remove the following check. If the type is unspecified, it can just be ommited.
             if (type == json::VAL_UNDEFINED || type == json::VAL_NULL)
-                throw parsing_error(common::string_escape(type_str) + " is not an accepted type");
+                throw parsing_error(string_escape(type_str) + " is not an accepted type");
         } catch (std::out_of_range&) {
         } catch (json::wrong_type&) {
             throw parsing_error("\"type\" is not a string");
@@ -528,7 +528,7 @@ item_path::item_path(const std::string& path, size_t max_segment_length, size_t 
         if (validate_segment(segment))
             push_back(std::move(segment));
         else
-            throw parsing_error("path segment " + common::string_escape(segment) + " is invalid");
+            throw parsing_error("path segment " + string_escape(segment) + " is invalid");
     }
 
     throw parsing_error("path exceeds maximum depth");
@@ -544,7 +544,7 @@ std::string item_path::to_string() const {
     std::string str;
     ssize_t path_validate = validate();
     if (path_validate != -1)
-        throw invalid_path("path segment " + common::string_escape(at(path_validate)) + " is invalid", path_validate);
+        throw invalid_path("path segment " + string_escape(at(path_validate)) + " is invalid", path_validate);
 
     size_t length = 0;
     for (const std::string& segment : *this)
@@ -569,7 +569,7 @@ ssize_t item_path::validate() const {
 void item_path::validate_with_exception() const {
     ssize_t path_validate = validate();
     if (path_validate != -1)
-        throw invalid_path("path segment " + common::string_escape(at(path_validate)) + " is invalid", path_validate);
+        throw invalid_path("path segment " + string_escape(at(path_validate)) + " is invalid", path_validate);
 }
 
 bool item_path::validate_segment(size_t pos) const {
@@ -619,9 +619,9 @@ void strtb::event::param_type_check(const json::value* param, const param_defini
                 param_type_check(param_obj->at(subdef->name), subdef);
             } catch (std::out_of_range&) {
                 if (subdef->required)
-                    throw wrong_type("missing required key " + common::string_escape(subdef->name));
+                    throw wrong_type("missing required key " + string_escape(subdef->name));
             } catch (wrong_type& e) {
-                throw wrong_type("at " + common::string_escape(subdef->name) + ": " + e.what());
+                throw wrong_type("at " + string_escape(subdef->name) + ": " + e.what());
             }
         }
     }
@@ -645,7 +645,7 @@ void strtb::event::param_type_check(const json::value* param, const std::vector<
             if (subdef.required)
                 throw wrong_type("missing required key " + subdef.name);
         } catch (wrong_type& e) {
-            throw wrong_type("at " + common::string_escape(subdef.name) + ": " + e.what());
+            throw wrong_type("at " + string_escape(subdef.name) + ": " + e.what());
         }
     }
 }
@@ -686,5 +686,5 @@ item_type strtb::event::item_type_from_string(const std::string& type_str) {
     else if (type_str == "category")
         return ITEM_CATEGORY;
     else
-        throw parsing_error(common::string_escape(type_str) + " is not a valid item type");
+        throw parsing_error(string_escape(type_str) + " is not a valid item type");
 }

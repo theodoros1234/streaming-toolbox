@@ -3,7 +3,7 @@
 #include "../libstrtb/chat/system.h"
 #include "../libstrtb/logging/logging.h"
 #include "../libstrtb/config/system.h"
-#include "../libstrtb/common/version.h"
+#include "../libstrtb/version.h"
 #include "../libstrtb/event/system.h"
 #include "../libstrtb/uri.h"
 
@@ -31,13 +31,13 @@ int main(int argc, char *argv[]) {
     logging::source log("Main", false);
 
     // Check libstrtb version
-    if (!common::versions_equal(common::get_libstrtb_version(),
-                                {.major=STRTB_SRC_VERSION_MAJOR, .minor=STRTB_SRC_VERSION_MINOR,
-                                 .patch=STRTB_SRC_VERSION_PATCH, .phase=STRTB_SRC_VERSION_PHASE})) {
+    if (!versions_equal(get_libstrtb_version(),
+                        {.major=STRTB_SRC_VERSION_MAJOR, .minor=STRTB_SRC_VERSION_MINOR,
+                         .patch=STRTB_SRC_VERSION_PATCH, .phase=STRTB_SRC_VERSION_PHASE})) {
         // Print to log
         log.put(logging::CRITICAL, {"Version mismatch between Streaming Toolbox (v",
                                     STRTB_SRC_VERSION_MAJOR, ".", STRTB_SRC_VERSION_MINOR, ".", STRTB_SRC_VERSION_PATCH, "-", STRTB_SRC_VERSION_PHASE,
-                                    ") and libstrtb (", common::get_libstrtb_version_string(), ")."});
+                                    ") and libstrtb (", get_libstrtb_version_string(), ")."});
         // Show error message
         QMessageBox error_message_box;
 
@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
         error_message.append('-');
         error_message.append(STRTB_SRC_VERSION_PHASE);
         error_message.append(") and libstrtb (");
-        error_message.append(common::get_libstrtb_version_string());
+        error_message.append(get_libstrtb_version_string());
         error_message.append(").");
         error_message_box.setText(error_message);
         error_message_box.show();

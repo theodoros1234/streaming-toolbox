@@ -1,5 +1,5 @@
 #include "value_object.h"
-#include "../common/strescape.h"
+#include "../strescape.h"
 #include <stdexcept>
 
 using namespace strtb;
@@ -165,7 +165,7 @@ void value_object::write_to_stream(std::ostream &stream, int pretty_print, int p
                     stream << ' ';
             }
             // Key
-            stream << common::string_escape(val.first);
+            stream << string_escape(val.first);
             // Colon separator
             stream << ':';
             if (pretty_print)

@@ -1,5 +1,5 @@
 #include "value_string.h"
-#include "../common/strescape.h"
+#include "../strescape.h"
 
 using namespace strtb;
 using namespace strtb::json;
@@ -19,5 +19,5 @@ void value_string::set_value(const std::string &value) {_value = value;}
 value* value_string::copy() const {return new value_string(_value.c_str());}
 
 void value_string::write_to_stream(std::ostream &stream, int, int, const char*) const {
-    stream << common::string_escape(_value);
+    stream << string_escape(_value);
 }

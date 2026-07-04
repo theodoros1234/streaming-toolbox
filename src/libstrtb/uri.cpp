@@ -4,7 +4,7 @@
 #include <cassert>
 #include <cstdint>
 #include <vector>
-#include "common/strescape.h"
+#include "strescape.h"
 #include "logging/logging.h"
 
 using namespace strtb::uri;
@@ -1192,7 +1192,7 @@ static void tld_trie_add_word(const char* word, size_t from, size_t to) {
     for (size_t i = from; i < to; i++) {
         int code = tld_trie_charcode(word[i]);
         if (code == -1) {
-            s_log.warning({"Failed to add ", strtb::common::string_escape(std::string(word).substr(from, to-from)),
+            s_log.warning({"Failed to add ", strtb::string_escape(std::string(word).substr(from, to-from)),
                            " to the set of known TLDs due to an unsupported character."});
             return;
         }
