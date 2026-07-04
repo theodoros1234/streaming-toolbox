@@ -9,7 +9,7 @@
 
 using namespace strtb::uri;
 
-static strtb::logging::source log("URI");
+static strtb::logging::source s_log("URI");
 
 static const char to_hex[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
@@ -1192,8 +1192,8 @@ static void tld_trie_add_word(const char* word, size_t from, size_t to) {
     for (size_t i = from; i < to; i++) {
         int code = tld_trie_charcode(word[i]);
         if (code == -1) {
-            log.warning({"Failed to add ", strtb::common::string_escape(std::string(word).substr(from, to-from)),
-                         " to the set of known TLDs due to an unsupported character."});
+            s_log.warning({"Failed to add ", strtb::common::string_escape(std::string(word).substr(from, to-from)),
+                           " to the set of known TLDs due to an unsupported character."});
             return;
         }
 
