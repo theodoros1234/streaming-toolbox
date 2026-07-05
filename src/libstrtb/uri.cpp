@@ -9,7 +9,7 @@
 
 using namespace strtb::uri;
 
-static strtb::logging::source s_log("URI");
+static strtb::logging::source s_log("URI", false);
 
 static const char to_hex[16] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
