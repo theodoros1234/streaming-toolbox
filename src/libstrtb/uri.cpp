@@ -133,59 +133,198 @@ std::pair<std::string, ssize_t> strtb::uri::percent_decode(const char *str, size
     return {std::move(decoded), -1};
 }
 
-void parser::clear_uri() {
+void parser::clear() {
+    _clear_uri();
+}
+
+void parser::_clear_uri() {
     scheme_from = 0, scheme_to = 0;
-    clear_authority();
+    _clear_authority();
     path_from = 0, path_to = 0, path_type = PATH_EMPTY;
     query_from = 0, query_to = 0;
     fragment_from = 0, fragment_to = 0;
 }
 
-void parser::clear_authority() {
+void parser::_clear_authority() {
     authority_from = 0, authority_to = 0;
     userinfo_from = 0, userinfo_to = 0;
-    clear_host();
+    _clear_host();
     port_from = 0, port_to = 0;
 }
 
-void parser::clear_host() {
+void parser::_clear_host() {
     host_from = 0, host_to = 0;
     host_type = HOST_EMPTY;
+    _clear_uri_str();
+}
+
+void parser::_clear_uri_str() {
+    uri_str_offset = 0;
+    uri_str_stored = false;
+    uri_str.clear();
+}
+
+void parser::_store_str(const char* str, size_t from, size_t to) {
+    uri_str.assign(str + from, to - from);
+    uri_str_offset = from;
+    uri_str_stored = true;
+}
+
+void parser::_verify_uri_str_stored() const {
+    if (!uri_str_stored)
+        throw std::logic_error("URI string wasn't stored during parsing. "
+                               "It either needs to be stored, or you need to provide it here as an argument.");
+}
+
+std::string parser::scheme_str(bool fix_case) const {
+    _verify_uri_str_stored();
+    verify_range(uri_str, scheme_from - uri_str_offset, scheme_to - uri_str_offset);
+
+    if (fix_case) {
+        std::string scheme;
+        scheme.reserve(scheme_to - scheme_from);
+
+        // to lowercase, as the RFC recommends
+        for (size_t i = scheme_from - uri_str_offset; i < scheme_to - uri_str_offset; i++) {
+            char c = uri_str[i];
+            scheme.push_back(('A' <= c && c <= 'Z') ? c + 32 : c);
+        }
+
+        return scheme;
+    } else {
+        return uri_str.substr(scheme_from - uri_str_offset, scheme_to - scheme_from);
+    }
+}
+
+std::string parser::authority_str() const {
+    _verify_uri_str_stored();
+    verify_range(uri_str, authority_from - uri_str_offset, authority_to - uri_str_offset);
+    return uri_str.substr(authority_from - uri_str_offset, authority_to - authority_from);
+}
+
+std::string parser::userinfo_str() const {
+    _verify_uri_str_stored();
+    verify_range(uri_str, userinfo_from - uri_str_offset, userinfo_to - uri_str_offset);
+    return uri_str.substr(userinfo_from - uri_str_offset, userinfo_to - userinfo_from);
+}
+
+std::string parser::host_str(bool fix_case) const {
+    _verify_uri_str_stored();
+    verify_range(uri_str, host_from - uri_str_offset, host_to - uri_str_offset);
+
+    if (fix_case) {
+        std::string host;
+        host.reserve(host_to - host_from);
+
+        // to lowercase, except for percent-escaped characters, as the RFC recommends
+        unsigned int pct_encode_remaining = 0;
+        for (size_t i = host_from - uri_str_offset; i < host_to - uri_str_offset; i++) {
+            char c = uri_str[i];
+            if (c == '%') {
+                host.push_back(c);
+                pct_encode_remaining = 2;
+            } else if (pct_encode_remaining) {
+                // pct encoded to uppercase
+                host.push_back(('a' <= c && c <= 'z') ? c - 32 : c);
+                pct_encode_remaining--;
+            } else {
+                // regular chars to lowercase
+                host.push_back(('A' <= c && c <= 'Z') ? c + 32 : c);
+            }
+        }
+
+        return host;
+    } else {
+        return uri_str.substr(host_from, host_to - host_from);
+    }
+}
+
+std::string parser::port_str() const {
+    _verify_uri_str_stored();
+    verify_range(uri_str, port_from - uri_str_offset, port_to - uri_str_offset);
+    return uri_str.substr(port_from - uri_str_offset, port_to - port_from);
+}
+
+int parser::port_uint16() const {
+    _verify_uri_str_stored();
+    if (port_to == port_from)
+        return -1;  // no port specified
+
+    int x;
+    try {
+        x = std::stoi(port_str());
+    } catch (std::out_of_range&) {
+        return -1;  // overflows massively
+    } catch (std::invalid_argument&) {
+        return -1;  // something else went wrong
+    }
+
+    if (port_to - port_from > 5 || x >= 65536)
+        return -1;  // overflows
+    else
+        return (uint16_t) x;    // good
+}
+
+std::string parser::path_str() const {
+    _verify_uri_str_stored();
+    verify_range(uri_str, path_from - uri_str_offset, path_to - uri_str_offset);
+    return uri_str.substr(path_from - uri_str_offset, path_to - path_from);
+}
+
+std::string parser::query_str() const {
+    _verify_uri_str_stored();
+    verify_range(uri_str, query_from - uri_str_offset, query_to - uri_str_offset);
+    return uri_str.substr(query_from - uri_str_offset, query_to - query_from);
+}
+
+std::string parser::fragment_str() const {
+    _verify_uri_str_stored();
+    verify_range(uri_str, fragment_from - uri_str_offset, fragment_to - uri_str_offset);
+    return uri_str.substr(fragment_from - uri_str_offset, fragment_to - fragment_from);
 }
 
 std::string parser::scheme_str(const std::string& str, bool fix_case) const {
+    verify_range(str, scheme_from, scheme_to);
     return scheme_str(str.data(), fix_case);
 }
 
 std::string parser::authority_str(const std::string& str) const {
+    verify_range(str, authority_from, authority_to);
     return str.substr(authority_from, authority_to - authority_from);
 }
 
 std::string parser::userinfo_str(const std::string& str) const {
+    verify_range(str, userinfo_from, userinfo_to);
     return str.substr(userinfo_from, userinfo_to - userinfo_from);
 }
 
 std::string parser::host_str(const std::string& str, bool fix_case) const {
+    verify_range(str, host_from, host_to);
     return host_str(str.data(), fix_case);
 }
 
 std::string parser::port_str(const std::string& str) const {
+    verify_range(str, port_from, port_to);
     return str.substr(port_from, port_to - port_from);
 }
 
 int parser::port_uint16(const std::string& str) const {
+    verify_range(str, port_from, port_to);
     return port_uint16(str.data());
 }
 
 std::string parser::path_str(const std::string& str) const {
+    verify_range(str, path_from, path_to);
     return str.substr(path_from, path_to - path_from);
 }
 
 std::string parser::query_str(const std::string& str) const {
+    verify_range(str, query_from, query_to);
     return str.substr(query_from, query_to - query_from);
 }
 
 std::string parser::fragment_str(const std::string& str) const {
+    verify_range(str, fragment_from, fragment_to);
     return str.substr(fragment_from, fragment_to - fragment_from);
 }
 
@@ -292,53 +431,53 @@ static parser_ret parse_host_ipv4(const char* str, size_t from, size_t to);
 static parser_ret parse_dec_octet(const char* str, size_t from, size_t to);
 static parser_ret parse_host_regname(const char* str, size_t from, size_t to);
 
-parser_ret parser::parse_uri(const std::string& str) {
-    return parse_uri(str.data(), 0, str.length());
+parser_ret parser::parse_uri(const std::string& str, bool store_str) {
+    return parse_uri(str.data(), 0, str.length(), store_str);
 }
 
-parser_ret parser::parse_uri_suffix(const std::string& str) {
-    return parse_uri_suffix(str.data(), 0, str.length());
+parser_ret parser::parse_uri_suffix(const std::string& str, bool store_str) {
+    return parse_uri_suffix(str.data(), 0, str.length(), store_str);
 }
 
-parser_ret parser::parse_relative_ref(const std::string& str) {
-    return parse_relative_ref(str.data(), 0, str.length());
+parser_ret parser::parse_relative_ref(const std::string& str, bool store_str) {
+    return parse_relative_ref(str.data(), 0, str.length(), store_str);
 }
 
-parser_ret parser::parse_authority(const std::string& str) {
-    return parse_authority(str.data(), 0, str.length());
+parser_ret parser::parse_authority(const std::string& str, bool store_str) {
+    return parse_authority(str.data(), 0, str.length(), store_str);
 }
 
-parser_ret parser::parse_host(const std::string& str) {
-    return parse_host(str.data(), 0, str.length());
+parser_ret parser::parse_host(const std::string& str, bool store_str) {
+    return parse_host(str.data(), 0, str.length(), store_str);
 }
 
-parser_ret parser::parse_uri(const std::string& str, size_t from, size_t to) {
+parser_ret parser::parse_uri(const std::string& str, size_t from, size_t to, bool store_str) {
     verify_range(str, from, to);
-    return parse_uri(str.data(), from, to);
+    return parse_uri(str.data(), from, to, store_str);
 }
 
-parser_ret parser::parse_uri_suffix(const std::string& str, size_t from, size_t to) {
+parser_ret parser::parse_uri_suffix(const std::string& str, size_t from, size_t to, bool store_str) {
     verify_range(str, from, to);
-    return parse_uri_suffix(str.data(), from, to);
+    return parse_uri_suffix(str.data(), from, to, store_str);
 }
 
-parser_ret parser::parse_relative_ref(const std::string& str, size_t from, size_t to) {
+parser_ret parser::parse_relative_ref(const std::string& str, size_t from, size_t to, bool store_str) {
     verify_range(str, from, to);
-    return parse_relative_ref(str.data(), from, to);
+    return parse_relative_ref(str.data(), from, to, store_str);
 }
 
-parser_ret parser::parse_authority(const std::string& str, size_t from, size_t to) {
+parser_ret parser::parse_authority(const std::string& str, size_t from, size_t to, bool store_str) {
     verify_range(str, from, to);
-    return parse_authority(str.data(), from, to);
+    return parse_authority(str.data(), from, to, store_str);
 }
 
-parser_ret parser::parse_host(const std::string& str, size_t from, size_t to) {
+parser_ret parser::parse_host(const std::string& str, size_t from, size_t to, bool store_str) {
     verify_range(str, from, to);
-    return parse_host(str.data(), from, to);
+    return parse_host(str.data(), from, to, store_str);
 }
 
-parser_ret parser::parse_uri(const char *str, size_t from, size_t to) {
-    clear_uri();
+parser_ret parser::parse_uri(const char *str, size_t from, size_t to, bool store_str) {
+    _clear_uri();
 
     // scheme
     parser_ret ret = parse_scheme(str, from, to);
@@ -374,7 +513,7 @@ parser_ret parser::parse_uri(const char *str, size_t from, size_t to) {
             pos++;
 
             // authority
-            ret = parse_authority(str, pos, to);
+            ret = parse_authority(str, pos, to, false);
             if (!ret.second) {
                 if (ret.first > best_progress)
                     best_progress = ret.first;
@@ -444,18 +583,20 @@ parser_ret parser::parse_uri(const char *str, size_t from, size_t to) {
         if (pos < to) {
             if (pos > best_progress)
                 best_progress = pos;
-            clear_authority();
+            _clear_authority();
             path_from = 0, path_to = 0, path_type = PATH_EMPTY;
             query_from = 0, query_to = 0;
             fragment_from = 0, fragment_to = 0;
             continue;
         }
 
+        if (store_str)  // save uri string
+            _store_str(str, from, to);
         return {to, true};
     }
 
     // no full matches
-    clear_uri();
+    _clear_uri();
     return {best_progress, false};
 }
 
@@ -472,14 +613,14 @@ parser_ret parser::parse_uri(const char *str, size_t from, size_t to) {
  *
  * Read more: https://datatracker.ietf.org/doc/html/rfc3986#section-4.5
  */
-parser_ret parser::parse_uri_suffix(const char *str, size_t from, size_t to) {
-    clear_uri();
+parser_ret parser::parse_uri_suffix(const char *str, size_t from, size_t to, bool store_str) {
+    _clear_uri();
 
     parser_ret ret;
     size_t pos = from;
 
     // authority
-    ret = parse_authority(str, pos, to);
+    ret = parse_authority(str, pos, to, false);
     if (!ret.second)
         return {ret.first, false};
     pos = ret.first;
@@ -508,15 +649,17 @@ parser_ret parser::parse_uri_suffix(const char *str, size_t from, size_t to) {
 
     // must have reached the end, otherwise there's some kind of error
     if (pos < to) {
-        clear_uri();
+        _clear_uri();
         return {pos, false};
     }
 
+    if (store_str)  // save uri string
+        _store_str(str, from, to);
     return {pos, true};
 }
 
-parser_ret parser::parse_relative_ref(const char *str, size_t from, size_t to) {
-    clear_uri();
+parser_ret parser::parse_relative_ref(const char *str, size_t from, size_t to, bool store_str) {
+    _clear_uri();
 
     // relative-part (all variations and things after it)
     size_t best_progress = from;
@@ -543,7 +686,7 @@ parser_ret parser::parse_relative_ref(const char *str, size_t from, size_t to) {
             pos++;
 
             // authority
-            ret = parse_authority(str, pos, to);
+            ret = parse_authority(str, pos, to, false);
             if (!ret.second) {
                 if (ret.first > best_progress)
                     best_progress = ret.first;
@@ -613,33 +756,35 @@ parser_ret parser::parse_relative_ref(const char *str, size_t from, size_t to) {
         if (pos < to) {
             if (pos > best_progress)
                 best_progress = pos;
-            clear_uri();
+            _clear_uri();
             continue;
         }
 
+        if (store_str)  // save uri string
+            _store_str(str, from, to);
         return {to, true};
     }
 
     // no full matches
-    clear_uri();
+    _clear_uri();
     return {best_progress, false};
 }
 
-web_url_ret parser::is_web_url(const std::string& str) {
-    return is_web_url(str.data(), 0, str.length());
+web_url_ret parser::is_web_url(const std::string& str, bool store_str) {
+    return is_web_url(str.data(), 0, str.length(), store_str);
 }
 
-web_url_ret parser::is_web_url(const std::string& str, size_t from, size_t to) {
+web_url_ret parser::is_web_url(const std::string& str, size_t from, size_t to, bool store_str) {
     verify_range(str, from, to);
-    return is_web_url(str.data(), from, to);
+    return is_web_url(str.data(), from, to, store_str);
 }
 
-web_url_ret parser::is_web_url(const char *str, size_t from, size_t to) {
+web_url_ret parser::is_web_url(const char *str, size_t from, size_t to, bool store_str) {
     bool type = true;
     size_t fail_pos_full = 0;
 
     // try to parse a full URL first
-    auto ret = parse_uri(str, from, to);
+    auto ret = parse_uri(str, from, to, false);
     if (ret.second) {
         // make sure the scheme is http(s)
         std::string scheme = scheme_str(str);
@@ -654,10 +799,14 @@ web_url_ret parser::is_web_url(const char *str, size_t from, size_t to) {
 
     // if that fails, try to parse a suffix
     if (type) {
-        ret = parse_uri_suffix(str, from, to);
+        ret = parse_uri_suffix(str, from, to, false);
         if (!ret.second)
             return {WEB_URL_ERROR, false, std::max(fail_pos_full, ret.first)};
     }
+
+    // save uri string
+    if (store_str)
+        _store_str(str, from, to);
 
     // determine how likely this is an intentional URI, specifically a web URL
     // empty authority or host
@@ -738,8 +887,8 @@ parser_ret parse_scheme(const char *str, size_t from, size_t to) {
     return {pos, true};
 }
 
-parser_ret parser::parse_authority(const char *str, size_t from, size_t to) {
-    clear_authority();
+parser_ret parser::parse_authority(const char *str, size_t from, size_t to, bool store_str) {
+    _clear_authority();
     size_t pos = from;
 
     // try to get userinfo if it exists
@@ -751,9 +900,9 @@ parser_ret parser::parse_authority(const char *str, size_t from, size_t to) {
     }
 
     // get host
-    ret = parse_host(str, pos, to);
+    ret = parse_host(str, pos, to, false);
     if (!ret.second) {  // invalid host
-        clear_authority();
+        _clear_authority();
         return ret;
     } else {
         pos = ret.first;
@@ -768,6 +917,8 @@ parser_ret parser::parse_authority(const char *str, size_t from, size_t to) {
 
     authority_from = from;
     authority_to = pos;
+    if (store_str)  // save uri string
+        _store_str(str, from, to);
     return {pos, true};
 }
 
@@ -782,8 +933,8 @@ parser_ret parse_userinfo(const char *str, size_t from, size_t to) {
     return {pos, true};
 }
 
-parser_ret parser::parse_host(const char *str, size_t from, size_t to) {
-    clear_host();
+parser_ret parser::parse_host(const char *str, size_t from, size_t to, bool store_str) {
+    _clear_host();
 
     // array with function ptrs for all the possible host types
     parser_ret (*ptrs[4])(const char*, size_t, size_t) = {
@@ -809,6 +960,9 @@ parser_ret parser::parse_host(const char *str, size_t from, size_t to) {
                     host_type = HOST_EMPTY;
                 else
                     host_type = types[i];
+
+                if (store_str)  // save uri string
+                    _store_str(str, from, to);
                 return ret;
             }
         }
@@ -1305,7 +1459,7 @@ std::vector<link_match> strtb::uri::find_links_in_message(const char* str, size_
             parser p;
             web_url_ret ret;
             do {
-                ret = p.is_web_url(str, i, upto);
+                ret = p.is_web_url(str, i, upto, false);
                 if (ret.retry_upto == i || ret.retry_upto >= upto)
                     break;
                 // retry ignoring some characters from the end that could've caused issues

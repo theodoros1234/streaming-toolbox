@@ -348,14 +348,17 @@ http_version_ret parse_http_version(const char *str, size_t from, size_t to) {
     return {pos, true, major, minor};
 }
 
-static inline request_target_form_enum parse_request_target(const std::string &target, uri::parser &uri_p) {
+static inline request_target_form_enum parse_request_target(const char *target, size_t from, size_t to,
+                                                            uri::parser &uri_p) {
     // try to parse all valid forms of request-target
     // asterisk-form
-    if (target.length() == 1 && target[0] == '*')
+    if (to - from == 1 && target[from] == '*') {
+        uri_p.uri_str = "*";
         return TARGET_FORM_ASTERISK;
+    }
 
     // origin form
-    if (uri_p.parse_relative_ref(target).second) {
+    if (uri_p.parse_relative_ref(target, from, to, true).second) {
         // instantly reject #fragments cause # is only ever used for fragments
         if (uri_p.fragment_to)
             return TARGET_FORM_INVALID;
@@ -363,28 +366,28 @@ static inline request_target_form_enum parse_request_target(const std::string &t
         if (uri_p.path_type == uri::PATH_ABSOLUTE)
             return TARGET_FORM_ORIGIN;
     }
-    uri_p.clear_uri();
+    uri_p.clear();
 
     // absolute-form
-    if (uri_p.parse_uri(target).second) {
+    if (uri_p.parse_uri(target, from, to, true).second) {
         // instantly reject #fragments cause # is only ever used for fragments
         if (uri_p.fragment_to)
             return TARGET_FORM_INVALID;
 
-        std::string scheme = uri_p.scheme_str(target, true);
+        std::string scheme = uri_p.scheme_str(true);
         if (uri_p.path_type == uri::PATH_ABEMPTY &&     // this path type only shows up for full URIs
             uri_p.userinfo_to == 0 &&                   // reject user login details in URI
             (scheme == "http" || scheme == "https"))    // make sure scheme is http(s)
             return TARGET_FORM_ABSOLUTE;
     }
-    uri_p.clear_uri();
+    uri_p.clear();
 
     // authority-form
-    if (uri_p.parse_authority(target).second &&
+    if (uri_p.parse_authority(target, from, to, true).second &&
         uri_p.userinfo_to == 0 &&
         uri_p.port_to > 0 && uri_p.port_to > uri_p.port_from)
         return TARGET_FORM_AUTHORITY;
-    uri_p.clear_authority();
+    uri_p.clear();
 
     // none of the forms matched
     return TARGET_FORM_INVALID;
@@ -411,11 +414,10 @@ request_line_ret parse_request_line(const char *line, size_t length) {
     size_t target_to = find_char(line, pos, length, ' ');
     if (target_to == length || target_to == pos)
         return {};
-    ret.target.assign(line + pos, target_to - pos);
-    pos = target_to + 1;
-    ret.target_form = parse_request_target(ret.target, ret.target_segments);
+    ret.target_form = parse_request_target(line, pos, target_to, ret.target);
     if (ret.target_form == TARGET_FORM_INVALID)
         return {};
+    pos = target_to + 1;
 
     // http version
     auto http_version = parse_http_version(line, pos, length);
@@ -1367,8 +1369,8 @@ abs_or_part_uri_field_ret parse_field_abs_or_part_uri(const char *field_value, s
     uri::parser uri;
     bool is_partial = false;
 
-    if (!uri.parse_uri(field_value, from, to).second) { // try parsing as absolute
-        if (!uri.parse_relative_ref(field_value, from, to).second)  // try parsing as partial
+    if (!uri.parse_uri(field_value, from, to, true).second) {   // try parsing as absolute
+        if (!uri.parse_relative_ref(field_value, from, to, true).second)    // try parsing as partial
             return {};  // fully invalid
         is_partial = true;
     }

@@ -52,6 +52,14 @@ typedef struct {
 } web_url_ret;
 
 class parser {
+private:
+    void _clear_uri();
+    void _clear_authority();
+    void _clear_host();
+    void _clear_uri_str();
+    void _store_str(const char* str, size_t from, size_t to);
+    void _verify_uri_str_stored() const;
+
 public:
     size_t scheme_from = 0, scheme_to = 0,
            authority_from = 0, authority_to = 0,
@@ -60,35 +68,46 @@ public:
            port_from = 0, port_to = 0,
            path_from = 0, path_to = 0,
            query_from = 0, query_to = 0,
-           fragment_from = 0, fragment_to = 0;
+           fragment_from = 0, fragment_to = 0,
+           uri_str_offset = 0;
     host_type_enum host_type = HOST_EMPTY;
     path_type_enum path_type = PATH_EMPTY;
+    std::string uri_str;
+    bool uri_str_stored = false;
 
-    parser_ret parse_uri(const std::string& str);
-    parser_ret parse_uri_suffix(const std::string& str);
-    parser_ret parse_relative_ref(const std::string& str);
-    parser_ret parse_authority(const std::string& str);
-    parser_ret parse_host(const std::string& str);
+    void clear();
 
-    parser_ret parse_uri(const std::string& str, size_t from, size_t to);
-    parser_ret parse_uri_suffix(const std::string& str, size_t from, size_t to);
-    parser_ret parse_relative_ref(const std::string& str, size_t from, size_t to);
-    parser_ret parse_authority(const std::string& str, size_t from, size_t to);
-    parser_ret parse_host(const std::string& str, size_t from, size_t to);
+    parser_ret parse_uri(const std::string& str, bool store_str);
+    parser_ret parse_uri_suffix(const std::string& str, bool store_str);
+    parser_ret parse_relative_ref(const std::string& str, bool store_str);
+    parser_ret parse_authority(const std::string& str, bool store_str);
+    parser_ret parse_host(const std::string& str, bool store_str);
 
-    parser_ret parse_uri(const char* str, size_t from, size_t to);
-    parser_ret parse_uri_suffix(const char* str, size_t from, size_t to);
-    parser_ret parse_relative_ref(const char* str, size_t from, size_t to);
-    parser_ret parse_authority(const char* str, size_t from, size_t to);
-    parser_ret parse_host(const char* str, size_t from, size_t to);
+    parser_ret parse_uri(const std::string& str, size_t from, size_t to, bool store_str);
+    parser_ret parse_uri_suffix(const std::string& str, size_t from, size_t to, bool store_str);
+    parser_ret parse_relative_ref(const std::string& str, size_t from, size_t to, bool store_str);
+    parser_ret parse_authority(const std::string& str, size_t from, size_t to, bool store_str);
+    parser_ret parse_host(const std::string& str, size_t from, size_t to, bool store_str);
 
-    web_url_ret is_web_url(const std::string& str);
-    web_url_ret is_web_url(const std::string& str, size_t from, size_t to);
-    web_url_ret is_web_url(const char* str, size_t from, size_t to);
+    parser_ret parse_uri(const char* str, size_t from, size_t to, bool store_str);
+    parser_ret parse_uri_suffix(const char* str, size_t from, size_t to, bool store_str);
+    parser_ret parse_relative_ref(const char* str, size_t from, size_t to, bool store_str);
+    parser_ret parse_authority(const char* str, size_t from, size_t to, bool store_str);
+    parser_ret parse_host(const char* str, size_t from, size_t to, bool store_str);
 
-    void clear_uri();
-    void clear_authority();
-    void clear_host();
+    web_url_ret is_web_url(const std::string& str, bool store_str);
+    web_url_ret is_web_url(const std::string& str, size_t from, size_t to, bool store_str);
+    web_url_ret is_web_url(const char* str, size_t from, size_t to, bool store_str);
+
+    std::string scheme_str(bool fix_case = false) const;
+    std::string authority_str() const;
+    std::string userinfo_str() const;
+    std::string host_str(bool fix_case = false) const;
+    std::string port_str() const;
+    int port_uint16() const;  // returns -1 when out of range or not specified
+    std::string path_str() const;
+    std::string query_str() const;
+    std::string fragment_str() const;
 
     std::string scheme_str(const std::string& str, bool fix_case = false) const;
     std::string authority_str(const std::string& str) const;

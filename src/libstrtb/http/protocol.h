@@ -36,9 +36,9 @@ enum request_target_form_enum {
 
 struct request_line_ret {
     bool valid = false;
-    std::string method, target;
+    std::string method;
     request_target_form_enum target_form = TARGET_FORM_INVALID;
-    uri::parser target_segments;
+    uri::parser target;
     int http_version_major = 0, http_version_minor = 0;
 };
 
