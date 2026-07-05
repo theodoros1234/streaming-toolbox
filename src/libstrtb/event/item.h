@@ -5,7 +5,7 @@
 #include <vector>
 #include <stdint.h>
 #include "../json/value_object.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include "../json/holder.h"
 
 namespace strtb::event {

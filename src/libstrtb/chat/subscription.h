@@ -6,7 +6,7 @@
 #include <mutex>
 #include "queue.h"
 #include "../common/deregistration_interface.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 
 namespace strtb::chat {
 

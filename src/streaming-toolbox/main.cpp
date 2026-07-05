@@ -1,7 +1,7 @@
 #include "gui/main_window.h"
 #include "plugins/loader.h"
 #include "../libstrtb/chat/system.h"
-#include "../libstrtb/logging/logging.h"
+#include "../libstrtb/logging.h"
 #include "../libstrtb/config/system.h"
 #include "../libstrtb/version.h"
 #include "../libstrtb/event/system.h"

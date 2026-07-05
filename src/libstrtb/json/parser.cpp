@@ -1,5 +1,5 @@
 #include "parser.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include "../unicode/unicode.h"
 
 #include <sstream>

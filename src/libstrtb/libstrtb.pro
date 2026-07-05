@@ -37,7 +37,7 @@ SOURCES += \
     json/value_null.cpp \
     json/value_object.cpp \
     json/value_string.cpp \
-    logging/logging.cpp \
+    logging.cpp \
     chat/channel.cpp \
     chat/provider.cpp \
     chat/queue.cpp \
@@ -88,7 +88,7 @@ HEADERS += \
     json/value_null.h \
     json/value_object.h \
     json/value_string.h \
-    logging/logging.h \
+    logging.h \
     networking/exceptions.h \
     networking/sigpipe_suppressor.h \
     networking/tcp_client.h \

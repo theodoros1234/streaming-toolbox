@@ -4,7 +4,7 @@
 #include "queue.h"
 #include "../common/deregistration_interface.h"
 #include "channel.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include <vector>
 #include <map>
 #include <mutex>

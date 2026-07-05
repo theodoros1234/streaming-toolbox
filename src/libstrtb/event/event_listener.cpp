@@ -1,7 +1,7 @@
 #include "event_listener.h"
 #include "system.h"
 #include "item.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include "../strescape.h"
 #include <cassert>
 

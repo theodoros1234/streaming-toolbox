@@ -1,5 +1,5 @@
 #include "tcp_socket_ssl_thread.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include "sigpipe_suppressor.h"
 #include <sys/eventfd.h>
 #include <poll.h>

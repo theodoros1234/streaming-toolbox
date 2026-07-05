@@ -3,7 +3,7 @@
 
 #include "plugin.h"
 #include "list.h"
-#include "../libstrtb/logging/logging.h"
+#include "../libstrtb/logging.h"
 #include <string>
 #include <vector>
 #include <mutex>

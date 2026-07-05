@@ -5,7 +5,7 @@
 #include "provider.h"
 #include "subscription.h"
 #include "../common/deregistration_interface.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include <map>
 #include <thread>
 

@@ -2,7 +2,7 @@
 #define STRTB_GUI_MAIN_WINDOW_H
 
 #include "../plugins/list.h"
-#include "../libstrtb/logging/logging.h"
+#include "../libstrtb/logging.h"
 #include "chat_tab.h"
 #include "plugin_tab.h"
 #include "event_viewer.h"

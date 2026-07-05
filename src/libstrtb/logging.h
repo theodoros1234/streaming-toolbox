@@ -1,5 +1,5 @@
-#ifndef STRTB_LOGGING_LOGGING_H
-#define STRTB_LOGGING_LOGGING_H
+#ifndef STRTB_LOGGING_H
+#define STRTB_LOGGING_H
 
 #include <cstdint>
 #include <filesystem>
@@ -72,4 +72,4 @@ public:
 
 }
 
-#endif // STRTB_LOGGING_LOGGING_H
+#endif // STRTB_LOGGING_H

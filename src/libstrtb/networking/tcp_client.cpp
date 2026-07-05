@@ -1,5 +1,5 @@
 #include "tcp_client.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>

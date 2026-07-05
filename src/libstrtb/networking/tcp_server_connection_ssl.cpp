@@ -1,5 +1,5 @@
 #include "tcp_server_connection_ssl.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include <assert.h>
 #include <stdexcept>
 

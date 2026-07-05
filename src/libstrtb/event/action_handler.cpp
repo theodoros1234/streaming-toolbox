@@ -2,7 +2,7 @@
 #include "action_requester.h"
 #include "system.h"
 #include "provider.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 
 using namespace strtb::event;
 

@@ -3,7 +3,7 @@
 
 #include "id_type.h"
 #include "../json/value.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 
 #include <string>
 #include <map>

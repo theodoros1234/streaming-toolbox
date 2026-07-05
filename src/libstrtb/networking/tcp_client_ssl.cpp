@@ -1,5 +1,5 @@
 #include "tcp_client_ssl.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include "sigpipe_suppressor.h"
 #include <sys/eventfd.h>
 #include <unistd.h>

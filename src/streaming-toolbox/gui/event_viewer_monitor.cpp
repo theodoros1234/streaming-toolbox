@@ -1,7 +1,7 @@
 #include "event_viewer_monitor.h"
 #include "ui_event_viewer_monitor.h"
 #include "../libstrtb/json/value.h"
-#include "../libstrtb/logging/logging.h"
+#include "../libstrtb/logging.h"
 #include <QPushButton>
 #include <QKeyEvent>
 

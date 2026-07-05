@@ -1,6 +1,6 @@
 #include "plugin.h"
 #include "../libstrtb/plugins/link.h"
-#include "../libstrtb/logging/logging.h"
+#include "../libstrtb/logging.h"
 #include "../libstrtb/strescape.h"
 
 #include <filesystem>

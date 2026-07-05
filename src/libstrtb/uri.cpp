@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <vector>
 #include "strescape.h"
-#include "logging/logging.h"
+#include "logging.h"
 
 using namespace strtb::uri;
 

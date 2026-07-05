@@ -1,5 +1,5 @@
 #include "tcp_socket.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include <stdexcept>
 #include <sys/socket.h>
 #include <sys/types.h>

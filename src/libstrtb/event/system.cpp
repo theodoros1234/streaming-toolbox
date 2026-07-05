@@ -5,7 +5,7 @@
 #include "event_listener.h"
 #include "action_handler.h"
 #include "action_requester.h"
-#include "../logging/logging.h"
+#include "../logging.h"
 #include "../strescape.h"
 #include "../json/cast.h"
 
