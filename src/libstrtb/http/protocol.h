@@ -394,6 +394,8 @@ const char* get_status_code_phrase(int status_code);
 std::string timestamp_to_string(time_t timestamp);
 bool etag_compare(const entity_tag &a, const entity_tag &b, bool strong);
 std::string etag_to_string(const entity_tag &etag);
+bool is_unsafe_port(int port);
+const std::string &get_default_user_agent();
 
 }
 

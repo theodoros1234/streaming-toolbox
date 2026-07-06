@@ -1,11 +1,14 @@
 #include "protocol.h"
 #include "strescape.h"
+#include "version.h"
 
 #include <cstdint>
 #include <climits>  // IWYU pragma: keep
 #include <cstring>
 #include <stdexcept>
 #include <map>
+
+using namespace std::string_literals;
 
 namespace strtb::http {
 
@@ -62,6 +65,23 @@ const char* get_status_code_phrase(int status_code) {
     case 511: return "Network Authentication Required";
     default : return "";    // empty phrase for unknown codes
     }
+};
+
+/* unsafe ports, blocked by popular web browsers, such as Mozilla Firefox and Google Chrome
+ *
+ * Sources:
+ * Firefox: https://www-archive.mozilla.org/projects/netlib/portbanning
+ * Chromium: https://chromium.googlesource.com/chromium/src.git/+/refs/heads/master/net/base/port_util.cc
+ *
+ * this list MUST BE sorted in ascending order
+ */
+static const int blocked_ports[] = {
+    0, 1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69,
+    77, 79, 87, 95, 101, 102, 103, 104, 109, 110, 111, 113, 115, 117, 119,
+    123, 135, 137, 139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515,
+    526, 530, 531, 532, 540, 548, 554, 556, 563, 587, 601, 636, 989, 990,
+    993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 5060, 5061, 6000, 6566,
+    6665, 6666, 6667, 6668, 6669, 6697, 10080
 };
 
 typedef enum month_enum {
@@ -2277,6 +2297,31 @@ content_range_field_ret parse_field_content_range(std::string_view field_value) 
 
 via_field_ret parse_field_via(std::string_view field_value) {
     return parse_field_via(field_value.data(), 0, field_value.length());
+}
+
+static const std::string default_user_agent = "StreamingToolbox/"s + get_libstrtb_version_string();
+
+const std::string &get_default_user_agent() {
+    return default_user_agent;
+}
+
+bool is_unsafe_port(int port) {
+    // do a binary search on blocked_ports
+    size_t from = 0, to = sizeof(blocked_ports) / sizeof(int), mid = 0;
+    while (true) {
+        if (from >= to)     // not found
+            return false;
+
+        mid = (from + to) / 2;
+        int value = blocked_ports[mid];
+
+        if (value > port)
+            to = mid - 1;
+        else if (value < port)
+            from = mid + 1;
+        else    // found
+            return true;
+    }
 }
 
 }

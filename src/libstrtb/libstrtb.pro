@@ -15,6 +15,7 @@ include( ../../version.pri )
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    http/client.cpp \
     strescape.cpp \
     version.cpp \
     config/system.cpp \
@@ -65,6 +66,7 @@ HEADERS += \
     chat/subscription.h \
     chat/system.h \
     common/deregistration_interface.h \
+    http/client.h \
     strescape.h \
     version.h \
     config/id_type.h \
