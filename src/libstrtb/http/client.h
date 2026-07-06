@@ -62,6 +62,7 @@ public:
                  bool allow_invalid_cert = false, bool allow_unsafe_ports = false);
     client& set_header(const std::string &name, const std::string &value);
     client& set_headers(const std::map<std::string, std::string> &headers);
+    bool clear_header(const std::string &name);
     int send();
 
     const std::string& log_name() const;

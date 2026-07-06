@@ -136,7 +136,6 @@ static parser_ret parse_required_whitespace(const char *str, size_t from, size_t
 static parser_ret parse_word(const char *str, size_t from, size_t to, const char *word);
 static size_t find_char(const char *str, size_t from, size_t to, char c);
 static std::tuple<size_t, bool, unsigned int> parse_digits(const char *str, size_t from, size_t to, size_t digits);
-static std::string parse_token_tolower(const char *str, size_t from, size_t to);
 static parser_ret parse_token68(const char *str, size_t from, size_t to);
 static constexpr size_t strlen_constexpr(const char *str);
 static constexpr uint64_t date_hash_short(const char *str);
@@ -145,40 +144,6 @@ static parser_ret parse_time_of_day(const char *str, size_t from, size_t to, dat
 static date_parser_inner_ret parse_date_imf(const char *str, size_t from, size_t to);
 static date_parser_inner_ret parse_date_rfc850(const char *str, size_t from, size_t to);
 static date_parser_inner_ret parse_date_asctime(const char *str, size_t from, size_t to);
-
-static inline bool is_digit(char c) {
-    return '0' <= c && c <= '9';
-}
-
-static inline bool is_alpha(char c) {
-    return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z');
-}
-
-static inline bool is_tchar(char c) {
-    return is_alpha(c) || is_digit(c) ||
-           c == '!' || c == '#' || c == '$' || c == '%' || c == '&' || c == '\'' || c == '*' ||
-           c == '+' || c == '-' || c == '.' || c == '^' || c == '_' || c == '`' || c == '|' || c == '~';
-}
-
-static inline bool is_whitespace(char c) {
-    return c == ' ' || c == '\t';
-}
-
-static inline bool is_vchar(char c) {
-    return 0x21 <= c && c <= 0x7E;
-}
-
-static inline bool is_obs_text(unsigned char c) {
-    return 0x80 <= c;
-}
-
-static inline bool is_qdtext(unsigned char c) {
-    return (0x20 <= c && c <= 0x7E && c != 0x22 && c != 0x5C) || c == '\t' || is_obs_text(c);
-}
-
-static inline char to_lower(char c) {
-    return 'A' <= c && c <= 'Z' ? c + ('a' - 'A') : c;
-}
 
 // makes sure the range params of parser functions is in string's bounds
 static inline void verify_range(const std::string& str, size_t from, size_t to) {
@@ -299,7 +264,16 @@ parser_ret parse_token(const char *str, size_t from, size_t to) {
     return std::make_pair(pos, pos > from);
 }
 
-static std::string parse_token_tolower(const char *str, size_t from, size_t to) {
+std::string parse_token_tolower(const std::string &str) {
+    return parse_token_tolower(str.data(), 0, str.length());
+}
+
+std::string parse_token_tolower(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_token_tolower(str.data(), from, to);
+}
+
+std::string parse_token_tolower(const char *str, size_t from, size_t to) {
     std::string token;
 
     for (const char *c = str + from; c < str + to; c++) {
@@ -2166,6 +2140,10 @@ via_field_ret parse_field_via(const char *field_value, size_t from, size_t to) {
 
 parser_ret parse_token(std::string_view str) {
     return parse_token(str.data(), 0, str.length());
+}
+
+std::string parse_token_tolower(std::string_view str) {
+    return parse_token_tolower(str.data(), 0, str.length());
 }
 
 quoted_ret parse_quoted_str(std::string_view str) {

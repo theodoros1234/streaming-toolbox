@@ -1,4 +1,5 @@
 #include "client.h"
+#include "strescape.h"
 
 using namespace std::string_literals;
 
@@ -45,14 +46,15 @@ client& client::open(const std::string &method, const std::string &url, bool all
         }
 
         // check URL host
+        std::string host = _url.host_str(true);
         switch (_url.host_type) {
         case uri::HOST_REGNAME:
         case uri::HOST_IPV4:
-            _hostname = _url.host_str(true);
+            _hostname = host;
             break;
 
         case uri::HOST_IPV6:
-            _hostname = _url.host_str(true).substr(1, _url.host_to - _url.host_from - 2);   // trim square brackets
+            _hostname = host.substr(1, _url.host_to - _url.host_from - 2);  // trim square brackets
             break;
 
         case uri::HOST_EMPTY:
@@ -84,12 +86,51 @@ client& client::open(const std::string &method, const std::string &url, bool all
         // merge query with path
         if (_url.query_to)
             _path += _url.query_str();
+
+        // set host header
+        if ((_encrypted && _port == 443) || (!_encrypted && _port == 80))   // default port, omit from header
+            set_header("host", host);
+        else    // other port, specify it
+            set_header("host", host + ":" + std::to_string(_port));
+
+        // set user agent
+        set_header("user-agent", get_default_user_agent());
     } catch (...) {
         clear();
         throw;
     }
 
     return *this;
+}
+
+client& client::set_header(const std::string &name, const std::string &value) {
+    // name must be case-insensitive
+    std::string name_tolower = parse_token_tolower(name);
+    if (name_tolower.empty() || name_tolower.length() != name.length())
+        throw std::invalid_argument("invalid header name");
+
+    // check value for invalid characters
+    for (char c : value)
+        if (!(is_vchar(c) || is_obs_text(c) || is_whitespace(c)))
+            std::invalid_argument("value contains invalid character " + char_escape(c));
+
+    _rq_headers[name_tolower] = value;
+
+    return *this;
+}
+
+client& client::set_headers(const std::map<std::string, std::string> &headers) {
+    for (const auto &[name, value] : headers)
+        set_header(name, value);
+
+    return *this;
+}
+
+bool client::clear_header(const std::string &name) {
+    std::string name_tolower = parse_token_tolower(name);
+    if (!name_tolower.empty() && name_tolower.length() == name.length())
+        return _rq_headers.erase(name_tolower);
+    return false;
 }
 
 }

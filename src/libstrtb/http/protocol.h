@@ -225,10 +225,46 @@ struct via_field_ret {
     std::vector<via_part> list;
 };
 
+inline bool is_digit(char c) {
+    return '0' <= c && c <= '9';
+}
+
+inline bool is_alpha(char c) {
+    return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z');
+}
+
+inline bool is_tchar(char c) {
+    return is_alpha(c) || is_digit(c) ||
+           c == '!' || c == '#' || c == '$' || c == '%' || c == '&' || c == '\'' || c == '*' ||
+           c == '+' || c == '-' || c == '.' || c == '^' || c == '_' || c == '`' || c == '|' || c == '~';
+}
+
+inline bool is_whitespace(char c) {
+    return c == ' ' || c == '\t';
+}
+
+inline bool is_vchar(char c) {
+    return 0x21 <= c && c <= 0x7E;
+}
+
+inline bool is_obs_text(unsigned char c) {
+    return 0x80 <= c;
+}
+
+inline bool is_qdtext(unsigned char c) {
+    return (0x20 <= c && c <= 0x7E && c != 0x22 && c != 0x5C) || c == '\t' || is_obs_text(c);
+}
+
+inline char to_lower(char c) {
+    return 'A' <= c && c <= 'Z' ? c + ('a' - 'A') : c;
+}
+
 // all line parsers need CRLF pre-stripped from the end of the string
 
 parser_ret parse_token(const std::string &str);
 parser_ret parse_token(const std::string &str, size_t from, size_t to);
+std::string parse_token_tolower(const std::string &str);
+std::string parse_token_tolower(const std::string &str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const std::string &str);
 quoted_ret parse_quoted_str(const std::string &str, size_t from, size_t to);
 parser_ret parse_comment(const std::string &str);
@@ -298,6 +334,7 @@ via_field_ret parse_field_via(const std::string &field_value);
 via_field_ret parse_field_via(const std::string &field_value, size_t from, size_t to);
 
 parser_ret parse_token(std::string_view str);
+std::string parse_token_tolower(std::string_view str);
 quoted_ret parse_quoted_str(std::string_view str);
 parser_ret parse_comment(std::string_view str);
 http_version_ret parse_http_version(std::string_view str);
@@ -336,6 +373,7 @@ via_field_ret parse_field_via(std::string_view field_value);
 
 
 parser_ret parse_token(const char *str, size_t from, size_t to);
+std::string parse_token_tolower(const char *str, size_t from, size_t to);
 quoted_ret parse_quoted_str(const char *str, size_t from, size_t to);
 parser_ret parse_comment(const char *str, size_t from, size_t to);
 http_version_ret parse_http_version(const char *str, size_t from, size_t to);
