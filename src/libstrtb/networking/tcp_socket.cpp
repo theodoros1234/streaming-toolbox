@@ -185,12 +185,13 @@ bool tcp_socket::is_open() const {
     return _sock != -1;
 }
 
-std::pair<std::string, bool> tcp_socket::recv_line(const std::string& endline, size_t max_len) {
+std::pair<std::string, bool> tcp_socket::recv_line(bool strip_endline, const std::string& endline, size_t max_len) {
     std::string line;
-    return std::make_pair(line, recv_line(line, endline, max_len));
+    return std::make_pair(line, recv_line(line, strip_endline, endline, max_len));
 }
 
-bool tcp_socket::recv_line(std::string& line, const std::string& endline, size_t max_len) {
+// WARNING: CRLF won't be detected when hitting the length limit in the middle of it
+bool tcp_socket::recv_line(std::string& line, bool strip_endline, const std::string& endline, size_t max_len) {
     line.clear();
     // Up to 2 characters allowed for endline argument
     if (endline.size() > 2)
@@ -215,12 +216,6 @@ bool tcp_socket::recv_line(std::string& line, const std::string& endline, size_t
         for (i=0; i<received; i++) {
             line.push_back(buf[i]);
 
-            // Check for maximum length
-            if (line.size() >= max_len) {
-                more = false;
-                break;
-            }
-
             // Check for endline
             if (buf[i] == endline.back()) {
                 // Also handle 2 character endlines
@@ -228,13 +223,23 @@ bool tcp_socket::recv_line(std::string& line, const std::string& endline, size_t
                     if (line.size() >= 2 && line[line.size() - 2] == endline.front()) {
                         more = false;
                         endline_reached = true;
+                        if (strip_endline)
+                            line.resize(line.length() - 2);
                         break;
                     }
                 } else {
                     more = false;
                     endline_reached = true;
+                    if (strip_endline)
+                        line.pop_back();
                     break;
                 }
+            }
+
+            // Check for maximum length
+            if (line.size() >= max_len) {
+                more = false;
+                break;
             }
         }
     } while (more);

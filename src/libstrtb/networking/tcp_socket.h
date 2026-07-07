@@ -39,8 +39,10 @@ public:
     void send(const char* buf, size_t len);
     void send(const std::string& buf);
     void flush();
-    std::pair<std::string, bool> recv_line(const std::string& endline = "\r\n", size_t max_len = 8192);
-    bool recv_line(std::string& line, const std::string& endline = "\r\n", size_t max_len = 8192);
+    std::pair<std::string, bool> recv_line(bool strip_endline = false,
+                                           const std::string& endline = "\r\n", size_t max_len = 8192);
+    bool recv_line(std::string& line, bool strip_endline = false,
+                   const std::string& endline = "\r\n", size_t max_len = 8192);
     void shutdown(bool receive = true, bool send = true);
     virtual void close();
     bool is_open() const;
