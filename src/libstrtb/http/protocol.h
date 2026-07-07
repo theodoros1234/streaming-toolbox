@@ -20,10 +20,14 @@ typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is val
 typedef std::tuple<size_t, bool, std::string> quoted_ret;   // ends at, is valid, unescaped string
 typedef std::map<std::string, std::string> parameter_map;
 
+struct http_version {
+    int major = 0, minor = 0;
+};
+
 struct http_version_ret {
     size_t to = 0;
     bool valid = false; // make sure to check this
-    int v_major = 0, v_minor = 0;
+    http_version version;
 };
 
 enum request_target_form_enum {
@@ -39,13 +43,13 @@ struct request_line_ret {
     std::string method;
     request_target_form_enum target_form = TARGET_FORM_INVALID;
     uri::parser target;
-    int http_version_major = 0, http_version_minor = 0;
+    http_version version;
 };
 
 struct status_line_ret {
     bool valid = false;
-    int http_version_major = 0, http_version_minor = 0,
-        status_code = 0;
+    http_version version;
+    int status_code = 0;
     std::string reason_phrase;
 };
 

@@ -316,30 +316,30 @@ http_version_ret parse_http_version(const char *str, size_t from, size_t to) {
     // 'HTTP/'
     std::tie(pos, valid) = parse_word(str, pos, to, "HTTP/");
     if (!valid)
-        return {.to = pos, .valid = false};
+        return {pos, false, {}};
 
     // major version
     std::tie(major, valid) = parse_digit(str, pos, to);
     if (!valid)
-        return {.to = pos, .valid = false};
+        return {pos, false, {}};
     pos++;
 
     // .
     if (!parse_char(str, pos, to, '.'))
-        return {.to = pos, .valid = false};
+        return {pos, false, {}};
     pos++;
 
     // minor version
     std::tie(minor, valid) = parse_digit(str, pos, to);
     if (!valid)
-        return {.to = pos, .valid = false};
+        return {pos, false, {}};
     pos++;
 
     // make sure there's no more stuff afterwards
     if (pos < to)
-        return {.to = pos, .valid = false};
+        return {pos, false, {}};
 
-    return {pos, true, major, minor};
+    return {pos, true, {major, minor}};
 }
 
 static inline request_target_form_enum parse_request_target(const char *target, size_t from, size_t to,
@@ -417,8 +417,7 @@ request_line_ret parse_request_line(const char *line, size_t length) {
     auto http_version = parse_http_version(line, pos, length);
     if (!http_version.valid)
         return {};
-    ret.http_version_major = http_version.v_major;
-    ret.http_version_minor = http_version.v_minor;
+    ret.version = http_version.version;
 
     // line end is checked by http version parser
     ret.valid = true;
@@ -436,8 +435,7 @@ status_line_ret parse_status_line(const char *line, size_t length) {
     auto http_version = parse_http_version(line, pos, http_version_to);
     if (!http_version.valid)
         return {};
-    ret.http_version_major = http_version.v_major;
-    ret.http_version_minor = http_version.v_minor;
+    ret.version = http_version.version;
     pos = http_version_to + 1;
 
     // 3-digit status code

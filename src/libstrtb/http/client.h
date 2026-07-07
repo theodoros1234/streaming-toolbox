@@ -22,9 +22,10 @@ public:
     const char* what() const noexcept;
 };
 
+class bad_state : public exception {using exception::exception;};
 class bad_response : public exception {using exception::exception;};
-class incomplete_data : public exception {};
-class in_shutdown_state : public exception {};
+class incomplete_data : public exception {using exception::exception;};
+class in_shutdown_state : public exception {using exception::exception;};
 class security_precaution : public exception {using exception::exception;};
 
 class client {
@@ -47,14 +48,14 @@ private:
     std::string _method;
     uri::parser _url;
     std::string _hostname;
-    int _port;
+    int _port = -1;
     std::string _path;
     bool _encrypted = false, _allow_invalid_cert = false;
     std::map<std::string, std::string> _rq_headers;
     int _status_code = 0;
     std::string _status_message;
-    field_parser _rs_headers;
-    http_version_ret _rs_http_version;
+    field_parser _rs_headers = true;
+    http_version _rs_http_version;
 
 public:
     client(const std::string &log_name);
