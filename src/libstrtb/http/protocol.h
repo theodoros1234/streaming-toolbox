@@ -426,10 +426,12 @@ public:
 
     field_parser() = default;
     field_parser(bool allow_obs_fold);
+    bool process_line(const std::string &line);
     bool process_line(const char *line, size_t length);
     void clear();
-
-    bool process_line(const std::string &line);
+    // case insensitive search
+    const std::string& get_field(const std::string &name) const;
+    const std::string* get_field_or_null(const std::string &name) const;
 };
 
 const char* get_status_code_phrase(int status_code);

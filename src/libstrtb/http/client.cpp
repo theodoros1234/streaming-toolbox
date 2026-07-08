@@ -200,10 +200,12 @@ void client::clear() {
     _rs_http_version.minor = 0;
     _content_length = 0;
     _content_length_decoded = 0;
+    _content_length_read = 0;
     _content_length_known = false;
     _content_length_decoded_known = false;
     _content_ends_on_close = false;
     _transfer_encoding.clear();
+    _content_encoding.clear();
 }
 
 static std::string make_header_line(const std::string &name, const std::string &value) {
@@ -306,6 +308,15 @@ int client::send() {
             _content_length = 0;
             _content_length_known = true;
         } else {
+            // check and parse content-encoding
+            auto ce = _rs_headers.fields.find("content-encoding");
+            if (ce != _rs_headers.fields.end()) {
+                auto ce_parsed = parse_field_token_list(ce->second, false);
+                if (!ce_parsed.valid)
+                    throw bad_response("invalid response content encoding");
+                _content_encoding = std::move(ce_parsed.list);
+            }
+
             auto te = _rs_headers.fields.find("transfer-encoding");
             if (te != _rs_headers.fields.end()) {
                 _state = STATE_RECEIVING_BODY;
@@ -346,11 +357,146 @@ int client::send() {
             }
         }
 
+        // we only know the final decoded length prematurely if content-length is known and content is not encoded
+        if (_content_length_known && _content_encoding.empty())
+            _content_length_decoded_known = true;
+
+        // close connection if there's no body
+        // TODO: remove this when persistent connections are implemented
+        if (_state == STATE_DONE)
+            _socket->close();
+
         return _status_code;
     } catch (...) {
         clear();
         throw;
     }
+}
+
+std::pair<const char*, size_t> client::recv_body() {
+    return recv_body(_socket->buffer_size());
+    // TODO: determine what's an actual good default max_len
+}
+
+std::pair<const char*, size_t> client::recv_body(size_t max_len) {
+    // TODO: handle transfer encodings
+
+    if (_state != STATE_RECEIVING_BODY) {
+        if (_state < STATE_RECEIVING_BODY)
+            throw bad_state("request not prepared or sent");
+        else    // already received the entire body
+            return {0, 0};
+    }
+
+    // only read upto the end of the content (if known)
+    if (_content_length_known)
+        max_len = std::min(_content_length - _content_length_read, max_len);
+
+    auto ret = _socket->recv(max_len);
+    _content_length_read += ret.second;
+    _content_length_decoded = _content_length_read; // TODO: change this when decoding
+    // check if socket returned more data than asked
+    assert(!_content_length_known || _content_length >= _content_length_read);
+
+    if (_content_length_known) {
+        if (_content_length_read >= _content_length) {
+            // reached end of body after we read enough bytes
+            _state = STATE_DONE;
+            _socket->close();
+        } else if (ret.second == 0) {
+            // prematurely reached end of body
+            _state = STATE_DONE;
+            _socket->close();
+            throw premature_end("incomplete body received");
+        }
+    } else {    // content length not known
+        // TODO: for HTTPS connections, treat abrupt ends as an incomplete body
+        if (ret.second == 0) {
+            // connection closure marks end of body
+            _state = STATE_DONE;
+            _socket->close();
+        }
+    }
+
+    return ret;
+}
+
+const std::string& client::log_name() const {
+    return _log_name;
+}
+
+client::state_enum client::state() const {
+    return _state;
+}
+
+const std::string& client::method() const {
+    return _method;
+}
+
+const std::string& client::hostname() const {
+    return _hostname;
+}
+
+int client::port() const {
+    return _port;
+}
+
+const std::string& client::path() const {
+    return _path;
+}
+
+bool client::encrypted() const {
+    return _encrypted;
+}
+
+int client::status_code() const {
+    return _status_code;
+}
+
+const std::string& client::status_message() const {
+    return _status_message;
+}
+
+http_version client::response_http_version() const {
+    return _rs_http_version;
+}
+
+const std::string& client::response_header_raw(const std::string &name) const {
+    return _rs_headers.get_field(name);
+}
+
+const std::string* client::response_header_raw_or_null(const std::string &name) const {
+    return _rs_headers.get_field_or_null(name);
+}
+
+const std::map<std::string, std::string>& client::response_headers_raw() const {
+    return _rs_headers.fields;
+}
+
+const std::vector<std::string>& client::response_cookies_raw() const {
+    return _rs_headers.fields_set_cookie;
+}
+
+std::pair<size_t, bool> client::content_length() const {
+    if (_content_length_known)
+        return {_content_length, true};
+    else
+        return {0, false};
+}
+
+std::pair<size_t, bool> client::content_length_decoded() const {
+    if (_content_length_decoded_known)
+        return {_content_length_decoded, true};
+    else
+        return {0, false};
+}
+
+const std::vector<token_params>& client::transfer_encoding() const {
+    return _transfer_encoding;
+}
+
+const std::vector<std::string>& client::content_encoding() const {
+    return _content_encoding;
 }
 
 }
