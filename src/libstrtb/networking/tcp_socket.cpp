@@ -174,8 +174,6 @@ void tcp_socket::close() {
     int close_ret = ::close(_sock);
     _sock = -1;
     _send_pos = 0;
-    buffer_clear_recv();
-    buffer_clear_send();
     _line_leftovers = 0;
     if (close_ret)
         throw internal_error(errno);

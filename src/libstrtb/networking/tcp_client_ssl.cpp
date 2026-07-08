@@ -187,8 +187,6 @@ void tcp_client_ssl::close() {
     _thread.stop();
     SSL_free(_ssl);
     _ssl = nullptr;
-    buffer_clear_recv();
-    buffer_clear_send();
     _line_leftovers = 0;
 }
 

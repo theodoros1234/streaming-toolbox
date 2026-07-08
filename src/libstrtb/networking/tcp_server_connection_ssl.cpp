@@ -109,8 +109,6 @@ void tcp_server_connection_ssl::close() {
         SSL_free(_ssl);
         _ssl = nullptr;
         _sock = -1;
-        buffer_clear_recv();
-        buffer_clear_send();
         _line_leftovers = 0;
     }
 
