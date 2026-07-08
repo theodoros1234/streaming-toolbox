@@ -1532,7 +1532,7 @@ token_params_list_ret parse_field_token_params_list(const std::string &field_val
     return parse_field_token_params_list(field_value.data(), from, to, token_case_sensitive, allow_bad_whitespace);
 }
 
-// used in fields such as: TE, Accept-Charset, Accept-Encoding, Accept-Language
+// used in fields such as: TE, Transfer-Encoding, Accept-Charset, Accept-Encoding, Accept-Language
 token_params_list_ret parse_field_token_params_list(const char *field_value, size_t from, size_t to,
                                                     bool token_case_sensitive, bool allow_bad_whitespace) {
     std::vector<token_params> list;

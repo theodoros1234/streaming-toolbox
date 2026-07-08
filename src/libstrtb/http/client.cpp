@@ -196,7 +196,14 @@ void client::clear() {
     _status_code = 0;
     _status_message.clear();
     _rs_headers.clear();
-    _rs_http_version = http_version_ret();
+    _rs_http_version.major = 0;
+    _rs_http_version.minor = 0;
+    _content_length = 0;
+    _content_length_decoded = 0;
+    _content_length_known = false;
+    _content_length_decoded_known = false;
+    _content_ends_on_close = false;
+    _transfer_encoding.clear();
 }
 
 static std::string make_header_line(const std::string &name, const std::string &value) {
@@ -290,8 +297,54 @@ int client::send() {
                 throw bad_response("invalid response header line");
         }
 
+        // TODO: Transfer-Encoding in HTTP/1.0 MUST be treated as faulty framing and close the connection afterwards
+
         // determine if a body is present
-        // change state
+        if (_method == "HEAD" || _status_code == 204 || _status_code == 304 || _status_code / 100 == 1) {
+            // certain methods and status codes cannot have a body
+            _state = STATE_DONE;
+            _content_length = 0;
+            _content_length_known = true;
+        } else {
+            auto te = _rs_headers.fields.find("transfer-encoding");
+            if (te != _rs_headers.fields.end()) {
+                _state = STATE_RECEIVING_BODY;
+                _content_length_known = false;
+
+                // parse transfer-encoding header
+                auto te_parsed = parse_field_token_params_list(te->second, false, true);
+                if (!te_parsed.valid)
+                    throw bad_response("invalid response transfer encoding");
+
+                // TODO: check for unsupported encodings and convert codings to either enums or conversion objects
+                _transfer_encoding = std::move(te_parsed.list);
+                // TODO: if the last coding ISN'T chunked, body end is marked by connection closing
+                _content_ends_on_close = !(!_transfer_encoding.empty() && _transfer_encoding.back().token == "chunked");
+            } else {
+                auto ce = _rs_headers.fields.find("content-length");
+
+                if (ce != _rs_headers.fields.end()) {
+                    // parse content-length header
+                    auto ce_parsed = parse_field_integer(ce->second);
+                    if (!ce_parsed.valid) {
+                        if (ce_parsed.overflow)
+                            throw unsupported_response("response content length is too long");
+                        else
+                            throw bad_response("invalid response content length");
+                    }
+
+                    _content_length = ce_parsed.number;
+                    _content_length_known = true;
+                    _state = _content_length ? STATE_RECEIVING_BODY : STATE_DONE;
+                } else {
+                    // no encoding or length info
+                    _state = STATE_RECEIVING_BODY;
+                    _content_length = 0;
+                    _content_length_known = false;
+                    _content_ends_on_close = true;
+                }
+            }
+        }
 
         return _status_code;
     } catch (...) {

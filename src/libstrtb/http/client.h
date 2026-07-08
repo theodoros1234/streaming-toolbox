@@ -24,6 +24,7 @@ public:
 
 class bad_state : public exception {using exception::exception;};
 class bad_response : public exception {using exception::exception;};
+class unsupported_response : public exception {using exception::exception;};
 class incomplete_data : public exception {using exception::exception;};
 class in_shutdown_state : public exception {using exception::exception;};
 class security_precaution : public exception {using exception::exception;};
@@ -56,6 +57,10 @@ private:
     std::string _status_message;
     field_parser _rs_headers = true;
     http_version _rs_http_version;
+    size_t _content_length = 0, _content_length_decoded = 0;
+    bool _content_length_known = false, _content_length_decoded_known = false,
+         _content_ends_on_close = false;
+    std::vector<token_params> _transfer_encoding;
 
 public:
     client(const std::string &log_name);
