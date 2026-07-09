@@ -9,14 +9,6 @@ using namespace std::string_literals;
 
 namespace strtb::http {
 
-exception::exception(const char *str) : _what(str) {}
-exception::exception(const std::string &str) : _what(str) {}
-exception::exception(std::string &&str) : _what(str) {}
-
-const char* exception::what() const noexcept {
-    return _what.c_str();
-}
-
 client::client(const std::string &log_name) :
     _log_name(log_name),
     _log(log_name.empty() ? "HTTP Client" : "HTTP Client: " + log_name, false) {}
@@ -199,13 +191,10 @@ void client::clear() {
     _rs_http_version.major = 0;
     _rs_http_version.minor = 0;
     _content_length = 0;
-    _content_length_decoded = 0;
-    _content_length_read = 0;
     _content_length_known = false;
-    _content_length_decoded_known = false;
-    _content_ends_on_close = false;
     _transfer_encoding.clear();
     _content_encoding.clear();
+    _decoders.clear();
 }
 
 static std::string make_header_line(const std::string &name, const std::string &value) {
@@ -330,7 +319,7 @@ int client::send() {
                 // TODO: check for unsupported encodings and convert codings to either enums or conversion objects
                 _transfer_encoding = std::move(te_parsed.list);
                 // TODO: if the last coding ISN'T chunked, body end is marked by connection closing
-                _content_ends_on_close = !(!_transfer_encoding.empty() && _transfer_encoding.back().token == "chunked");
+                _decoders.push_back(std::unique_ptr<decoder>(new body_until_close(*_socket)));
             } else {
                 auto ce = _rs_headers.fields.find("content-length");
 
@@ -346,20 +335,17 @@ int client::send() {
 
                     _content_length = ce_parsed.number;
                     _content_length_known = true;
-                    _state = _content_length ? STATE_RECEIVING_BODY : STATE_DONE;
+                    _state = STATE_RECEIVING_BODY;
+                    _decoders.push_back(std::unique_ptr<decoder>(new body_fixed_length(*_socket, _content_length)));
                 } else {
                     // no encoding or length info
                     _state = STATE_RECEIVING_BODY;
                     _content_length = 0;
                     _content_length_known = false;
-                    _content_ends_on_close = true;
+                    _decoders.push_back(std::unique_ptr<decoder>(new body_until_close(*_socket)));
                 }
             }
         }
-
-        // we only know the final decoded length prematurely if content-length is known and content is not encoded
-        if (_content_length_known && _content_encoding.empty())
-            _content_length_decoded_known = true;
 
         // close connection if there's no body
         // TODO: remove this when persistent connections are implemented
@@ -388,37 +374,25 @@ std::pair<const char*, size_t> client::recv_body(size_t max_len) {
             return {0, 0};
     }
 
-    // only read upto the end of the content (if known)
-    if (_content_length_known)
-        max_len = std::min(_content_length - _content_length_read, max_len);
+    try {
+        assert(!_decoders.empty());
+        if (!_decoders.empty()) {
+            auto ret = _decoders.front()->read(max_len);
 
-    auto ret = _socket->recv(max_len);
-    _content_length_read += ret.second;
-    _content_length_decoded = _content_length_read; // TODO: change this when decoding
-    // check if socket returned more data than asked
-    assert(!_content_length_known || _content_length >= _content_length_read);
+            if (ret.second == 0) {  // reading 0 bytes means we reached the end of the body
+                _state = STATE_DONE;
+                _socket->close();
+                // TODO: attempt graceful shutdown over TLS
+            }
 
-    if (_content_length_known) {
-        if (_content_length_read >= _content_length) {
-            // reached end of body after we read enough bytes
-            _state = STATE_DONE;
-            _socket->close();
-        } else if (ret.second == 0) {
-            // prematurely reached end of body
-            _state = STATE_DONE;
-            _socket->close();
-            throw premature_end("incomplete body received");
+            return ret;
+        } else {
+            return {0, 0};
         }
-    } else {    // content length not known
-        // TODO: for HTTPS connections, treat abrupt ends as an incomplete body
-        if (ret.second == 0) {
-            // connection closure marks end of body
-            _state = STATE_DONE;
-            _socket->close();
-        }
+    } catch (...) {
+        clear();
+        throw;
     }
-
-    return ret;
 }
 
 const std::string& client::log_name() const {
@@ -480,13 +454,6 @@ const std::vector<std::string>& client::response_cookies_raw() const {
 std::pair<size_t, bool> client::content_length() const {
     if (_content_length_known)
         return {_content_length, true};
-    else
-        return {0, false};
-}
-
-std::pair<size_t, bool> client::content_length_decoded() const {
-    if (_content_length_decoded_known)
-        return {_content_length_decoded, true};
     else
         return {0, false};
 }

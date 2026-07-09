@@ -12,6 +12,14 @@ using namespace std::string_literals;
 
 namespace strtb::http {
 
+exception::exception(const char *str) : _what(str) {}
+exception::exception(const std::string &str) : _what(str) {}
+exception::exception(std::string &&str) : _what(str) {}
+
+const char* exception::what() const noexcept {
+    return _what.c_str();
+}
+
 const char* get_status_code_phrase(int status_code) {
     switch (status_code) {
     case 100: return "Continue";
@@ -848,7 +856,8 @@ time_t parse_field_date(const std::string &str, size_t from, size_t to) {
     return parse_field_date(str.data(), from, to);
 }
 
-// used directly for fields such as: Date, If-(Un)modified-Since, Last-Modified, and indirectly for others (e.g. Retry-After)
+// used directly for fields such as: Date, If-(Un)modified-Since, Last-Modified, Expires,
+// and indirectly for others (e.g. Retry-After)
 time_t parse_field_date(const char *str, size_t from, size_t to) {
     date_parser_inner_ret inner_ret;
 
@@ -1339,7 +1348,8 @@ integer_field_ret parse_field_integer(const std::string &field_value, size_t fro
     return parse_field_integer(field_value.data(), from, to);
 }
 
-// field that only contains a non-negative integer number, used by: Content-Length, Max-Forwards, possibly for Retry-After
+// field that only contains a non-negative integer number, used by: Content-Length, Max-Forwards,
+// possibly for Retry-After, Age
 integer_field_ret parse_field_integer(const char *field_value, size_t from, size_t to) {
     auto ret = parse_integer(field_value, from, to);
     if (!ret.valid || ret.to != to)     // invalid/overflown, or extra stuff after number
@@ -1532,7 +1542,7 @@ token_params_list_ret parse_field_token_params_list(const std::string &field_val
     return parse_field_token_params_list(field_value.data(), from, to, token_case_sensitive, allow_bad_whitespace);
 }
 
-// used in fields such as: TE, Transfer-Encoding, Accept-Charset, Accept-Encoding, Accept-Language
+// used in fields such as: TE, Transfer-Encoding, Accept-Charset, Accept-Encoding, Accept-Language, Cache-Control
 token_params_list_ret parse_field_token_params_list(const char *field_value, size_t from, size_t to,
                                                     bool token_case_sensitive, bool allow_bad_whitespace) {
     std::vector<token_params> list;

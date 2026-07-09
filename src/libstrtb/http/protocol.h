@@ -16,6 +16,24 @@
 
 namespace strtb::http {
 
+class exception : public std::exception {
+private:
+    const std::string _what;
+public:
+    exception(const char *str);
+    exception(const std::string &str);
+    exception(std::string &&str);
+    const char* what() const noexcept;
+};
+
+class bad_state : public exception {using exception::exception;};
+class bad_response : public exception {using exception::exception;};
+class unsupported_response : public exception {using exception::exception;};
+class incomplete_data : public exception {using exception::exception;};
+class in_shutdown_state : public exception {using exception::exception;};
+class security_precaution : public exception {using exception::exception;};
+class premature_end : public exception {using exception::exception;};
+
 typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is valid
 typedef std::tuple<size_t, bool, std::string> quoted_ret;   // ends at, is valid, unescaped string
 typedef std::map<std::string, std::string> parameter_map;

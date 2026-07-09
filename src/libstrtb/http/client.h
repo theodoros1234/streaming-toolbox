@@ -2,6 +2,7 @@
 #define STRTB_HTTP_CLIENT_H
 
 #include "protocol.h"
+#include "codings.h"
 #include "../logging.h"
 #include "../networking/tcp_client.h"
 #include "../networking/tcp_client_ssl.h"
@@ -11,24 +12,6 @@
 #include <mutex>
 
 namespace strtb::http {
-
-class exception : public std::exception {
-private:
-    const std::string _what;
-public:
-    exception(const char *str);
-    exception(const std::string &str);
-    exception(std::string &&str);
-    const char* what() const noexcept;
-};
-
-class bad_state : public exception {using exception::exception;};
-class bad_response : public exception {using exception::exception;};
-class unsupported_response : public exception {using exception::exception;};
-class incomplete_data : public exception {using exception::exception;};
-class in_shutdown_state : public exception {using exception::exception;};
-class security_precaution : public exception {using exception::exception;};
-class premature_end : public exception {using exception::exception;};
 
 class client {
 public:
@@ -61,11 +44,11 @@ private:
     std::string _status_message;
     http_version _rs_http_version;
     field_parser _rs_headers = true;
-    size_t _content_length = 0, _content_length_decoded = 0, _content_length_read = 0;
-    bool _content_length_known = false, _content_length_decoded_known = false,
-         _content_ends_on_close = false;
+    size_t _content_length = 0;
+    bool _content_length_known = false;
     std::vector<token_params> _transfer_encoding;
     std::vector<std::string> _content_encoding;
+    std::vector<std::unique_ptr<decoder> > _decoders;
 
 public:
     client(const std::string &log_name);
@@ -94,7 +77,6 @@ public:
     const std::map<std::string, std::string>& response_headers_raw() const;
     const std::vector<std::string>& response_cookies_raw() const;
     std::pair<size_t, bool> content_length() const;
-    std::pair<size_t, bool> content_length_decoded() const;
     const std::vector<token_params>& transfer_encoding() const;
     const std::vector<std::string>& content_encoding() const;
     // TODO: more functions to get more internal variables

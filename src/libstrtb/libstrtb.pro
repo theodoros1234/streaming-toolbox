@@ -16,6 +16,7 @@ include( ../../version.pri )
 
 SOURCES += \
     http/client.cpp \
+    http/codings.cpp \
     strescape.cpp \
     version.cpp \
     config/system.cpp \
@@ -67,6 +68,7 @@ HEADERS += \
     chat/system.h \
     common/deregistration_interface.h \
     http/client.h \
+    http/codings.h \
     strescape.h \
     version.h \
     config/id_type.h \
