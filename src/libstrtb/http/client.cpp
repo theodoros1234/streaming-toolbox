@@ -168,7 +168,7 @@ void client::clear() {
             if (_socket->is_open())
                 _socket->close();
             _socket = nullptr;
-            _socket_container = false;
+            _socket_container.emplace<0>(false);
         }
     }
 
@@ -188,6 +188,7 @@ void client::clear() {
     _status_code = 0;
     _status_message.clear();
     _rs_headers.clear();
+    _rs_trailers.clear();
     _rs_http_version.major = 0;
     _rs_http_version.minor = 0;
     _content_length = 0;
@@ -252,9 +253,8 @@ int client::send() {
 
         // receive response status-line
         std::string line;
-        const size_t max_len = 16384;
-        if (!_socket->recv_line(line, true, CRLF, max_len)) {
-            if (line.length() == max_len)
+        if (!_socket->recv_line(line, true, CRLF, STRTB_HTTP_STATUS_LINE_MAX_LEN)) {
+            if (line.length() == STRTB_HTTP_STATUS_LINE_MAX_LEN)
                 throw bad_response("response status line too long");
             else
                 throw bad_response("incomplete response status line");
@@ -272,12 +272,13 @@ int client::send() {
         // receive response headers
         while (true) {
             // TODO: obs-fold is allowed, give a param to enable/disable that
+            // TODO: limit max amount of trailers to receive
 
-            if (!_socket->recv_line(line, true, CRLF, max_len)) {
-                if (line.length() == max_len)
+            if (!_socket->recv_line(line, true, CRLF, STRTB_HTTP_FIELD_LINE_MAX_LEN)) {
+                if (line.length() >= STRTB_HTTP_FIELD_LINE_MAX_LEN)
                     throw bad_response("response header line too long");
                 else
-                    throw bad_response("incpomplete response header line");
+                    throw bad_response("incomplete response header line");
             }
 
             // empty line marks end of headers
@@ -318,8 +319,14 @@ int client::send() {
 
                 // TODO: check for unsupported encodings and convert codings to either enums or conversion objects
                 _transfer_encoding = std::move(te_parsed.list);
-                // TODO: if the last coding ISN'T chunked, body end is marked by connection closing
-                _decoders.push_back(std::unique_ptr<decoder>(new body_until_close(*_socket)));
+                // check if chunked encoding is specified (must be last)
+                bool chunked = (!_transfer_encoding.empty() && _transfer_encoding.back().token == "chunked");
+                // TODO: treat params as errors
+                // TODO: check for other encodings
+                if (chunked)
+                    _decoders.push_back(std::unique_ptr<decoder>(new body_chunked(*_socket, _rs_trailers)));
+                else    // if the last coding isn't chunked, body end is marked by connection closing
+                    _decoders.push_back(std::unique_ptr<decoder>(new body_until_close(*_socket)));
             } else {
                 auto ce = _rs_headers.fields.find("content-length");
 
@@ -435,20 +442,32 @@ http_version client::response_http_version() const {
     return _rs_http_version;
 }
 
-const std::string& client::response_header_raw(const std::string &name) const {
+const std::string& client::response_header(const std::string &name) const {
     return _rs_headers.get_field(name);
 }
 
-const std::string* client::response_header_raw_or_null(const std::string &name) const {
+const std::string* client::response_header_or_null(const std::string &name) const {
     return _rs_headers.get_field_or_null(name);
 }
 
-const std::map<std::string, std::string>& client::response_headers_raw() const {
+const std::map<std::string, std::string>& client::response_headers() const {
     return _rs_headers.fields;
 }
 
 const std::vector<std::string>& client::response_cookies_raw() const {
     return _rs_headers.fields_set_cookie;
+}
+
+const std::string& client::response_trailer(const std::string &name) const {
+    return _rs_trailers.get_field(name);
+}
+
+const std::string* client::response_trailer_or_null(const std::string &name) const {
+    return _rs_trailers.get_field_or_null(name);
+}
+
+const std::map<std::string, std::string>& client::response_trailers() const {
+    return _rs_trailers.fields;
 }
 
 std::pair<size_t, bool> client::content_length() const {

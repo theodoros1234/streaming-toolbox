@@ -9,6 +9,7 @@
 #define STRTB_NETWORKING_RECV_BUFFER_SIZE_MIN 256
 #define STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT 4096
 #define STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT_SSL 16384
+#define STRTB_NETWORKING_RECV_LINE_MAX_LEN_DEFAULT 8192
 
 namespace strtb::networking {
 
@@ -39,10 +40,10 @@ public:
     void send(const char* buf, size_t len);
     void send(const std::string& buf);
     void flush();
-    std::pair<std::string, bool> recv_line(bool strip_endline = false,
-                                           const std::string& endline = "\r\n", size_t max_len = 8192);
-    bool recv_line(std::string& line, bool strip_endline = false,
-                   const std::string& endline = "\r\n", size_t max_len = 8192);
+    std::pair<std::string, bool> recv_line(bool strip_endline = false, const std::string& endline = "\r\n",
+                                           size_t max_len = STRTB_NETWORKING_RECV_LINE_MAX_LEN_DEFAULT);
+    bool recv_line(std::string& line, bool strip_endline = false, const std::string& endline = "\r\n",
+                   size_t max_len = STRTB_NETWORKING_RECV_LINE_MAX_LEN_DEFAULT);
     void shutdown(bool receive = true, bool send = true);
     virtual void close();
     bool is_open() const;

@@ -4,8 +4,11 @@
 #include <cstddef>
 #include <utility>
 #include "../networking/tcp_socket.h"
+#include "protocol.h"
 
 namespace strtb::http {
+
+// TODO: fix potential problems on 32-bit systems mixing size_t and unsigned long long types
 
 class decoder {
 public:
@@ -32,6 +35,19 @@ private:
 public:
     body_until_close(networking::tcp_socket &socket);
     ~body_until_close() = default;
+    std::pair<const char*, size_t> read(size_t max_len);
+};
+
+class body_chunked : public decoder {
+private:
+    networking::tcp_socket &_socket;
+    field_parser &_trailers;
+    size_t _bytes_remaining = 0;    // for current chunk
+    bool _done = false, _first = true;
+
+public:
+    body_chunked(networking::tcp_socket &socket, field_parser &trailers);
+    ~body_chunked() = default;
     std::pair<const char*, size_t> read(size_t max_len);
 };
 

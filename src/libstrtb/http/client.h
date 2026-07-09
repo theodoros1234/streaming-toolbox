@@ -43,7 +43,7 @@ private:
     int _status_code = 0;
     std::string _status_message;
     http_version _rs_http_version;
-    field_parser _rs_headers = true;
+    field_parser _rs_headers = true, _rs_trailers = true;
     size_t _content_length = 0;
     bool _content_length_known = false;
     std::vector<token_params> _transfer_encoding;
@@ -72,10 +72,13 @@ public:
     int status_code() const;
     const std::string& status_message() const;
     http_version response_http_version() const;
-    const std::string& response_header_raw(const std::string &name) const;
-    const std::string* response_header_raw_or_null(const std::string &name) const;
-    const std::map<std::string, std::string>& response_headers_raw() const;
+    const std::string& response_header(const std::string &name) const;
+    const std::string* response_header_or_null(const std::string &name) const;
+    const std::map<std::string, std::string>& response_headers() const;
     const std::vector<std::string>& response_cookies_raw() const;
+    const std::string& response_trailer(const std::string &name) const;
+    const std::string* response_trailer_or_null(const std::string &name) const;
+    const std::map<std::string, std::string>& response_trailers() const;
     std::pair<size_t, bool> content_length() const;
     const std::vector<token_params>& transfer_encoding() const;
     const std::vector<std::string>& content_encoding() const;

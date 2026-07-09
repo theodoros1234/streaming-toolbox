@@ -24,6 +24,8 @@ const char* get_status_code_phrase(int status_code) {
     switch (status_code) {
     case 100: return "Continue";
     case 101: return "Switching Protocols";
+    case 102: return "Processing";
+    case 103: return "Early Hints";
     case 200: return "OK";
     case 201: return "Created";
     case 202: return "Accepted";
@@ -2339,6 +2341,45 @@ const std::string* field_parser::get_field_or_null(const std::string &name) cons
         return &value->second;
     else
         return nullptr;
+}
+
+integer_ret parse_integer_hex(const std::string &str) {
+    return parse_integer_hex(str.data(), 0, str.length());
+}
+
+integer_ret parse_integer_hex(const std::string &str, size_t from, size_t to) {
+    verify_range(str, from, to);
+    return parse_integer_hex(str.data(), from, to);
+}
+
+integer_ret parse_integer_hex(std::string_view str) {
+    return parse_integer_hex(str.data(), 0, str.length());
+}
+
+integer_ret parse_integer_hex(const char *str, size_t from, size_t to) {
+    unsigned long long number = 0;
+    size_t i;
+
+    for (i = from; i < to; i++) {
+        char c = str[i];
+        unsigned n = 0;
+        if (is_digit(c))
+            n = c - '0';
+        else if ('A' <= c && c <= 'F')
+            n = c - 'A' + 10;
+        else if ('a' <= c && c <= 'f')
+            n = c - 'a' + 10;
+        else
+            break;
+
+        // overflow check
+        if (number > ULONG_LONG_MAX / 16)
+            return {i, false, true, 0};
+
+        number = number * 16 + n;
+    }
+
+    return {i, i > from, false, number};
 }
 
 }

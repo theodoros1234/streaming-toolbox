@@ -11,6 +11,9 @@
 #include "../uri.h"
 
 #define STRTB_HTTP_PARSE_LIST_MAX_EMPTY_ELEMENTS 16
+#define STRTB_HTTP_FIELD_LINE_MAX_LEN 16384
+#define STRTB_HTTP_STATUS_LINE_MAX_LEN 512
+#define STRTB_HTTP_CHUNK_LINE_MAX_LEN 4096
 
 // NOTE: currently targetting HTTP/1.1 compatibility
 
@@ -313,6 +316,8 @@ auth_params_ret parse_auth_params(const std::string &str);
 auth_params_ret parse_auth_params(const std::string &str, size_t from, size_t to);
 media_type_ret parse_media_type(const std::string &str);
 media_type_ret parse_media_type(const std::string &str, size_t from, size_t to);
+integer_ret parse_integer_hex(const std::string &str);
+integer_ret parse_integer_hex(const std::string &str, size_t from, size_t to);
 
 time_t parse_field_date(const std::string &str);
 time_t parse_field_date(const std::string &str, size_t from, size_t to);
@@ -371,6 +376,7 @@ parser_ret parse_list(std::string_view str,
 credentials_ret parse_credentials_or_challenge(std::string_view str);
 auth_params_ret parse_auth_params(std::string_view str);
 media_type_ret parse_media_type(std::string_view str);
+integer_ret parse_integer_hex(std::string_view str);
 
 time_t parse_field_date(std::string_view str);
 token_list_ret parse_field_token_list(std::string_view field_value, bool case_sensitive);
@@ -410,6 +416,7 @@ parser_ret parse_list(const char *str, size_t from, size_t to,
 credentials_ret parse_credentials_or_challenge(const char *str, size_t from, size_t to);
 auth_params_ret parse_auth_params(const char *str, size_t from, size_t to);
 media_type_ret parse_media_type(const char *str, size_t from, size_t to);
+integer_ret parse_integer_hex(const char *str, size_t from, size_t to);
 
 time_t parse_field_date(const char *str, size_t from, size_t to);
 token_list_ret parse_field_token_list(const char *field_value, size_t from, size_t to, bool case_sensitive);
