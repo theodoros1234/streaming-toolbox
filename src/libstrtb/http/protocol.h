@@ -30,12 +30,12 @@ public:
 };
 
 class bad_state : public exception {using exception::exception;};
-class bad_response : public exception {using exception::exception;};
-class unsupported_response : public exception {using exception::exception;};
-class incomplete_data : public exception {using exception::exception;};
+class invalid_message : public exception {using exception::exception;};
+class unsupported_message : public exception {using exception::exception;};
 class in_shutdown_state : public exception {using exception::exception;};
 class security_precaution : public exception {using exception::exception;};
-class premature_end : public exception {using exception::exception;};
+class incomplete_message : public exception {using exception::exception;};
+class internal_error : public exception {using exception::exception;};
 
 typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is valid
 typedef std::tuple<size_t, bool, std::string> quoted_ret;   // ends at, is valid, unescaped string

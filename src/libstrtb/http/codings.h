@@ -2,9 +2,14 @@
 #define STRTB_HTTP_CODINGS_H
 
 #include <cstddef>
+#include <memory>
 #include <utility>
 #include "../networking/tcp_socket.h"
 #include "protocol.h"
+#include <zlib.h>
+
+#define STRTB_HTTP_ZLIB_CHUNK_SIZE 16384
+#define STRTB_HTTP_MAX_DECODERS 5
 
 namespace strtb::http {
 
@@ -12,7 +17,10 @@ namespace strtb::http {
 
 class decoder {
 public:
+    decoder() = default;
+    decoder(const decoder&) = delete;
     virtual ~decoder() = default;
+    virtual std::pair<const char*, size_t> read() = 0;
     virtual std::pair<const char*, size_t> read(size_t max_len) = 0;
 };
 
@@ -25,6 +33,7 @@ private:
 public:
     body_fixed_length(networking::tcp_socket &socket, size_t content_length);
     ~body_fixed_length() = default;
+    std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
 
@@ -35,6 +44,7 @@ private:
 public:
     body_until_close(networking::tcp_socket &socket);
     ~body_until_close() = default;
+    std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
 
@@ -48,8 +58,29 @@ private:
 public:
     body_chunked(networking::tcp_socket &socket, field_parser &trailers);
     ~body_chunked() = default;
+    std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
+
+// used for deflate and gzip encodings
+class decoder_zlib : public decoder {
+private:
+    decoder &_read_from;
+    z_stream _stream;
+    unsigned char _buf[STRTB_HTTP_ZLIB_CHUNK_SIZE];
+    size_t _buf_pos = 0, _buf_filled = 0;
+    bool _done = false;
+
+public:
+    decoder_zlib(decoder& read_from, bool gzip);
+    ~decoder_zlib();
+    std::pair<const char*, size_t> read();
+    std::pair<const char*, size_t> read(size_t max_len);
+};
+
+void content_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &decoders,
+                                    std::vector<std::string> &content_encoding,
+                                    size_t max_decoders = STRTB_HTTP_MAX_DECODERS);
 
 }
 

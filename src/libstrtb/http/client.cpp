@@ -69,7 +69,7 @@ client& client::open(const std::string &method, const std::string &url, bool all
             if (_port == -1)
                 throw std::invalid_argument("invalid port number");
             else if (!allow_unsafe_ports && _port != 80 && _port != 443 && is_unsafe_port(_port))
-                throw security_precaution("test");
+                throw security_precaution("blocked access to unsafe port");
         }
 
         // disallow fragments
@@ -92,7 +92,7 @@ client& client::open(const std::string &method, const std::string &url, bool all
         // set some headers
         set_header("user-agent", get_default_user_agent());
         set_header("connection", "close");
-        set_header("accept-encoding", "identity");
+        set_header("accept-encoding", "gzip, deflate");     // TODO: get supported encodings from elsewhere
     } catch (...) {
         clear();
         throw;
@@ -255,16 +255,16 @@ int client::send() {
         std::string line;
         if (!_socket->recv_line(line, true, CRLF, STRTB_HTTP_STATUS_LINE_MAX_LEN)) {
             if (line.length() == STRTB_HTTP_STATUS_LINE_MAX_LEN)
-                throw bad_response("response status line too long");
+                throw invalid_message("response status line too long");
             else
-                throw bad_response("incomplete response status line");
+                throw invalid_message("incomplete response status line");
         }
 
         auto status_line = parse_status_line(line);
         if (!status_line.valid)
-            throw bad_response("invalid response status line");
+            throw invalid_message("invalid response status line");
         if (status_line.version.major != 1)
-            throw bad_response("incompatible response HTTP version");
+            throw invalid_message("incompatible response HTTP version");
         _status_code = status_line.status_code;
         _status_message = std::move(status_line.reason_phrase);
         _rs_http_version = status_line.version;
@@ -276,9 +276,9 @@ int client::send() {
 
             if (!_socket->recv_line(line, true, CRLF, STRTB_HTTP_FIELD_LINE_MAX_LEN)) {
                 if (line.length() >= STRTB_HTTP_FIELD_LINE_MAX_LEN)
-                    throw bad_response("response header line too long");
+                    throw invalid_message("response header line too long");
                 else
-                    throw bad_response("incomplete response header line");
+                    throw invalid_message("incomplete response header line");
             }
 
             // empty line marks end of headers
@@ -286,7 +286,7 @@ int client::send() {
                 break;
 
             if (!_rs_headers.process_line(line))
-                throw bad_response("invalid response header line");
+                throw invalid_message("invalid response header line");
         }
 
         // TODO: Transfer-Encoding in HTTP/1.0 MUST be treated as faulty framing and close the connection afterwards
@@ -303,7 +303,7 @@ int client::send() {
             if (ce != _rs_headers.fields.end()) {
                 auto ce_parsed = parse_field_token_list(ce->second, false);
                 if (!ce_parsed.valid)
-                    throw bad_response("invalid response content encoding");
+                    throw invalid_message("invalid response content encoding");
                 _content_encoding = std::move(ce_parsed.list);
             }
 
@@ -315,7 +315,7 @@ int client::send() {
                 // parse transfer-encoding header
                 auto te_parsed = parse_field_token_params_list(te->second, false, true);
                 if (!te_parsed.valid)
-                    throw bad_response("invalid response transfer encoding");
+                    throw invalid_message("invalid response transfer encoding");
 
                 // TODO: check for unsupported encodings and convert codings to either enums or conversion objects
                 _transfer_encoding = std::move(te_parsed.list);
@@ -335,9 +335,9 @@ int client::send() {
                     auto ce_parsed = parse_field_integer(ce->second);
                     if (!ce_parsed.valid) {
                         if (ce_parsed.overflow)
-                            throw unsupported_response("response content length is too long");
+                            throw unsupported_message("response content length is too long");
                         else
-                            throw bad_response("invalid response content length");
+                            throw invalid_message("invalid response content length");
                     }
 
                     _content_length = ce_parsed.number;
@@ -358,6 +358,10 @@ int client::send() {
         // TODO: remove this when persistent connections are implemented
         if (_state == STATE_DONE)
             _socket->close();
+
+        // handle content encodings
+        if (_state == STATE_RECEIVING_BODY)
+            content_encoding_make_decoders(_decoders, _content_encoding);
 
         return _status_code;
     } catch (...) {
@@ -384,7 +388,7 @@ std::pair<const char*, size_t> client::recv_body(size_t max_len) {
     try {
         assert(!_decoders.empty());
         if (!_decoders.empty()) {
-            auto ret = _decoders.front()->read(max_len);
+            auto ret = _decoders.back()->read(max_len);
 
             if (ret.second == 0) {  // reading 0 bytes means we reached the end of the body
                 _state = STATE_DONE;
