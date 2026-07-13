@@ -32,7 +32,7 @@ private:
     networking::tcp_client *_socket = nullptr;
     // TODO: rethink this, especially for persistent connections
     state_enum _state = STATE_IDLE;
-    bool _is_shutdown = false;
+    volatile bool _is_shutdown = false;
     std::string _method;
     uri::parser _url;
     std::string _hostname;
@@ -49,6 +49,9 @@ private:
     std::vector<token_params> _transfer_encoding;
     std::vector<std::string> _content_encoding;
     std::vector<std::unique_ptr<decoder> > _decoders;
+
+    void _shutdown_check_early();
+    void _shutdown_check();
 
 public:
     client(const std::string &log_name);
@@ -84,7 +87,7 @@ public:
     const std::vector<std::string>& content_encoding() const;
     // TODO: more functions to get more internal variables
 
-    void cancel();      // cancel an existing open connection
+    void cancel();      // cancel an existing open connection without clearing data (NOT MT-SAFE)
     void shutdown();    // fully shutdown current and future connections from another thread
     void reset();       // for undoing shutdown and allowing a new connection
     void clear();       // for deleting stored data

@@ -13,8 +13,20 @@ client::client(const std::string &log_name) :
     _log_name(log_name),
     _log(log_name.empty() ? "HTTP Client" : "HTTP Client: " + log_name, false) {}
 
+void client::_shutdown_check_early() {
+    // try to detect a shutdown early (before the request is sent)
+    if (_is_shutdown)
+        throw in_shutdown_state("http client was shut down");
+}
+
+void client::_shutdown_check() {
+    std::lock_guard<std::mutex> guard(_lock);
+    _shutdown_check_early();
+}
+
 client& client::open(const std::string &method, const std::string &url, bool allow_invalid_cert, bool allow_unsafe_ports) {
     clear();
+    _shutdown_check_early();
 
     try {
         _state = STATE_PREPARING;
@@ -102,6 +114,8 @@ client& client::open(const std::string &method, const std::string &url, bool all
 }
 
 client& client::set_header(const std::string &name, const std::string &value) {
+    _shutdown_check_early();
+
     // must be in preparation state
     if (_state != STATE_PREPARING) {
         if (_state < STATE_PREPARING)
@@ -126,6 +140,8 @@ client& client::set_header(const std::string &name, const std::string &value) {
 }
 
 client& client::set_headers(const std::map<std::string, std::string> &headers) {
+    _shutdown_check_early();
+
     try {
         for (const auto &[name, value] : headers) {
             try {
@@ -161,17 +177,7 @@ bool client::clear_header(const std::string &name) {
 
 void client::clear() {
     // cancel any open connection
-    // TODO: move this into cancel() afterwards, checking if more steps are needed
-    {
-        std::lock_guard<std::mutex> guard(_lock);
-        if (_socket) {
-            if (_socket->is_open())
-                _socket->close();
-            _socket = nullptr;
-            _socket_container.emplace<0>(false);
-        }
-    }
-
+    cancel();
     _state = STATE_IDLE;
 
     // clear request data
@@ -198,6 +204,33 @@ void client::clear() {
     _decoders.clear();
 }
 
+void client::shutdown() {
+    std::lock_guard<std::mutex> guard(_lock);
+    _is_shutdown = true;
+    if (_socket) {
+        _socket->cancel_connect();
+        _socket->shutdown();
+    }
+}
+
+void client::reset() {
+    clear();
+    _is_shutdown = false;
+}
+
+void client::cancel() {
+    std::lock_guard<std::mutex> guard(_lock);
+    if (_socket) {
+        if (_socket->is_open())
+            _socket->close();
+        _socket = nullptr;
+        _socket_container.emplace<0>(false);
+    }
+
+    if (STATE_CONNECTING <= _state && _state < STATE_DONE)
+        _state = STATE_DONE;
+}
+
 static std::string make_header_line(const std::string &name, const std::string &value) {
     return name + ": " + value + CRLF;
 }
@@ -218,12 +251,21 @@ int client::send() {
         // set up the appropriate socket and connect
         if (_encrypted) {
             // https
-            networking::tcp_client_ssl &s = _socket_container.emplace<2>(true);
-            _socket = &s;
-            s.connect(_hostname, _port, true, !_allow_invalid_cert);
+            networking::tcp_client_ssl *s = nullptr;
+            {
+                std::lock_guard<std::mutex> guard(_lock);
+                _shutdown_check_early();
+                s = &_socket_container.emplace<2>(true);
+                _socket = s;
+            }
+            s->connect(_hostname, _port, true, !_allow_invalid_cert);
         } else {
             // http
-            _socket = &_socket_container.emplace<1>(true);
+            {
+                std::lock_guard<std::mutex> guard(_lock);
+                _shutdown_check_early();
+                _socket = &_socket_container.emplace<1>(true);
+            }
             _socket->connect(_hostname, _port);
         }
 
@@ -366,6 +408,8 @@ int client::send() {
         return _status_code;
     } catch (...) {
         clear();
+        // check if the error was caused by a shutdown
+        _shutdown_check();
         throw;
     }
 }
@@ -391,6 +435,8 @@ std::pair<const char*, size_t> client::recv_body(size_t max_len) {
             auto ret = _decoders.back()->read(max_len);
 
             if (ret.second == 0) {  // reading 0 bytes means we reached the end of the body
+                // unless a shutdown truncated part of the body and somehow didn't cause an error
+                _shutdown_check();
                 _state = STATE_DONE;
                 _socket->close();
                 // TODO: attempt graceful shutdown over TLS
@@ -402,6 +448,8 @@ std::pair<const char*, size_t> client::recv_body(size_t max_len) {
         }
     } catch (...) {
         clear();
+        // check if the error was caused by a shutdown
+        _shutdown_check();
         throw;
     }
 }
