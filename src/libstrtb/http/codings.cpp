@@ -155,7 +155,7 @@ decoder_zlib::decoder_zlib(decoder& read_from, bool gzip) : _read_from(read_from
 decoder_zlib::~decoder_zlib() {
     int ret = inflateEnd(&_stream);
     if (ret != Z_OK)
-        log.warning({"Zlib infateEnd returned error code ", ret});
+        log.warning({"zlib infateEnd returned error code ", ret});
 }
 
 std::pair<const char*, size_t> decoder_zlib::read() {

@@ -9,7 +9,7 @@
 #include <zlib.h>
 #include <brotli/decode.h>
 
-#define STRTB_HTTP_CODINGS_CHUNK_SIZE 16384
+#define STRTB_HTTP_CODINGS_BUFFER_SIZE 65536
 #define STRTB_HTTP_MAX_DECODERS 5
 
 namespace strtb::http {
@@ -68,7 +68,7 @@ class decoder_zlib : public decoder {
 private:
     decoder &_read_from;
     z_stream _stream;
-    unsigned char _buf[STRTB_HTTP_CODINGS_CHUNK_SIZE];
+    unsigned char _buf[STRTB_HTTP_CODINGS_BUFFER_SIZE];
     size_t _buf_pos = 0, _buf_filled = 0;
     bool _done = false, _maybe_more_output = false;
 
@@ -84,7 +84,7 @@ private:
     decoder &_read_from;
     BrotliDecoderState *_state = nullptr;
     BrotliDecoderResult _ret = BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT;
-    char _buf[STRTB_HTTP_CODINGS_CHUNK_SIZE];
+    char _buf[STRTB_HTTP_CODINGS_BUFFER_SIZE];
     const char *_next_in = nullptr;
     size_t _buf_pos = 0, _buf_filled = 0, _avail_in = 0, _avail_out = sizeof(_buf);
     bool _done = false;
