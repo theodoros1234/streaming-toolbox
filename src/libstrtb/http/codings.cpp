@@ -230,17 +230,19 @@ void content_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &dec
         throw internal_error("missing socket interface");
 
     // go through the content encodings backwards
-    for (auto itr = content_encoding.end() - 1; itr >= content_encoding.begin(); itr--) {
-        if (decoders.size() >= max_decoders)
-            throw security_precaution("message uses too many encodings; blocking to prevent DoS");
+    if (!content_encoding.empty()) {
+        for (auto itr = content_encoding.end() - 1; itr >= content_encoding.begin(); itr--) {
+            if (decoders.size() >= max_decoders)
+                throw security_precaution("message uses too many encodings; blocking to prevent DoS");
 
-        // TODO: faster string matching
-        if (*itr == "gzip" || *itr == "x-gzip")
-            decoders.push_back(std::unique_ptr<decoder>(new decoder_zlib(*decoders.back(), true)));
-        else if (*itr == "deflate")
-            decoders.push_back(std::unique_ptr<decoder>(new decoder_zlib(*decoders.back(), false)));
-        else
-            throw unsupported_message("unsupported content encoding " + string_escape(*itr));
+            // TODO: faster string matching
+            if (*itr == "gzip" || *itr == "x-gzip")
+                decoders.push_back(std::unique_ptr<decoder>(new decoder_zlib(*decoders.back(), true)));
+            else if (*itr == "deflate")
+                decoders.push_back(std::unique_ptr<decoder>(new decoder_zlib(*decoders.back(), false)));
+            else
+                throw unsupported_message("unsupported content encoding " + string_escape(*itr));
+        }
     }
 }
 
