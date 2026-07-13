@@ -222,6 +222,77 @@ std::pair<const char*, size_t> decoder_zlib::read(size_t max_len) {
     return {ptr, len};
 }
 
+decoder_brotli::decoder_brotli(decoder& read_from) : _read_from(read_from) {
+    // initialize brotli decoder
+    _state = BrotliDecoderCreateInstance(nullptr, nullptr, nullptr);
+    if (!_state)
+        throw internal_error("failed to initialize brotli decoder");
+}
+
+decoder_brotli::~decoder_brotli() {
+    BrotliDecoderDestroyInstance(_state);
+}
+
+std::pair<const char*, size_t> decoder_brotli::read() {
+    return read(sizeof(_buf));
+}
+
+std::pair<const char*, size_t> decoder_brotli::read(size_t max_len) {
+    if (_buf_pos >= _buf_filled) {  // need to decompress more data
+        if (_done)  // full stream already read
+            return {_buf, 0};
+
+        while (true) {
+            _buf_filled = sizeof(_buf) - _avail_out;
+            if (_buf_filled > 0) {
+                // available data to return
+                _buf_pos = 0;
+                _avail_out = sizeof(_buf);
+                break;
+            } else if (_done) {
+                // just finished without outputting any data
+                return {_buf, 0};
+            } else if (_avail_in == 0 && _ret != BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) {
+                // need to grab more input data
+                std::tie(_next_in, _avail_in) = _read_from.read();
+                if (_avail_in == 0)
+                    throw incomplete_message("incomplete compressed data");
+            }
+
+            // process compressed data
+            uint8_t *next_out = (uint8_t*) _buf;
+            _ret = BrotliDecoderDecompressStream(_state,
+                                                 &_avail_in, (const uint8_t**) &_next_in,
+                                                 &_avail_out, &next_out, nullptr);
+
+            switch (_ret) {
+            case BROTLI_DECODER_RESULT_ERROR:
+                throw internal_error("failed to decompress brotli data: "s +
+                                     BrotliDecoderErrorString(BrotliDecoderGetErrorCode(_state)));
+
+            case BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT:
+            case BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT:
+                break;
+
+            case BROTLI_DECODER_RESULT_SUCCESS:     // end of compressed data
+                // make sure there's no more garbage data afterwards
+                // NOTE: this is also required to finalize any other decoders under this one
+                if (_avail_in > 0 || _read_from.read().second > 0)
+                    throw invalid_message("invalid or corrupted compressed data: "
+                                          "garbage data present after compressed section");
+                _done = true;
+                break;
+            }
+        }
+    }
+
+    // return data from output buffer
+    size_t len = std::min(max_len, _buf_filled - _buf_pos);     // return at most max_len bytes
+    const char *ptr = (char*) _buf + _buf_pos;
+    _buf_pos += len;
+    return {ptr, len};
+}
+
 void content_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &decoders,
                                     std::vector<std::string> &content_encoding,
                                     size_t max_decoders) {
@@ -240,6 +311,8 @@ void content_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &dec
                 decoders.push_back(std::unique_ptr<decoder>(new decoder_zlib(*decoders.back(), true)));
             else if (*itr == "deflate")
                 decoders.push_back(std::unique_ptr<decoder>(new decoder_zlib(*decoders.back(), false)));
+            else if (*itr == "br")
+                decoders.push_back(std::unique_ptr<decoder>(new decoder_brotli(*decoders.back())));
             else
                 throw unsupported_message("unsupported content encoding " + string_escape(*itr));
         }

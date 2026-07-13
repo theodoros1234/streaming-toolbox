@@ -7,8 +7,9 @@
 #include "../networking/tcp_socket.h"
 #include "protocol.h"
 #include <zlib.h>
+#include <brotli/decode.h>
 
-#define STRTB_HTTP_ZLIB_CHUNK_SIZE 16384
+#define STRTB_HTTP_CODINGS_CHUNK_SIZE 16384
 #define STRTB_HTTP_MAX_DECODERS 5
 
 namespace strtb::http {
@@ -67,13 +68,30 @@ class decoder_zlib : public decoder {
 private:
     decoder &_read_from;
     z_stream _stream;
-    unsigned char _buf[STRTB_HTTP_ZLIB_CHUNK_SIZE];
+    unsigned char _buf[STRTB_HTTP_CODINGS_CHUNK_SIZE];
     size_t _buf_pos = 0, _buf_filled = 0;
     bool _done = false;
 
 public:
     decoder_zlib(decoder& read_from, bool gzip);
     ~decoder_zlib();
+    std::pair<const char*, size_t> read();
+    std::pair<const char*, size_t> read(size_t max_len);
+};
+
+class decoder_brotli : public decoder {
+private:
+    decoder &_read_from;
+    BrotliDecoderState *_state = nullptr;
+    BrotliDecoderResult _ret = BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT;
+    char _buf[STRTB_HTTP_CODINGS_CHUNK_SIZE];
+    const char *_next_in = nullptr;
+    size_t _buf_pos = 0, _buf_filled = 0, _avail_in = 0, _avail_out = sizeof(_buf);
+    bool _done = false;
+
+public:
+    decoder_brotli(decoder& read_from);
+    ~decoder_brotli();
     std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
