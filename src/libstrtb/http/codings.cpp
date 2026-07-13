@@ -168,17 +168,16 @@ std::pair<const char*, size_t> decoder_zlib::read(size_t max_len) {
             return {(char*) _buf, 0};
 
         while (true) {
-            size_t filled_out = sizeof(_buf) - _stream.avail_out;
-            if (filled_out > 0) {
+            _buf_filled = sizeof(_buf) - _stream.avail_out;
+            if (_buf_filled > 0) {
                 // available decompressed data to return
-                _buf_filled = filled_out;
                 _buf_pos = 0;
                 _stream.next_out = _buf;
                 _stream.avail_out = sizeof(_buf);
                 break;
             } else if (_done) { // just finished without outputting any extra data
                 return {(char*) _buf, 0};
-            } else if (_stream.avail_in == 0) {
+            } else if (_stream.avail_in == 0 && !_maybe_more_output) {
                 // need to grab more input data
                 std::tie((const char*&) _stream.next_in, _stream.avail_in) = _read_from.read();
                 if (_stream.avail_in == 0)
@@ -198,8 +197,13 @@ std::pair<const char*, size_t> decoder_zlib::read(size_t max_len) {
             case Z_MEM_ERROR:
                 throw internal_error("out of memory");
 
-            case Z_STREAM_ERROR:
             case Z_BUF_ERROR:
+                if (_maybe_more_output) {
+                    _maybe_more_output = false;
+                    break;
+                }
+                [[fallthrough]];
+            case Z_STREAM_ERROR:
             default:
                 throw internal_error("internal error during decompression");
 
@@ -212,6 +216,9 @@ std::pair<const char*, size_t> decoder_zlib::read(size_t max_len) {
                 _done = true;
                 break;
             }
+
+            // might need to output more data before needing to read from input
+            _maybe_more_output = _stream.avail_out == 0;
         }
     }
 

@@ -70,7 +70,7 @@ private:
     z_stream _stream;
     unsigned char _buf[STRTB_HTTP_CODINGS_CHUNK_SIZE];
     size_t _buf_pos = 0, _buf_filled = 0;
-    bool _done = false;
+    bool _done = false, _maybe_more_output = false;
 
 public:
     decoder_zlib(decoder& read_from, bool gzip);
