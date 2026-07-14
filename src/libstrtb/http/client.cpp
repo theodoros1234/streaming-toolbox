@@ -104,7 +104,7 @@ client& client::open(const std::string &method, const std::string &url, bool all
         // set some headers
         set_header("user-agent", get_default_user_agent());
         set_header("connection", "close");
-        set_header("accept-encoding", "gzip, deflate, br");     // TODO: get supported encodings from elsewhere
+        set_header("accept-encoding", "gzip, deflate, br, zstd");   // TODO: get supported encodings from elsewhere
     } catch (...) {
         clear();
         throw;

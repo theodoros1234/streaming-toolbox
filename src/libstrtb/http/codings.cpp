@@ -295,7 +295,95 @@ std::pair<const char*, size_t> decoder_brotli::read(size_t max_len) {
 
     // return data from output buffer
     size_t len = std::min(max_len, _buf_filled - _buf_pos);     // return at most max_len bytes
-    const char *ptr = (char*) _buf + _buf_pos;
+    const char *ptr = _buf + _buf_pos;
+    _buf_pos += len;
+    return {ptr, len};
+}
+
+decoder_zstd::decoder_zstd(decoder& read_from) : _read_from(read_from) {
+    // create and init zstd stream
+    _stream = ZSTD_createDStream();
+    if (!_stream)
+        throw internal_error("failed to create zstd decoder");
+    try {
+        size_t init_ret = ZSTD_initDStream(_stream);
+        if (ZSTD_isError(init_ret))
+            throw internal_error("failed to initialize zstd decoder"s + ZSTD_getErrorName(init_ret));
+    } catch (...) {
+        ZSTD_freeDStream(_stream);
+        throw;
+    }
+
+    // init buffers
+    _zin = {nullptr, 0, 0};
+    _zout = {_buf, sizeof(_buf), 0};
+}
+
+decoder_zstd::~decoder_zstd() {
+    size_t ret = ZSTD_freeDStream(_stream);
+    if (ZSTD_isError(ret))
+        log.warning({"ZSTD_freeDStream returned an error: ", ZSTD_getErrorName(ret)});
+}
+
+std::pair<const char*, size_t> decoder_zstd::read() {
+    return read(sizeof(_buf));
+}
+
+std::pair<const char*, size_t> decoder_zstd::read(size_t max_len) {
+    if (_buf_pos >= _buf_filled) {  // need to decompress more data
+        if (_done)  // full stream already read
+            return {_buf, 0};
+
+        while (true) {
+            _buf_filled = _zout.pos;
+            if (_zout.pos > 0) {
+                // available data to return
+                _buf_pos = 0;
+                _zout.pos = 0;
+                break;
+            } else if (_done) {
+                // just fiished without outputting any data
+                return {_buf, 0};
+            } else if (_zin.pos >= _zin.size && !_more_output) {
+                // need to grab more input data
+                _zin.pos = 0;
+                std::tie(_zin.src, _zin.size) = _read_from.read();
+                if (_zin.size == 0) {
+                    if (_zret == 0) {
+                        // done
+                        _done = true;
+                        return {_buf, 0};
+                    } else {
+                        // ended in the middle of a zstd frame
+                        throw incomplete_message("incomplete compressed data");
+                    }
+                }
+            }
+
+            _more_output = false;
+            _zret = ZSTD_decompressStream(_stream, &_zout, &_zin);
+
+            if (ZSTD_isError(_zret)) {
+                // NOTE: error codes require at least zstd v1.3.1 (released in 2017)
+                switch (ZSTD_getErrorCode(_zret)) {
+                case ZSTD_error_corruption_detected:
+                case ZSTD_error_checksum_wrong:
+                    throw invalid_message("invalid or corrupted compressed data: "s + ZSTD_getErrorName(_zret));
+
+                default:
+                    throw internal_error("failed to decompress zstd data: "s + ZSTD_getErrorName(_zret));
+
+                case ZSTD_error_noForwardProgress_destFull:
+                    _more_output = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // return data from output buffer
+    size_t len = std::min(max_len, _buf_filled - _buf_pos);     // return at most max_len bytes
+    const char *ptr = _buf + _buf_pos;
     _buf_pos += len;
     return {ptr, len};
 }
@@ -320,6 +408,8 @@ void content_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &dec
                 decoders.push_back(std::unique_ptr<decoder>(new decoder_zlib(*decoders.back(), false)));
             else if (*itr == "br")
                 decoders.push_back(std::unique_ptr<decoder>(new decoder_brotli(*decoders.back())));
+            else if (*itr == "zstd")
+                decoders.push_back(std::unique_ptr<decoder>(new decoder_zstd(*decoders.back())));
             else
                 throw unsupported_message("unsupported content encoding " + string_escape(*itr));
         }

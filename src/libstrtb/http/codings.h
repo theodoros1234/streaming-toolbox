@@ -8,6 +8,7 @@
 #include "protocol.h"
 #include <zlib.h>
 #include <brotli/decode.h>
+#include <zstd.h>
 
 #define STRTB_HTTP_CODINGS_BUFFER_SIZE 65536
 #define STRTB_HTTP_MAX_DECODERS 5
@@ -92,6 +93,23 @@ private:
 public:
     decoder_brotli(decoder& read_from);
     ~decoder_brotli();
+    std::pair<const char*, size_t> read();
+    std::pair<const char*, size_t> read(size_t max_len);
+};
+
+class decoder_zstd : public decoder {
+private:
+    decoder &_read_from;
+    ZSTD_DStream *_stream = nullptr;
+    ZSTD_inBuffer_s _zin;
+    ZSTD_outBuffer_s _zout;
+    char _buf[STRTB_HTTP_CODINGS_BUFFER_SIZE];
+    size_t _buf_pos = 0, _buf_filled = 0, _zret = 0;
+    bool _done = false, _more_output = false;
+
+public:
+    decoder_zstd(decoder& read_from);
+    ~decoder_zstd();
     std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
