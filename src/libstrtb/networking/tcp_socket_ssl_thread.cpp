@@ -20,7 +20,7 @@ tcp_socket_ssl_thread::tcp_socket_ssl_thread() {
 }
 
 tcp_socket_ssl_thread::~tcp_socket_ssl_thread() {
-    if (_t) {
+    if (_t.joinable()) {
         log.put(strtb::logging::WARNING, {"Object destroyed while thread was still open or not properly closed. Stopping thread, but this could cause a crash. Please report this bug."});
         stop();
     }
@@ -29,7 +29,7 @@ tcp_socket_ssl_thread::~tcp_socket_ssl_thread() {
 }
 
 void tcp_socket_ssl_thread::start(int sock, SSL* ssl) {
-    if (_t)
+    if (_t.joinable())
         throw internal_error("SSL helper thread already started", 0);
     if (_eventfd == -1)
         throw internal_error("error in internal synchronization mechanism", 0);
@@ -58,15 +58,13 @@ void tcp_socket_ssl_thread::start(int sock, SSL* ssl) {
 
     try {
         _thread_active = true;
-        _t = new std::thread(&tcp_socket_ssl_thread::thread_loop, this); // Can throw system_error and other exceptions
+        _t = std::thread(&tcp_socket_ssl_thread::thread_loop, this);
     } catch (std::exception& e) {
-        _t = nullptr;
         _sock = -1;
         _ssl = nullptr;
         _thread_active = false;
         throw internal_error("SSL helper thread could not be started: " + std::string(e.what()), 0);
     } catch (...) {
-        _t = nullptr;
         _sock = -1;
         _ssl = nullptr;
         _thread_active = false;
@@ -75,7 +73,7 @@ void tcp_socket_ssl_thread::start(int sock, SSL* ssl) {
 }
 
 void tcp_socket_ssl_thread::stop() {
-    if (!_t)
+    if (!_t.joinable())
         throw internal_error("SSL helper thread not running", 0);
 
     {
@@ -87,9 +85,7 @@ void tcp_socket_ssl_thread::stop() {
         }
     }
 
-    _t->join();
-    delete _t;
-    _t = nullptr;
+    _t.join();
     _ssl = nullptr;
     _sock = -1;
     _errno_ssl = 0;

@@ -12,7 +12,7 @@ class tcp_socket_ssl_thread {
 private:
     std::mutex _lock;
     std::condition_variable _cv_read, _cv_write;
-    std::thread* _t = nullptr;
+    std::thread _t;
     bool _thread_active = false;
     int _sock, _eventfd;
     SSL* _ssl;
