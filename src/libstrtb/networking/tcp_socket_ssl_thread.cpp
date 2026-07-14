@@ -199,6 +199,8 @@ void tcp_socket_ssl_thread::thread_loop() {
         poll_read = false;
         poll_write = false;
 
+        std::lock_guard<std::mutex> guard(_lock);
+
         if (p[1].revents & POLLIN) {
             uint64_t u;
             if (read(_eventfd, &u, sizeof(uint64_t)) != sizeof(uint64_t)) {
@@ -216,103 +218,99 @@ void tcp_socket_ssl_thread::thread_loop() {
             break;
         }
 
-        {
-            std::lock_guard<std::mutex> guard(_lock);
+        if (_requested_close) {
+            _thread_active = false;
+            break;
+        }
 
-            if (_requested_close) {
-                _thread_active = false;
-                break;
-            }
+        if (_requested_write) {
+            incomplete_write = false;
 
-            if (_requested_write) {
-                incomplete_write = false;
-
-                if (_requested_shutdown) {
-                    ret = SSL_shutdown(_ssl);
-                    if (ret >= 0) {
-                        _shutdown_sent = true;
-                        _requested_write = false;
-                        _cv_write.notify_one();
-                    }
-
-                } else {
-                    /* TODO: maybe replace with SSL_write_ex and allow partial writes,
-                     * or only write one record every time, so that it doesn't block
-                     * the read side when sending a lot of data at a time.
-                     * This thread will handle sending everything after partial writes.
-                     */
-                    ret = SSL_write(_ssl, _buffer_write, _length_write);
-                    if (ret > 0) {
-                        _length_write = ret;
-                        _successful_write = true;
-                        _requested_write = false;
-                        _cv_write.notify_one();
-                    }
+            if (_requested_shutdown) {
+                ret = SSL_shutdown(_ssl);
+                if (ret >= 0) {
+                    _shutdown_sent = true;
+                    _requested_write = false;
+                    _cv_write.notify_one();
                 }
 
-                // Handle error from either SSL_write or SSL_shutdown
-                if (_requested_write) {
-                    int errno_ssl = SSL_get_error(_ssl, ret);
-                    switch (errno_ssl) {
-                    case SSL_ERROR_WANT_READ:
-                        poll_read = true;
-                        break;
-
-                    case SSL_ERROR_WANT_WRITE:
-                        poll_write = true;
-                        incomplete_write = true;
-                        break;
-
-                    case SSL_ERROR_SYSCALL:
-                        _errno_syscall = errno;
-                        [[fallthrough]];
-                    default:
-                        _errno_ssl = errno_ssl;
-                        _thread_active = false;
-                    }
-                }
-            }
-
-            if (!_thread_active)
-                break;
-
-            if (_requested_read && !incomplete_write) {
-                ret = SSL_read(_ssl, _buffer_read, _length_read);
+            } else {
+                /* TODO: maybe replace with SSL_write_ex and allow partial writes,
+                 * or only write one record every time, so that it doesn't block
+                 * the read side when sending a lot of data at a time.
+                 * This thread will handle sending everything after partial writes.
+                 */
+                ret = SSL_write(_ssl, _buffer_write, _length_write);
                 if (ret > 0) {
-                    _length_read = ret;
+                    _length_write = ret;
+                    _successful_write = true;
+                    _requested_write = false;
+                    _cv_write.notify_one();
+                }
+            }
+
+            // Handle error from either SSL_write or SSL_shutdown
+            if (_requested_write) {
+                int errno_ssl = SSL_get_error(_ssl, ret);
+                switch (errno_ssl) {
+                case SSL_ERROR_WANT_READ:
+                    poll_read = true;
+                    break;
+
+                case SSL_ERROR_WANT_WRITE:
+                    poll_write = true;
+                    incomplete_write = true;
+                    break;
+
+                case SSL_ERROR_SYSCALL:
+                    _errno_syscall = errno;
+                    [[fallthrough]];
+                default:
+                    _errno_ssl = errno_ssl;
+                    _thread_active = false;
+                }
+            }
+        }
+
+        if (!_thread_active)
+            break;
+
+        if (_requested_read && !incomplete_write) {
+            ret = SSL_read(_ssl, _buffer_read, _length_read);
+            if (ret > 0) {
+                _length_read = ret;
+                _successful_read = true;
+                _requested_read = false;
+                _cv_read.notify_one();
+            } else {
+                int errno_ssl = SSL_get_error(_ssl, ret);
+                switch (errno_ssl) {
+                case SSL_ERROR_WANT_READ:
+                    poll_read = true;
+                    break;
+
+                case SSL_ERROR_WANT_WRITE:
+                    poll_write = true;
+                    break;
+
+                case SSL_ERROR_ZERO_RETURN:
+                    _length_read = 0;
                     _successful_read = true;
                     _requested_read = false;
                     _cv_read.notify_one();
-                } else {
-                    int errno_ssl = SSL_get_error(_ssl, ret);
-                    switch (errno_ssl) {
-                    case SSL_ERROR_WANT_READ:
-                        poll_read = true;
-                        break;
+                    break;
 
-                    case SSL_ERROR_WANT_WRITE:
-                        poll_write = true;
-                        break;
-
-                    case SSL_ERROR_ZERO_RETURN:
-                        _length_read = 0;
-                        _successful_read = true;
-                        _requested_read = false;
-                        _cv_read.notify_one();
-                        break;
-
-                    case SSL_ERROR_SYSCALL:
-                        _errno_syscall = errno;
-                        [[fallthrough]];
-                    default:
-                        _errno_ssl = errno_ssl;
-                        _thread_active = false;
-                    }
+                case SSL_ERROR_SYSCALL:
+                    _errno_syscall = errno;
+                    [[fallthrough]];
+                default:
+                    _errno_ssl = errno_ssl;
+                    _thread_active = false;
                 }
             }
-
-            // When expanding this loop in the future, don't forget to check and break if !_thread_active
         }
+
+        // When expanding this loop in the future, don't forget to check and break if !_thread_active
     }
     assert(_thread_active == false);
 
