@@ -57,19 +57,21 @@ void tcp_socket_ssl_thread::start(int sock, SSL* ssl) {
     _errno_syscall = 0;
 
     try {
+        _thread_active = true;
         _t = new std::thread(&tcp_socket_ssl_thread::thread_loop, this); // Can throw system_error and other exceptions
     } catch (std::exception& e) {
         _t = nullptr;
         _sock = -1;
         _ssl = nullptr;
+        _thread_active = false;
         throw internal_error("SSL helper thread could not be started: " + std::string(e.what()), 0);
     } catch (...) {
         _t = nullptr;
         _sock = -1;
         _ssl = nullptr;
+        _thread_active = false;
         throw;
     }
-    _thread_active = true;
 }
 
 void tcp_socket_ssl_thread::stop() {
