@@ -416,4 +416,58 @@ void content_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &dec
     }
 }
 
+bool transfer_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &decoders,
+                                     std::vector<token_params> &transfer_encoding,
+                                     field_parser &trailers,
+                                     networking::tcp_socket &socket,
+                                     bool allow_no_chunked,
+                                     size_t max_decoders) {
+    bool chunked = false;
+
+    // transfer decoders must be added first, cause chunked reads directly from the socket
+    assert(decoders.empty());
+
+    if (transfer_encoding.empty()) {
+        if (allow_no_chunked)   // explained below
+            decoders.push_back(std::unique_ptr<decoder>(new body_until_close(socket)));
+    } else {
+        // go through transfer encodings backwards
+        for (auto itr = transfer_encoding.end() - 1; itr >= transfer_encoding.begin(); itr--) {
+            if (decoders.size() >= max_decoders)
+                throw security_precaution("message uses too many encodings; blocking to prevent DoS");
+
+            // none of the supported codings use any params
+            if (!itr->params.empty()) {
+                throw invalid_message("transfer encoding params are forbidden: "
+                                      "no supported coding uses any params");
+            }
+
+            // handle chunked decoder that reads directly from the socket
+            if (decoders.empty()) {
+                if (itr->token == "chunked") {  // chunked encoding marks end of body
+                    decoders.push_back(std::unique_ptr<decoder>(new body_chunked(socket, trailers)));
+                    chunked = true;
+                    continue;
+                } else if (allow_no_chunked) {  // socket close marks end of body (ONLY for responses)
+                    decoders.push_back(std::unique_ptr<decoder>(new body_until_close(socket)));
+                } else {
+                    throw invalid_message("request with transfer-encoding must end with chunked encoding");
+                }
+            }
+
+            // TODO: faster string matching
+            if (itr->token == "gzip" || itr->token == "x-gzip")
+                decoders.push_back(std::unique_ptr<decoder>(new decoder_zlib(*decoders.back(), true)));
+            else if (itr->token == "deflate")
+                decoders.push_back(std::unique_ptr<decoder>(new decoder_zlib(*decoders.back(), false)));
+            else if (itr->token == "chunked")
+                throw invalid_message("chunked transfer encoding can only be the last one");
+            else
+                throw unsupported_message("unsupported transfer encoding " + string_escape(itr->token));
+        }
+    }
+
+    return chunked;
+}
+
 }

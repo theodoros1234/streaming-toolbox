@@ -359,16 +359,9 @@ int client::send() {
                 if (!te_parsed.valid)
                     throw invalid_message("invalid response transfer encoding");
 
-                // TODO: check for unsupported encodings and convert codings to either enums or conversion objects
                 _transfer_encoding = std::move(te_parsed.list);
-                // check if chunked encoding is specified (must be last)
-                bool chunked = (!_transfer_encoding.empty() && _transfer_encoding.back().token == "chunked");
-                // TODO: treat params as errors
-                // TODO: check for other encodings
-                if (chunked)
-                    _decoders.push_back(std::unique_ptr<decoder>(new body_chunked(*_socket, _rs_trailers)));
-                else    // if the last coding isn't chunked, body end is marked by connection closing
-                    _decoders.push_back(std::unique_ptr<decoder>(new body_until_close(*_socket)));
+                // TODO: check return value to decide if the connection needs to close afterwards
+                transfer_encoding_make_decoders(_decoders, _transfer_encoding, _rs_trailers, *_socket, true);
             } else {
                 auto ce = _rs_headers.fields.find("content-length");
 

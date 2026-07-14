@@ -118,6 +118,13 @@ void content_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &dec
                                     std::vector<std::string> &content_encoding,
                                     size_t max_decoders = STRTB_HTTP_MAX_DECODERS);
 
+bool transfer_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &decoders,
+                                     std::vector<token_params> &transfer_encoding,
+                                     field_parser &trailers,
+                                     networking::tcp_socket &socket,
+                                     bool allow_no_chunked,
+                                     size_t max_decoders = STRTB_HTTP_MAX_DECODERS);
+
 }
 
 #endif // STRTB_HTTP_CODINGS_H
