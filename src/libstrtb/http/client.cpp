@@ -258,7 +258,7 @@ int client::send() {
                 s = &_socket_container.emplace<2>(true);
                 _socket = s;
             }
-            s->connect(_hostname, _port, true, !_allow_invalid_cert);
+            s->connect(_hostname, _port, false, !_allow_invalid_cert);
         } else {
             // http
             {
