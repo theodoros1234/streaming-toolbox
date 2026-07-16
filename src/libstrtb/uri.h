@@ -95,9 +95,16 @@ public:
     parser_ret parse_authority(const char* str, size_t from, size_t to, bool store_str);
     parser_ret parse_host(const char* str, size_t from, size_t to, bool store_str);
 
+    parser_ret parse_uri(std::string_view str, bool store_str);
+    parser_ret parse_uri_suffix(std::string_view str, bool store_str);
+    parser_ret parse_relative_ref(std::string_view str, bool store_str);
+    parser_ret parse_authority(std::string_view str, bool store_str);
+    parser_ret parse_host(std::string_view str, bool store_str);
+
     web_url_ret is_web_url(const std::string& str, bool store_str);
     web_url_ret is_web_url(const std::string& str, size_t from, size_t to, bool store_str);
     web_url_ret is_web_url(const char* str, size_t from, size_t to, bool store_str);
+    web_url_ret is_web_url(std::string_view str, bool store_str);
 
     std::string scheme_str(bool fix_case = false) const;
     std::string authority_str() const;
@@ -128,6 +135,18 @@ public:
     std::string path_str(const char* str) const;
     std::string query_str(const char* str) const;
     std::string fragment_str(const char* str) const;
+
+    std::string scheme_str(std::string_view str, bool fix_case) const;
+    std::string_view scheme_str(std::string_view str) const;
+    std::string_view authority_str(std::string_view str) const;
+    std::string_view userinfo_str(std::string_view str) const;
+    std::string host_str(std::string_view str, bool fix_case) const;
+    std::string_view host_str(std::string_view str) const;
+    std::string_view port_str(std::string_view str) const;
+    int port_uint16(std::string_view str) const;  // returns -1 when out of range or not specified
+    std::string_view path_str(std::string_view str) const;
+    std::string_view query_str(std::string_view str) const;
+    std::string_view fragment_str(std::string_view str) const;
 };
 
 std::string percent_encode(const std::string& str);     // like encodeURIComponent()
@@ -142,6 +161,10 @@ std::string percent_encode(const char* str, size_t from, size_t to);
 std::string percent_encode_limited(const char* str, size_t from, size_t to);
 std::pair<std::string, ssize_t> percent_decode(const char* str, size_t from, size_t to);
 
+std::string percent_encode(std::string_view str);
+std::string percent_encode_limited(std::string_view str);
+std::pair<std::string, ssize_t> percent_decode(std::string_view str);
+
 typedef struct {
     size_t from;
     size_t to;
@@ -150,6 +173,7 @@ typedef struct {
 std::vector<link_match> find_links_in_message(const std::string& str);
 std::vector<link_match> find_links_in_message(const std::string& str, size_t from, size_t to);
 std::vector<link_match> find_links_in_message(const char* str, size_t from, size_t to);
+std::vector<link_match> find_links_in_message(std::string_view str);
 
 extern const char known_tlds_default[];
 extern const size_t known_tlds_default_length;
@@ -157,6 +181,7 @@ void known_tlds_load_str(const char* str, size_t len);
 bool is_known_tld(const char* str, size_t from, size_t to);     // case-insensitive
 bool is_known_tld(const std::string& str, size_t from, size_t to);
 bool is_known_tld(const std::string& str);
+bool is_known_tld(std::string_view str);
 
 }
 

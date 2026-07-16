@@ -34,6 +34,15 @@ static inline void verify_range(const std::string& str, size_t from, size_t to) 
         throw std::out_of_range("'from' is bigger than 'to'");
 }
 
+static inline void verify_range(std::string_view str, size_t from, size_t to) {
+    if (from > str.size())
+        throw std::out_of_range("'from' is out of range");
+    if (to > str.size())
+        throw std::out_of_range("'to' is out of range");
+    if (from > to)
+        throw std::out_of_range("'from' is bigger than 'to'");
+}
+
 static std::string char_substr(const char* str, size_t from, size_t len) {
     std::string result(len, ' ');
     std::memcpy(result.data(), str + from, len);
@@ -41,6 +50,18 @@ static std::string char_substr(const char* str, size_t from, size_t len) {
 }
 
 // NOTE: percent encode/decode doesn't check for invalid UTF-8 sequences
+
+std::string strtb::uri::percent_encode(std::string_view str) {
+    return percent_encode(str.data(), 0, str.length());
+}
+
+std::string strtb::uri::percent_encode_limited(std::string_view str) {
+    return percent_encode_limited(str.data(), 0, str.length());
+}
+
+std::pair<std::string, ssize_t> strtb::uri::percent_decode(std::string_view str) {
+    return percent_decode(str.data(), 0, str.length());
+}
 
 std::string strtb::uri::percent_encode(const std::string& str) {
     return percent_encode(str.data(), 0, str.length());
@@ -283,6 +304,61 @@ std::string parser::fragment_str() const {
     return uri_str.substr(fragment_from - uri_str_offset, fragment_to - fragment_from);
 }
 
+std::string parser::scheme_str(std::string_view str, bool fix_case) const {
+    verify_range(str, scheme_from, scheme_to);
+    return scheme_str(str.data(), fix_case);
+}
+
+std::string_view parser::scheme_str(std::string_view str) const {
+    verify_range(str, scheme_from, scheme_to);
+    return str.substr(scheme_from, scheme_to - scheme_from);
+}
+
+std::string_view parser::authority_str(std::string_view str) const {
+    verify_range(str, authority_from, authority_to);
+    return str.substr(authority_from, authority_to - authority_from);
+}
+
+std::string_view parser::userinfo_str(std::string_view str) const {
+    verify_range(str, userinfo_from, userinfo_to);
+    return str.substr(userinfo_from, userinfo_to - userinfo_from);
+}
+
+std::string parser::host_str(std::string_view str, bool fix_case) const {
+    verify_range(str, host_from, host_to);
+    return host_str(str.data(), fix_case);
+}
+
+std::string_view parser::host_str(std::string_view str) const {
+    verify_range(str, host_from, host_to);
+    return str.substr(host_from, host_to - host_from);
+}
+
+std::string_view parser::port_str(std::string_view str) const {
+    verify_range(str, port_from, port_to);
+    return str.substr(port_from, port_to - port_from);
+}
+
+int parser::port_uint16(std::string_view str) const {
+    verify_range(str, port_from, port_to);
+    return port_uint16(str.data());
+}
+
+std::string_view parser::path_str(std::string_view str) const {
+    verify_range(str, path_from, path_to);
+    return str.substr(path_from, path_to - path_from);
+}
+
+std::string_view parser::query_str(std::string_view str) const {
+    verify_range(str, query_from, query_to);
+    return str.substr(query_from, query_to - query_from);
+}
+
+std::string_view parser::fragment_str(std::string_view str) const {
+    verify_range(str, fragment_from, fragment_to);
+    return str.substr(fragment_from, fragment_to - fragment_from);
+}
+
 std::string parser::scheme_str(const std::string& str, bool fix_case) const {
     verify_range(str, scheme_from, scheme_to);
     return scheme_str(str.data(), fix_case);
@@ -430,6 +506,26 @@ static parser_ret parse_host_ipvfuture(const char* str, size_t from, size_t to);
 static parser_ret parse_host_ipv4(const char* str, size_t from, size_t to);
 static parser_ret parse_dec_octet(const char* str, size_t from, size_t to);
 static parser_ret parse_host_regname(const char* str, size_t from, size_t to);
+
+parser_ret parser::parse_uri(std::string_view str, bool store_str) {
+    return parse_uri(str.data(), 0, str.length(), store_str);
+}
+
+parser_ret parser::parse_uri_suffix(std::string_view str, bool store_str) {
+    return parse_uri_suffix(str.data(), 0, str.length(), store_str);
+}
+
+parser_ret parser::parse_relative_ref(std::string_view str, bool store_str) {
+    return parse_relative_ref(str.data(), 0, str.length(), store_str);
+}
+
+parser_ret parser::parse_authority(std::string_view str, bool store_str) {
+    return parse_authority(str.data(), 0, str.length(), store_str);
+}
+
+parser_ret parser::parse_host(std::string_view str, bool store_str) {
+    return parse_host(str.data(), 0, str.length(), store_str);
+}
 
 parser_ret parser::parse_uri(const std::string& str, bool store_str) {
     return parse_uri(str.data(), 0, str.length(), store_str);
@@ -768,6 +864,10 @@ parser_ret parser::parse_relative_ref(const char *str, size_t from, size_t to, b
     // no full matches
     _clear_uri();
     return {best_progress, false};
+}
+
+web_url_ret parser::is_web_url(std::string_view str, bool store_str) {
+    return is_web_url(str.data(), 0, str.length(), store_str);
 }
 
 web_url_ret parser::is_web_url(const std::string& str, bool store_str) {
@@ -1434,6 +1534,14 @@ bool strtb::uri::is_known_tld(const std::string& str, size_t from, size_t to) {
 
 bool strtb::uri::is_known_tld(const std::string& str) {
     return is_known_tld(str.data(), 0, str.length());
+}
+
+bool strtb::uri::is_known_tld(std::string_view str) {
+    return is_known_tld(str.data(), 0, str.length());
+}
+
+std::vector<link_match> strtb::uri::find_links_in_message(std::string_view str) {
+    return find_links_in_message(str.data(), 0, str.length());
 }
 
 std::vector<link_match> strtb::uri::find_links_in_message(const std::string& str) {
