@@ -535,20 +535,51 @@ const std::vector<std::string>& client::content_encoding() const {
     return _content_encoding;
 }
 
-client::request::request(const std::string &method) {
+client::request::request(std::string_view method) {
+    _d = new data;
+
     // check validity
     auto [method_to, method_valid] = parse_token(method);
     if (!method_valid || method_to != method.length())
         throw std::invalid_argument("invalid request method");
-    _method = method;
+    _d->method = method;
 
     // check if it's safe and/or idempotent
     // TODO: faster string matching
-    _method_safe = _method == "GET" || _method == "HEAD" || _method == "OPTIONS" || _method == "TRACE";
-    _method_idempotent = _method_safe || _method == "PUT" || _method == "DELETE";
+    _d->method_safe = _d->method == "GET" || _d->method == "HEAD" || _d->method == "OPTIONS" || _d->method == "TRACE";
+    _d->method_idempotent = _d->method_safe || _d->method == "PUT" || _d->method == "DELETE";
 }
 
-client::request& client::request::with_url(const std::string &url) {
+client::request::~request() {
+    if (_d) {
+        // TODO: cancel in-progress request
+        delete _d;
+        _d = nullptr;
+    }
+}
+
+client::request::request(request &&other) {
+    // WARNING: DO NOT run this while using the other request from another thread
+    _d = other._d;
+    other._d = nullptr;
+}
+
+void client::request::_valid_state(bool running) {
+    // make sure this request is in a valid state (not moved or (not) in-progress)
+    if (!_d)
+        throw bad_state("cannot reuse request after it has been moved");
+
+    if ((_d->c != nullptr) != running) {
+        if (running)
+            throw bad_state("request not in progress");
+        else
+            throw bad_state("request already in progress");
+    }
+}
+
+client::request&& client::request::with_url(std::string_view url) {
+    _valid_state(false);
+
     try {
         uri::parser parser;
 
@@ -559,61 +590,61 @@ client::request& client::request::with_url(const std::string &url) {
                                         "(note that IPv6 addresses must be enclosed in square brackets)");
 
         // check scheme
-        _https = false;
+        _d->https = false;
         std::string scheme = parser.scheme_str(url, true);
         if (scheme == "https")
-            _https = true;
+            _d->https = true;
         else if (scheme != "http")
             throw std::invalid_argument("incompatible URL scheme, only http/https allowed");
 
         // check host and port
-        const std::string host = parser.host_str(url, true);
+        std::string host = parser.host_str(url, true);
         int port = -1;
         if (parser.port_from == parser.port_to) // no port specified, use default
-            port = default_port(_https);
+            port = default_port(_d->https);
         else    // a port was specified
-            port = parser.port_uint16(url);     // -1 error will be handled by _with_parsed_host
-        _with_parsed_host(_https, host, parser.host_type, port);
+            port = parser.port_uint16(url);     // -1 error will be handled by _d->with_parsed_host
+        _with_parsed_host(_d->https, host, parser.host_type, port);
 
         // path
         // TODO: handle any double slashes and dot segments
-        _path_asterisk = false;
+        _d->path_asterisk = false;
         // empty path corresponds to /
-        _path = (parser.path_from == parser.path_to) ? "/" : parser.path_str(url);
+        _d->path = (parser.path_from == parser.path_to) ? "/" : parser.path_str(url);
 
         // query
-        _query_set = parser.query_to;
-        if (_query_set) {
-            _path += '?';
-            _path.append(url.data() + parser.query_from, parser.query_to - parser.query_from);
+        _d->query_set = parser.query_to;
+        if (_d->query_set) {
+            _d->path += '?';
+            _d->path.append(url.data() + parser.query_from, parser.query_to - parser.query_from);
         }
 
         // fragment is ignored
     } catch (...) {
-        _https = false;
-        _port = -1;
-        _path_asterisk = false;
-        _query_set = false;
-        _authority.clear();
-        _host.clear();
-        _path.clear();
+        _d->https = false;
+        _d->port = -1;
+        _d->path_asterisk = false;
+        _d->query_set = false;
+        _d->authority.clear();
+        _d->host.clear();
+        _d->path.clear();
         throw;
     }
 
-    return *this;
+    return std::move(*this);
 }
 
 // checks the host and port, stores them, and creates authority string (https must be stored by caller)
-void client::request::_with_parsed_host(bool https, const std::string &host, uri::host_type_enum type, unsigned int port) {
+void client::request::_with_parsed_host(bool https, std::string_view host, uri::host_type_enum type, unsigned int port) {
     // check host
     switch (type) {
     case uri::HOST_REGNAME:
     case uri::HOST_IPV4:
-        _host = host;
+        _d->host = host;
         break;
 
     case uri::HOST_IPV6:
-        _host = host.substr(1, host.size() - 2);    // trim square brackets
+        _d->host = host.substr(1, host.size() - 2);    // trim square brackets
         break;
 
     case uri::HOST_EMPTY:
@@ -628,28 +659,30 @@ void client::request::_with_parsed_host(bool https, const std::string &host, uri
     if (port >= 65536)
         throw std::invalid_argument("invalid port number");
     // check for unsafe ports
-    if (!_allow_unsafe_ports && _port != 80 && port != 443 && is_unsafe_port(port))
+    if (!_d->allow_unsafe_ports && _d->port != 80 && port != 443 && is_unsafe_port(port))
         throw security_precaution("blocked access to unsafe port");
-    _port = port;
+    _d->port = port;
 
     // set authority (used by host header)
     if (port == default_port(https)) {  // no need to specify the default port
-        _authority = host;
+        _d->authority = host;
     } else {
         // convert port to str without locale issues
         char port_str[6] = {0};
         std::to_chars(port_str, &port_str[sizeof(port_str) - 1], port);
-        _authority = host + ":" + port_str;
+        _d->authority = host + ":" + port_str;
     }
 }
 
-client::request& client::request::with_host(bool https, const std::string &hostname) {
+client::request&& client::request::with_host(bool https, std::string_view hostname) {
     return with_host(https, hostname, default_port(https));
 }
 
-client::request& client::request::with_host(bool https, const std::string &hostname, unsigned int port) {
+client::request&& client::request::with_host(bool https, std::string_view hostname, unsigned int port) {
+    _valid_state(false);
+
     try {
-        _https = https;
+        _d->https = https;
 
         // parse host
         uri::parser parser;
@@ -661,24 +694,26 @@ client::request& client::request::with_host(bool https, const std::string &hostn
 
         _with_parsed_host(https, host_str, parser.host_type, port);
     } catch (...) {
-        _https = false;
-        _port = -1;
-        _host.clear();
-        _authority.clear();
+        _d->https = false;
+        _d->port = -1;
+        _d->host.clear();
+        _d->authority.clear();
         throw;
     }
 
-    return *this;
+    return std::move(*this);
 }
 
 // NOTE: only allows origin form and asterisk form, maybe change this later if it's a problem
-client::request& client::request::with_path(const std::string &path) {
-    try {
-        _query_set = false;
-        _path_asterisk = (path.size() == 1 && path[0] == '*');
+client::request&& client::request::with_path(std::string_view path) {
+    _valid_state(false);
 
-        if (_path_asterisk) {   // asterisk-form (used for OPTIONS requests)
-            _path = path;
+    try {
+        _d->query_set = false;
+        _d->path_asterisk = (path.size() == 1 && path[0] == '*');
+
+        if (_d->path_asterisk) {   // asterisk-form (used for OPTIONS requests)
+            _d->path = path;
         } else {    // origin-form (used by most methods)
             uri::parser parser;
 
@@ -688,11 +723,11 @@ client::request& client::request::with_path(const std::string &path) {
 
             switch (parser.path_type) {
             case uri::PATH_ABSOLUTE:
-                _path = parser.path_str(path);
+                _d->path = parser.path_str(path);
                 break;
 
             case uri::PATH_EMPTY:   // empty path corresponds to /
-                _path = "/";
+                _d->path = "/";
                 break;
 
             default:
@@ -701,24 +736,26 @@ client::request& client::request::with_path(const std::string &path) {
 
             // handle query
             if (parser.query_to) {
-                _query_set = true;
-                _path += '?';
-                _path.append(path.data() + parser.query_from, parser.query_to - parser.query_from);
+                _d->query_set = true;
+                _d->path += '?';
+                _d->path.append(path.data() + parser.query_from, parser.query_to - parser.query_from);
             }
 
             // ignore fragment
         }
     } catch (...) {
-        _query_set = false;
-        _path_asterisk = false;
-        _path.clear();
+        _d->query_set = false;
+        _d->path_asterisk = false;
+        _d->path.clear();
         throw;
     }
 
-    return *this;
+    return std::move(*this);
 }
 
-client::request& client::request::with_header(const std::string &name, const std::string &value) {
+client::request&& client::request::with_header(std::string_view name, std::string_view value) {
+    _valid_state(false);
+
     // case-insensitive name
     std::string name_tolower = parse_token_tolower(name);
     if (name_tolower.empty() || name_tolower.length() != name.length())
@@ -730,53 +767,57 @@ client::request& client::request::with_header(const std::string &name, const std
             std::invalid_argument("value contains invalid character " + char_escape(c));
 
     try {
-        _headers[name_tolower] = value;
+        _d->headers[name_tolower] = value;
     } catch (...) {
-        _headers.erase(name_tolower);
+        _d->headers.erase(name_tolower);
         throw;
     }
 
-    return *this;
+    return std::move(*this);
 }
 
-client::request& client::request::with_headers(const std::map<std::string, std::string> &headers) {
-    _headers.clear();
+client::request&& client::request::with_headers(const std::map<std::string, std::string> &headers) {
+    _valid_state(false);
+    _d->headers.clear();
 
     try {
         // replace all headers with the new header list (duplicates will be silently ignored)
         for (const auto& [name, value] : headers)
             with_header(name, value);
     } catch (...) {
-        _headers.clear();
+        _d->headers.clear();
         throw;
     }
 
-    return *this;
+    return std::move(*this);
 }
 
-client::request& client::request::with_headers(const std::vector< std::pair<std::string, std::string> > &headers) {
-    _headers.clear();
+client::request&& client::request::with_headers(const std::vector< std::pair<std::string, std::string> > &headers) {
+    _valid_state(false);
+    _d->headers.clear();
 
     try {
         // replace all headers with the new header list (duplicates will be silently ignored)
         for (const auto& [name, value] : headers)
             with_header(name, value);
     } catch (...) {
-        _headers.clear();
+        _d->headers.clear();
         throw;
     }
 
-    return *this;
+    return std::move(*this);
 }
 
-client::request& client::request::allow_invalid_cert(bool value) {
-    _allow_invalid_cert = value;
-    return *this;
+client::request&& client::request::allow_invalid_cert(bool value) {
+    _valid_state(false);
+    _d->allow_invalid_cert = value;
+    return std::move(*this);
 }
 
-client::request& client::request::allow_unsafe_ports(bool value) {
-    _allow_unsafe_ports = value;
-    return *this;
+client::request&& client::request::allow_unsafe_ports(bool value) {
+    _valid_state(false);
+    _d->allow_unsafe_ports = value;
+    return std::move(*this);
 }
 
 }
