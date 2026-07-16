@@ -455,8 +455,8 @@ public:
     bool process_line(const char *line, size_t length);
     void clear();
     // case insensitive search
-    const std::string& get_field(const std::string &name) const;
-    const std::string* get_field_or_null(const std::string &name) const;
+    const std::string& get_field(std::string_view name) const;
+    const std::string* get_field_or_null(std::string_view name) const;
 };
 
 const char* get_status_code_phrase(int status_code);

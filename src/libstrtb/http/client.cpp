@@ -564,6 +564,17 @@ client::request::request(request &&other) {
     other._d = nullptr;
 }
 
+client::request& client::request::operator=(request &&other) {
+    // TODO: cancel in-progress request
+    if (_d)
+        delete _d;
+
+    _d = other._d;
+    other._d = nullptr;
+
+    return *this;
+}
+
 void client::request::_valid_state(bool running) {
     // make sure this request is in a valid state (not moved or (not) in-progress)
     if (!_d)
@@ -835,6 +846,67 @@ client::request&& client::request::allow_unsafe_ports(bool value) {
     _valid_state(false);
     _d->allow_unsafe_ports = value;
     return std::move(*this);
+}
+
+client::response::response(client *c) {
+    _d = new data;
+    _d->c = c;
+}
+
+client::response::~response() {
+    if (_d) {
+        // TODO: cancel request
+        delete _d;
+        _d = nullptr;
+    }
+}
+
+client::response::response(response &&other) {
+    _d = other._d;
+    other._d = nullptr;
+}
+
+client::response& client::response::operator=(response &&other) {
+    // TODO: cancel request
+    if (_d)
+        delete _d;
+
+    _d = other._d;
+    other._d = nullptr;
+
+    return *this;
+}
+
+http_version client::response::version() const {
+    return _d->version;
+}
+
+int client::response::status() const {
+    return _d->status;
+}
+
+const std::string& client::response::status_message() const {
+    return _d->status_message;
+}
+
+const std::string& client::response::header(std::string_view name) const {
+    return _d->headers.get_field(name);
+}
+
+const std::map<std::string, std::string>& client::response::headers() const {
+    return _d->headers.fields;
+}
+
+const std::vector<std::string>& client::response::headers_set_cookie() const {
+    return _d->headers_set_cookie;
+}
+
+const std::string& client::response::trailer(std::string_view name) const {
+    return _d->trailers.get_field(name);
+}
+
+const std::map<std::string, std::string>& client::response::trailers() const {
+    return _d->trailers.fields;
 }
 
 }

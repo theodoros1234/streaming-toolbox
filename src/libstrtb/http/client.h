@@ -34,8 +34,7 @@ public:
         struct data {
             // TODO: state
             // authority: for host header, host: for socket connection
-            std::mutex lock;
-            client* c = nullptr;
+            client *c = nullptr;
 
             std::string method, authority, host, path;
             int port = -1;
@@ -50,6 +49,7 @@ public:
         ~request();
         request(const request&) = delete;
         request(request &&other);
+        request& operator=(request &&other);
 
         request&& with_url(std::string_view url);
         request&& with_host(bool https, std::string_view hostname);    // for IPv6, must use square brackets
@@ -61,10 +61,41 @@ public:
         request&& with_headers(std::initializer_list< std::pair<std::string_view, std::string_view> > headers);
         request&& allow_invalid_cert(bool value = true);
         request&& allow_unsafe_ports(bool value = true);
+
+        // TODO: send with client?, cancel and clear
     };
 
     class response {
+    protected:
+        struct data {
+            client *c = nullptr;
 
+            http_version version;
+            int status = 0;
+            std::string status_message;
+            field_parser headers, trailers;
+            std::vector<std::string> headers_set_cookie;
+        } *_d = nullptr;
+
+        response(client *c);
+
+    public:
+        response() = default;
+        ~response();
+        response(const response&) = delete;
+        response(response &&other);
+        response& operator=(response &&other);
+
+        http_version version() const;
+        int status() const;
+        const std::string& status_message() const;
+        const std::string& header(std::string_view name) const;
+        const std::map<std::string, std::string>& headers() const;
+        const std::vector<std::string>& headers_set_cookie() const;
+        const std::string& trailer(std::string_view name) const;
+        const std::map<std::string, std::string>& trailers() const;
+        // std::string_view recv_body();
+        // TODO: cancel and clear
     };
 
 private:

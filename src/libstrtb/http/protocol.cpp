@@ -2322,7 +2322,7 @@ bool is_unsafe_port(int port) {
     }
 }
 
-const std::string& field_parser::get_field(const std::string &name) const {
+const std::string& field_parser::get_field(std::string_view name) const {
     auto ret = get_field_or_null(name);
     if (ret == nullptr)
         throw std::out_of_range("field not found");
@@ -2330,7 +2330,7 @@ const std::string& field_parser::get_field(const std::string &name) const {
         return *ret;
 }
 
-const std::string* field_parser::get_field_or_null(const std::string &name) const {
+const std::string* field_parser::get_field_or_null(std::string_view name) const {
     // case-insensitive name
     std::string name_tolower = parse_token_tolower(name);
     if (name_tolower.empty() || name_tolower.length() != name.length())     // invalid name
