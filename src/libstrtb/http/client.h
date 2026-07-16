@@ -58,6 +58,7 @@ public:
         request&& with_header(std::string_view name, std::string_view value);
         request&& with_headers(const std::map<std::string, std::string> &headers);
         request&& with_headers(const std::vector< std::pair<std::string, std::string> > &headers);
+        request&& with_headers(std::initializer_list< std::pair<std::string_view, std::string_view> > headers);
         request&& allow_invalid_cert(bool value = true);
         request&& allow_unsafe_ports(bool value = true);
     };

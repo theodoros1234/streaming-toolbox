@@ -808,6 +808,23 @@ client::request&& client::request::with_headers(const std::vector< std::pair<std
     return std::move(*this);
 }
 
+client::request&& client::request::with_headers(
+        std::initializer_list< std::pair<std::string_view, std::string_view> > headers) {
+    _valid_state(false);
+    _d->headers.clear();
+
+    try {
+        // replace all headers with the new header list (duplicates will be silently ignored)
+        for (const auto& [name, value] : headers)
+            with_header(name, value);
+    } catch (...) {
+        _d->headers.clear();
+        throw;
+    }
+
+    return std::move(*this);
+}
+
 client::request&& client::request::allow_invalid_cert(bool value) {
     _valid_state(false);
     _d->allow_invalid_cert = value;
