@@ -361,7 +361,7 @@ static inline request_target_form_enum parse_request_target(const char *target, 
         return TARGET_FORM_ASTERISK;
     }
 
-    // origin form
+    // origin-form
     if (uri_p.parse_relative_ref(target, from, to, true).second) {
         // instantly reject #fragments cause # is only ever used for fragments
         if (uri_p.fragment_to)
@@ -2296,7 +2296,7 @@ const std::string &get_default_user_agent() {
         // create string
         auto v = get_libstrtb_version();
         str.append("StreamingToolbox/");
-        str.append(std::to_string(v.major));
+        str.append(std::to_string(v.major));    // TODO: possible issues with certain locales
         str.push_back('.');
         str.append(std::to_string(v.minor));
         return str;
