@@ -1,5 +1,6 @@
 #include "client.h"
 #include "strescape.h"
+#include "../logging.h"
 
 #include <assert.h>
 #include <charconv>
@@ -10,13 +11,14 @@ using namespace std::string_literals;
 
 namespace strtb::http {
 
+static logging::source log("HTTP Client", false);
+
 static inline unsigned int default_port(bool https) {
     return https ? 443 : 80;
 }
 
-client::client(const std::string &log_name) :
-    _log_name(log_name),
-    _log(log_name.empty() ? "HTTP Client" : "HTTP Client: " + log_name, false) {}
+client::client() {}
+client::~client() {}    // TODO: disconnect from connected request or response objects
 
 void client::_shutdown_check_early() {
     // try to detect a shutdown early (before the request is sent)
@@ -29,183 +31,13 @@ void client::_shutdown_check() {
     _shutdown_check_early();
 }
 
-client& client::open(const std::string &method, const std::string &url, bool allow_invalid_cert, bool allow_unsafe_ports) {
-    clear();
-    _shutdown_check_early();
-
-    try {
-        _state = STATE_PREPARING;
-
-        // check given method
-        auto [method_to, method_valid] = parse_token(method);
-        if (!method_valid || method_to != method.length())
-            throw std::invalid_argument("invalid request method");
-        _method = method;
-
-        // check given URL
-        auto [url_to, url_valid] = _url.parse_uri(url, true);
-        if (!url_valid || _url.path_type != uri::PATH_ABEMPTY)
-            throw std::invalid_argument("invalid or incompatible URL");
-        if (_url.fragment_to != 0)
-            throw std::invalid_argument("request URL cannot have a fragment");
-
-        // check URL scheme
-        std::string scheme = _url.scheme_str(true);
-        if (scheme == "https") {
-            _encrypted = true;
-            _allow_invalid_cert = allow_invalid_cert;
-        } else if (scheme != "http") {
-            throw std::invalid_argument("incompatible URL scheme, only http/https allowed");
-        }
-
-        // check URL host
-        std::string host = _url.host_str(true);
-        switch (_url.host_type) {
-        case uri::HOST_REGNAME:
-        case uri::HOST_IPV4:
-            _hostname = host;
-            break;
-
-        case uri::HOST_IPV6:
-            _hostname = host.substr(1, _url.host_to - _url.host_from - 2);  // trim square brackets
-            break;
-
-        case uri::HOST_EMPTY:
-            throw std::invalid_argument("missing host");
-
-        case uri::HOST_IPVFUTURE:
-        default:
-            throw std::invalid_argument("invalid or unsupported IP address type");
-        }
-
-        // check URL port
-        if (_url.port_to == _url.port_from) {   // unspecified port, use default
-            _port = _encrypted ? 443 : 80;
-        } else {    // specified port, check its validity
-            _port = _url.port_uint16();
-            if (_port == -1)
-                throw std::invalid_argument("invalid port number");
-            else if (!allow_unsafe_ports && _port != 80 && _port != 443 && is_unsafe_port(_port))
-                throw security_precaution("blocked access to unsafe port");
-        }
-
-        // disallow fragments
-        if (_url.fragment_to)
-            throw std::invalid_argument("URL cannot contain fragment");
-
-        // extract path (replace empty path with /)
-        _path = (_url.path_to == _url.path_from) ? "/" : _url.path_str();
-
-        // merge query with path
-        if (_url.query_to)
-            _path += _url.query_str();
-
-        // set host header
-        if ((_encrypted && _port == 443) || (!_encrypted && _port == 80))   // default port, omit from header
-            set_header("host", host);
-        else    // other port, specify it
-            set_header("host", host + ":" + std::to_string(_port)); // TODO: possible issues with certain locales
-
-        // set some headers
-        set_header("user-agent", get_default_user_agent());
-        set_header("connection", "close");
-        set_header("accept-encoding", "gzip, deflate, br, zstd");   // TODO: get supported encodings from elsewhere
-    } catch (...) {
-        clear();
-        throw;
-    }
-
-    return *this;
-}
-
-client& client::set_header(const std::string &name, const std::string &value) {
-    _shutdown_check_early();
-
-    // must be in preparation state
-    if (_state != STATE_PREPARING) {
-        if (_state < STATE_PREPARING)
-            throw bad_state("cannot set request headers before opening a new request");
-        else
-            throw bad_state("cannot set request headers after the request was already sent");
-    }
-
-    // name must be case-insensitive
-    std::string name_tolower = parse_token_tolower(name);
-    if (name_tolower.empty() || name_tolower.length() != name.length())
-        throw std::invalid_argument("invalid header name");
-
-    // check value for invalid characters
-    for (char c : value)
-        if (!(is_vchar(c) || is_obs_text(c) || is_whitespace(c)))
-            std::invalid_argument("value contains invalid character " + char_escape(c));
-
-    _rq_headers[name_tolower] = value;
-
-    return *this;
-}
-
-client& client::set_headers(const std::map<std::string, std::string> &headers) {
-    _shutdown_check_early();
-
-    try {
-        for (const auto &[name, value] : headers) {
-            try {
-                set_header(name, value);
-            } catch (const std::invalid_argument &e) {
-                // attach header name to certain exceptions
-                throw std::invalid_argument(name + ": " + e.what());
-            }
-        }
-    } catch (...) {
-        // safer to clear, cause caller doesn't know which header caused the exception
-        clear();
-        throw;
-    }
-
-    return *this;
-}
-
-bool client::clear_header(const std::string &name) {
-    // must be in preparation state
-    if (_state != STATE_PREPARING) {
-        if (_state < STATE_PREPARING)
-            throw bad_state("cannot set request headers before opening a new request");
-        else
-            throw bad_state("cannot set request headers after the request was already sent");
-    }
-
-    std::string name_tolower = parse_token_tolower(name);
-    if (!name_tolower.empty() && name_tolower.length() == name.length())
-        return _rq_headers.erase(name_tolower);
-    return false;
-}
-
 void client::clear() {
     // cancel any open connection
     cancel();
     _state = STATE_IDLE;
-
-    // clear request data
-    _method.clear();
-    _url.clear();
-    _hostname.clear();
-    _port = -1;
-    _path.clear();
-    _encrypted = false;
-    _allow_invalid_cert = false;
-    _rq_headers.clear();
-
-    // clear response data
-    _status_code = 0;
-    _status_message.clear();
-    _rs_headers.clear();
-    _rs_trailers.clear();
-    _rs_http_version.major = 0;
-    _rs_http_version.minor = 0;
-    _content_length = 0;
-    _content_length_known = false;
-    _transfer_encoding.clear();
-    _content_encoding.clear();
+    // TODO: notify request and response objects about this
+    _request = nullptr;
+    _response = nullptr;
     _decoders.clear();
 }
 
@@ -238,23 +70,23 @@ void client::cancel() {
 
 static std::string make_header_line(const std::string &name, const std::string &value) {
     return name + ": " + value + CRLF;
+    // TODO: make this send stuff directly after adding std::string_view support to tcp_socket::send();
 }
 
-int client::send() {
+client::response client::send(request &r) {
     // request must be prepared
-    if (_state != STATE_PREPARING) {
-        if (_state < STATE_PREPARING)
-            throw bad_state("request not prepared");
-        else
-            throw bad_state("request already sent");
-    }
+    if (_request || _response)
+        throw bad_state("another request is in progress");
 
     try {
         assert(_socket == nullptr);
         _state = STATE_CONNECTING;
+        _request = r._d;
+        _request->c = this;
+        _authority = _request->authority;
 
         // set up the appropriate socket and connect
-        if (_encrypted) {
+        if (_request->https) {
             // https
             networking::tcp_client_ssl *s = nullptr;
             {
@@ -263,7 +95,7 @@ int client::send() {
                 s = &_socket_container.emplace<2>(true);
                 _socket = s;
             }
-            s->connect(_hostname, _port, false, !_allow_invalid_cert);
+            s->connect(_request->host, _request->port, false, !_request->allow_invalid_cert);
         } else {
             // http
             {
@@ -271,32 +103,45 @@ int client::send() {
                 _shutdown_check_early();
                 _socket = &_socket_container.emplace<1>(true);
             }
-            _socket->connect(_hostname, _port);
+            _socket->connect(_request->host, _request->port);
         }
 
         // send request line
-        _socket->send(_method + " " + _path + " HTTP/1.1" CRLF);
+        _socket->send(_request->method + " " + _request->path + " HTTP/1.1" CRLF);
 
-        // send headers, prioritizing some
-        auto header_host = _rq_headers.find("host");
-        if (header_host != _rq_headers.end()) {
-            _socket->send(make_header_line(header_host->first, header_host->second));
-            _rq_headers.erase(header_host);
+        // send headers, prioritizing some, and with default values
+        // WARNING: always use lowercase names, and never use values that may contain CRLF
+        std::initializer_list< std::pair<std::string, std::string> > priority_headers = {
+            {"host"s, _authority},
+            {"user-agent", get_default_user_agent()},
+            {"connection"s, "close"s},
+            {"accept-encoding"s, "gzip, deflate, br, zstd"}     // TODO: get supported encodings from elsewhere
+        };
+
+        for (const auto &h : priority_headers) {
+            auto h_existing = _request->headers.find(h.first);
+            if (h_existing == _request->headers.end()) {
+                // send the default value we defined above
+                _socket->send(make_header_line(h.first, h.second));
+            } else {
+                // send existing header
+                _socket->send(make_header_line(h_existing->first, h_existing->second));
+                _request->headers.erase(h_existing);
+            }
         }
 
-        auto header_user_agent = _rq_headers.find("user-agent");
-        if (header_user_agent != _rq_headers.end()) {
-            _socket->send(make_header_line(header_user_agent->first, header_user_agent->second));
-            _rq_headers.erase(header_user_agent);
-        }
-
-        for (const auto &h : _rq_headers)
+        // send remaining headers
+        for (const auto &h : _request->headers)
             _socket->send(make_header_line(h.first, h.second));
 
         // empty line to mark end of headers
         _socket->send(CRLF);
         _socket->flush();
         _state = STATE_RECEIVING_HEADERS;
+
+        // create response object
+        response rs(this);
+        _response = rs._d;
 
         // receive response status-line
         std::string line;
@@ -312,9 +157,9 @@ int client::send() {
             throw invalid_message("invalid response status line");
         if (status_line.version.major != 1)
             throw invalid_message("incompatible response HTTP version");
-        _status_code = status_line.status_code;
-        _status_message = std::move(status_line.reason_phrase);
-        _rs_http_version = status_line.version;
+        _response->status = status_line.status_code;
+        _response->status_message = std::move(status_line.reason_phrase);
+        _response->version = status_line.version;
 
         // receive response headers
         while (true) {
@@ -332,45 +177,33 @@ int client::send() {
             if (line.empty())
                 break;
 
-            if (!_rs_headers.process_line(line))
+            if (!_response->headers.process_line(line))
                 throw invalid_message("invalid response header line");
         }
 
         // TODO: Transfer-Encoding in HTTP/1.0 MUST be treated as faulty framing and close the connection afterwards
 
         // determine if a body is present
-        if (_method == "HEAD" || _status_code == 204 || _status_code == 304 || _status_code / 100 == 1) {
+        if (_request->method == "HEAD" || _response->status == 204 ||
+            _response->status == 304 || _response->status / 100 == 1) {
             // certain methods and status codes cannot have a body
             _state = STATE_DONE;
-            _content_length = 0;
-            _content_length_known = true;
         } else {
-            // check and parse content-encoding
-            auto ce = _rs_headers.fields.find("content-encoding");
-            if (ce != _rs_headers.fields.end()) {
-                auto ce_parsed = parse_field_token_list(ce->second, false);
-                if (!ce_parsed.valid)
-                    throw invalid_message("invalid response content encoding");
-                _content_encoding = std::move(ce_parsed.list);
-            }
-
-            auto te = _rs_headers.fields.find("transfer-encoding");
-            if (te != _rs_headers.fields.end()) {
+            auto te = _response->headers.fields.find("transfer-encoding");
+            if (te != _response->headers.fields.end()) {
                 _state = STATE_RECEIVING_BODY;
-                _content_length_known = false;
 
                 // parse transfer-encoding header
                 auto te_parsed = parse_field_token_params_list(te->second, false, true);
                 if (!te_parsed.valid)
                     throw invalid_message("invalid response transfer encoding");
 
-                _transfer_encoding = std::move(te_parsed.list);
                 // TODO: check return value to decide if the connection needs to close afterwards
-                transfer_encoding_make_decoders(_decoders, _transfer_encoding, _rs_trailers, *_socket, true);
+                transfer_encoding_make_decoders(_decoders, te_parsed.list, _response->trailers, *_socket, true);
             } else {
-                auto ce = _rs_headers.fields.find("content-length");
+                auto ce = _response->headers.fields.find("content-length");
 
-                if (ce != _rs_headers.fields.end()) {
+                if (ce != _response->headers.fields.end()) {
                     // parse content-length header
                     auto ce_parsed = parse_field_integer(ce->second);
                     if (!ce_parsed.valid) {
@@ -380,17 +213,23 @@ int client::send() {
                             throw invalid_message("invalid response content length");
                     }
 
-                    _content_length = ce_parsed.number;
-                    _content_length_known = true;
                     _state = STATE_RECEIVING_BODY;
-                    _decoders.push_back(std::unique_ptr<decoder>(new body_fixed_length(*_socket, _content_length)));
+                    _decoders.push_back(std::unique_ptr<decoder>(new body_fixed_length(*_socket, ce_parsed.number)));
                 } else {
                     // no encoding or length info
                     _state = STATE_RECEIVING_BODY;
-                    _content_length = 0;
-                    _content_length_known = false;
                     _decoders.push_back(std::unique_ptr<decoder>(new body_until_close(*_socket)));
                 }
+            }
+
+            // check, parse and handle content-encoding
+            auto ce = _response->headers.fields.find("content-encoding");
+            if (ce != _response->headers.fields.end()) {
+                auto ce_parsed = parse_field_token_list(ce->second, false);
+                if (!ce_parsed.valid)
+                    throw invalid_message("invalid response content encoding");
+
+                content_encoding_make_decoders(_decoders, ce_parsed.list);
             }
         }
 
@@ -399,11 +238,10 @@ int client::send() {
         if (_state == STATE_DONE)
             _socket->close();
 
-        // handle content encodings
-        if (_state == STATE_RECEIVING_BODY)
-            content_encoding_make_decoders(_decoders, _content_encoding);
+        _request->c = nullptr;
+        _request = nullptr;
 
-        return _status_code;
+        return rs;
     } catch (...) {
         clear();
         // check if the error was caused by a shutdown
@@ -437,6 +275,7 @@ std::pair<const char*, size_t> client::recv_body(size_t max_len) {
                 _shutdown_check();
                 _state = STATE_DONE;
                 _socket->close();
+                clear();
                 // TODO: attempt graceful shutdown over TLS
             }
 
@@ -452,87 +291,16 @@ std::pair<const char*, size_t> client::recv_body(size_t max_len) {
     }
 }
 
-const std::string& client::log_name() const {
-    return _log_name;
-}
-
 client::state_enum client::state() const {
     return _state;
 }
 
-const std::string& client::method() const {
-    return _method;
-}
-
-const std::string& client::hostname() const {
-    return _hostname;
-}
-
-int client::port() const {
-    return _port;
-}
-
-const std::string& client::path() const {
-    return _path;
+const std::string& client::authority() const {
+    return _authority;
 }
 
 bool client::encrypted() const {
-    return _encrypted;
-}
-
-int client::status_code() const {
-    return _status_code;
-}
-
-const std::string& client::status_message() const {
-    return _status_message;
-}
-
-http_version client::response_http_version() const {
-    return _rs_http_version;
-}
-
-const std::string& client::response_header(const std::string &name) const {
-    return _rs_headers.get_field(name);
-}
-
-const std::string* client::response_header_or_null(const std::string &name) const {
-    return _rs_headers.get_field_or_null(name);
-}
-
-const std::map<std::string, std::string>& client::response_headers() const {
-    return _rs_headers.fields;
-}
-
-const std::vector<std::string>& client::response_cookies_raw() const {
-    return _rs_headers.fields_set_cookie;
-}
-
-const std::string& client::response_trailer(const std::string &name) const {
-    return _rs_trailers.get_field(name);
-}
-
-const std::string* client::response_trailer_or_null(const std::string &name) const {
-    return _rs_trailers.get_field_or_null(name);
-}
-
-const std::map<std::string, std::string>& client::response_trailers() const {
-    return _rs_trailers.fields;
-}
-
-std::pair<size_t, bool> client::content_length() const {
-    if (_content_length_known)
-        return {_content_length, true};
-    else
-        return {0, false};
-}
-
-const std::vector<token_params>& client::transfer_encoding() const {
-    return _transfer_encoding;
-}
-
-const std::vector<std::string>& client::content_encoding() const {
-    return _content_encoding;
+    return _socket_container.index() == 2;
 }
 
 client::request::request(std::string_view method) {
