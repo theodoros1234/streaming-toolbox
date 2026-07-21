@@ -97,7 +97,8 @@ public:
         const std::vector<std::string>& headers_set_cookie() const;
         const std::string& trailer(std::string_view name) const;
         const std::map<std::string, std::string>& trailers() const;
-        // std::string_view recv_body();
+        std::string_view recv_body();
+        std::string_view recv_body(size_t max_len);
         // TODO: cancel and clear
     };
 
@@ -116,13 +117,14 @@ private:
     void _shutdown_check_early();
     void _shutdown_check();
 
+protected:
+    std::string_view recv_body();
+    std::string_view recv_body(size_t max_len);
+
 public:
     client();
     ~client();
     response send(request &r);
-
-    std::pair<const char*, size_t> recv_body();
-    std::pair<const char*, size_t> recv_body(size_t max_len);
 
     state_enum state() const;
     const std::string& authority() const;

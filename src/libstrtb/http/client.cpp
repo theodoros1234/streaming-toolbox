@@ -250,27 +250,25 @@ client::response client::send(request &r) {
     }
 }
 
-std::pair<const char*, size_t> client::recv_body() {
+std::string_view client::recv_body() {
     return recv_body(_socket->buffer_size());
     // TODO: determine what's an actual good default max_len
 }
 
-std::pair<const char*, size_t> client::recv_body(size_t max_len) {
-    // TODO: handle transfer encodings
-
+std::string_view client::recv_body(size_t max_len) {
     if (_state != STATE_RECEIVING_BODY) {
         if (_state < STATE_RECEIVING_BODY)
             throw bad_state("request not prepared or sent");
         else    // already received the entire body
-            return {0, 0};
+            return std::string_view();
     }
 
     try {
         assert(!_decoders.empty());
         if (!_decoders.empty()) {
-            auto ret = _decoders.back()->read(max_len);
+            auto [data, len] = _decoders.back()->read(max_len);
 
-            if (ret.second == 0) {  // reading 0 bytes means we reached the end of the body
+            if (len == 0) {     // reading 0 bytes means we reached the end of the body
                 // unless a shutdown truncated part of the body and somehow didn't cause an error
                 _shutdown_check();
                 _state = STATE_DONE;
@@ -279,9 +277,9 @@ std::pair<const char*, size_t> client::recv_body(size_t max_len) {
                 // TODO: attempt graceful shutdown over TLS
             }
 
-            return ret;
+            return std::string_view(data, len);
         } else {
-            return {0, 0};
+            return std::string_view();
         }
     } catch (...) {
         clear();
@@ -675,6 +673,30 @@ const std::string& client::response::trailer(std::string_view name) const {
 
 const std::map<std::string, std::string>& client::response::trailers() const {
     return _d->trailers.fields;
+}
+
+std::string_view client::response::recv_body() {
+    if (!_d)
+        throw bad_state("no response assigned");
+    if (!_d->c)
+        return std::string_view();
+
+    auto ret = _d->c->recv_body();
+    if (ret.empty())
+        _d->c = nullptr;
+    return ret;
+}
+
+std::string_view client::response::recv_body(size_t max_len) {
+    if (!_d)
+        throw bad_state("no response assigned");
+    if (!_d->c)
+        return std::string_view();
+
+    auto ret = _d->c->recv_body(max_len);
+    if (ret.empty())
+        _d->c = nullptr;
+    return ret;
 }
 
 }
