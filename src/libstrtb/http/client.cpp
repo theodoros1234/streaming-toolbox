@@ -18,7 +18,22 @@ static inline unsigned int default_port(bool https) {
 }
 
 client::client() {}
-client::~client() {}    // TODO: disconnect from connected request or response objects
+
+client::~client() {
+    if (_request) {
+        log.warning_one("Destroying while a request object is still connected. "
+                        "Attempting to disconnect, but this may cause a crash.");
+        shutdown();
+        _request->c = nullptr;
+    }
+
+    if (_response) {
+        log.warning_one("Destroying while a response object is still connected. "
+                        "Attempting to disconnect, but this may cause a crash.");
+        shutdown();
+        _response->c = nullptr;
+    }
+}
 
 void client::_shutdown_check_early() {
     // try to detect a shutdown early (before the request is sent)
@@ -31,15 +46,6 @@ void client::_shutdown_check() {
     _shutdown_check_early();
 }
 
-void client::clear() {
-    // cancel any open connection
-    cancel();
-    // TODO: notify request and response objects about this
-    _request = nullptr;
-    _response = nullptr;
-    _decoders.clear();
-}
-
 void client::shutdown() {
     std::lock_guard<std::mutex> guard(_lock);
     _is_shutdown = true;
@@ -50,18 +56,30 @@ void client::shutdown() {
 }
 
 void client::reset() {
-    clear();
     _is_shutdown = false;
 }
 
-void client::cancel() {
-    std::lock_guard<std::mutex> guard(_lock);
+void client::_cancel() {
     if (_socket) {
+        std::lock_guard<std::mutex> guard(_lock);
         if (_socket->is_open())
             _socket->close();
         _socket = nullptr;
         _socket_container.emplace<0>(false);
     }
+    _decoders.clear();
+}
+
+void client::cancel_request() {
+    assert(_request);
+    _cancel();
+    _request = nullptr;
+}
+
+void client::cancel_response() {
+    assert(_response);
+    _cancel();
+    _response = nullptr;
 }
 
 static std::string make_header_line(const std::string &name, const std::string &value) {
@@ -183,7 +201,8 @@ client::response client::send(request &r) {
             // certain methods and status codes cannot have a body
             // close connection if there's no body
             // TODO: remove this when persistent connections are implemented
-            _socket->close();
+            _response->c = nullptr;
+            cancel_response();
         } else {
             auto te = _response->headers.fields.find("transfer-encoding");
             if (te != _response->headers.fields.end()) {
@@ -230,7 +249,8 @@ client::response client::send(request &r) {
 
         return rs;
     } catch (...) {
-        clear();
+        r._d->c = nullptr;
+        cancel_request();
         // check if the error was caused by a shutdown
         _shutdown_check();
         throw;
@@ -252,9 +272,8 @@ std::string_view client::recv_body(size_t max_len) {
 
             if (len == 0) {     // reading 0 bytes means we reached the end of the body
                 // unless a shutdown truncated part of the body and somehow didn't cause an error
+                cancel_response();
                 _shutdown_check();
-                _socket->close();
-                clear();
                 // TODO: attempt graceful shutdown over TLS
             }
 
@@ -263,7 +282,7 @@ std::string_view client::recv_body(size_t max_len) {
             return std::string_view();
         }
     } catch (...) {
-        clear();
+        cancel_response();
         // check if the error was caused by a shutdown
         _shutdown_check();
         throw;
@@ -294,8 +313,8 @@ client::request::request(std::string_view method) {
 }
 
 client::request::~request() {
+    cancel();
     if (_d) {
-        // TODO: cancel in-progress request
         delete _d;
         _d = nullptr;
     }
@@ -308,7 +327,7 @@ client::request::request(request &&other) {
 }
 
 client::request& client::request::operator=(request &&other) {
-    // TODO: cancel in-progress request
+    cancel();
     if (_d)
         delete _d;
 
@@ -316,6 +335,21 @@ client::request& client::request::operator=(request &&other) {
     other._d = nullptr;
 
     return *this;
+}
+
+void client::request::cancel() {
+    if (_d && _d->c) {
+        _d->c->cancel_request();
+        _d->c = nullptr;
+    }
+}
+
+void client::request::clear() {
+    cancel();
+    if (_d) {
+        delete _d;
+        _d = nullptr;
+    }
 }
 
 void client::request::_valid_state(bool running) {
@@ -597,8 +631,8 @@ client::response::response(client *c) {
 }
 
 client::response::~response() {
+    cancel();
     if (_d) {
-        // TODO: cancel request
         delete _d;
         _d = nullptr;
     }
@@ -610,7 +644,7 @@ client::response::response(response &&other) {
 }
 
 client::response& client::response::operator=(response &&other) {
-    // TODO: cancel request
+    cancel();
     if (_d)
         delete _d;
 
@@ -652,16 +686,22 @@ const std::map<std::string, std::string>& client::response::trailers() const {
     return _d->trailers.fields;
 }
 
+// TODO: mostly duplicate code, tidy this up
 std::string_view client::response::recv_body() {
     if (!_d)
         throw bad_state("no response assigned");
     if (!_d->c)
         return std::string_view();
 
-    auto ret = _d->c->recv_body();
-    if (ret.empty())
+    try {
+        auto ret = _d->c->recv_body();
+        if (ret.empty())
+            _d->c = nullptr;
+        return ret;
+    } catch (...) {
         _d->c = nullptr;
-    return ret;
+        throw;
+    }
 }
 
 std::string_view client::response::recv_body(size_t max_len) {
@@ -670,10 +710,30 @@ std::string_view client::response::recv_body(size_t max_len) {
     if (!_d->c)
         return std::string_view();
 
-    auto ret = _d->c->recv_body(max_len);
-    if (ret.empty())
+    try {
+        auto ret = _d->c->recv_body(max_len);
+        if (ret.empty())
+            _d->c = nullptr;
+        return ret;
+    } catch (...) {
         _d->c = nullptr;
-    return ret;
+        throw;
+    }
+}
+
+void client::response::cancel() {
+    if (_d && _d->c) {
+        _d->c->cancel_response();
+        _d->c = nullptr;
+    }
+}
+
+void client::response::clear() {
+    cancel();
+    if (_d) {
+        delete _d;
+        _d = nullptr;
+    }
 }
 
 }

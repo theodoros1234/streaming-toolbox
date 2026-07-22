@@ -54,7 +54,8 @@ public:
         request&& allow_invalid_cert(bool value = true);
         request&& allow_unsafe_ports(bool value = true);
 
-        // TODO: send with client?, cancel and clear
+        void cancel();
+        void clear();
     };
 
     class response {
@@ -90,7 +91,9 @@ public:
         const std::map<std::string, std::string>& trailers() const;
         std::string_view recv_body();
         std::string_view recv_body(size_t max_len);
-        // TODO: cancel and clear
+
+        void cancel();
+        void clear();
     };
 
 private:
@@ -106,10 +109,13 @@ private:
 
     void _shutdown_check_early();
     void _shutdown_check();
+    void _cancel();
 
 protected:
     std::string_view recv_body();
     std::string_view recv_body(size_t max_len);
+    void cancel_request();
+    void cancel_response();
 
 public:
     client();
@@ -120,10 +126,8 @@ public:
     bool encrypted() const;
     // TODO: more functions to get more internal variables
 
-    void cancel();      // cancel an existing open connection without clearing data (NOT MT-SAFE)
     void shutdown();    // fully shutdown current and future connections from another thread
     void reset();       // for undoing shutdown and allowing a new connection
-    void clear();       // for deleting stored data
 };
 
 }
