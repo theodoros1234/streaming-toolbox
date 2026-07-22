@@ -34,7 +34,6 @@ void client::_shutdown_check() {
 void client::clear() {
     // cancel any open connection
     cancel();
-    _state = STATE_IDLE;
     // TODO: notify request and response objects about this
     _request = nullptr;
     _response = nullptr;
@@ -63,9 +62,6 @@ void client::cancel() {
         _socket = nullptr;
         _socket_container.emplace<0>(false);
     }
-
-    if (STATE_CONNECTING <= _state && _state < STATE_DONE)
-        _state = STATE_DONE;
 }
 
 static std::string make_header_line(const std::string &name, const std::string &value) {
@@ -80,7 +76,6 @@ client::response client::send(request &r) {
 
     try {
         assert(_socket == nullptr);
-        _state = STATE_CONNECTING;
         _request = r._d;
         _request->c = this;
         _authority = _request->authority;
@@ -137,7 +132,6 @@ client::response client::send(request &r) {
         // empty line to mark end of headers
         _socket->send(CRLF);
         _socket->flush();
-        _state = STATE_RECEIVING_HEADERS;
 
         // create response object
         response rs(this);
@@ -187,12 +181,12 @@ client::response client::send(request &r) {
         if (_request->method == "HEAD" || _response->status == 204 ||
             _response->status == 304 || _response->status / 100 == 1) {
             // certain methods and status codes cannot have a body
-            _state = STATE_DONE;
+            // close connection if there's no body
+            // TODO: remove this when persistent connections are implemented
+            _socket->close();
         } else {
             auto te = _response->headers.fields.find("transfer-encoding");
             if (te != _response->headers.fields.end()) {
-                _state = STATE_RECEIVING_BODY;
-
                 // parse transfer-encoding header
                 auto te_parsed = parse_field_token_params_list(te->second, false, true);
                 if (!te_parsed.valid)
@@ -213,11 +207,9 @@ client::response client::send(request &r) {
                             throw invalid_message("invalid response content length");
                     }
 
-                    _state = STATE_RECEIVING_BODY;
                     _decoders.push_back(std::unique_ptr<decoder>(new body_fixed_length(*_socket, ce_parsed.number)));
                 } else {
                     // no encoding or length info
-                    _state = STATE_RECEIVING_BODY;
                     _decoders.push_back(std::unique_ptr<decoder>(new body_until_close(*_socket)));
                 }
             }
@@ -232,11 +224,6 @@ client::response client::send(request &r) {
                 content_encoding_make_decoders(_decoders, ce_parsed.list);
             }
         }
-
-        // close connection if there's no body
-        // TODO: remove this when persistent connections are implemented
-        if (_state == STATE_DONE)
-            _socket->close();
 
         _request->c = nullptr;
         _request = nullptr;
@@ -256,12 +243,7 @@ std::string_view client::recv_body() {
 }
 
 std::string_view client::recv_body(size_t max_len) {
-    if (_state != STATE_RECEIVING_BODY) {
-        if (_state < STATE_RECEIVING_BODY)
-            throw bad_state("request not prepared or sent");
-        else    // already received the entire body
-            return std::string_view();
-    }
+    assert(_response);
 
     try {
         assert(!_decoders.empty());
@@ -271,7 +253,6 @@ std::string_view client::recv_body(size_t max_len) {
             if (len == 0) {     // reading 0 bytes means we reached the end of the body
                 // unless a shutdown truncated part of the body and somehow didn't cause an error
                 _shutdown_check();
-                _state = STATE_DONE;
                 _socket->close();
                 clear();
                 // TODO: attempt graceful shutdown over TLS
@@ -287,10 +268,6 @@ std::string_view client::recv_body(size_t max_len) {
         _shutdown_check();
         throw;
     }
-}
-
-client::state_enum client::state() const {
-    return _state;
 }
 
 const std::string& client::authority() const {

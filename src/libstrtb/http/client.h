@@ -14,15 +14,6 @@ namespace strtb::http {
 
 class client {
 public:
-    enum state_enum {
-        STATE_IDLE,
-        STATE_PREPARING,
-        STATE_CONNECTING,
-        STATE_RECEIVING_HEADERS,
-        STATE_RECEIVING_BODY,
-        STATE_DONE
-    };
-
     class request {
     private:
         bool _verify_not_sending() const;
@@ -107,7 +98,6 @@ private:
     std::variant<bool, networking::tcp_client, networking::tcp_client_ssl> _socket_container = false;
     networking::tcp_client *_socket = nullptr;
     // TODO: rethink this, especially for persistent connections
-    state_enum _state = STATE_IDLE;
     volatile bool _is_shutdown = false;
     std::string _authority;
     std::vector<std::unique_ptr<decoder> > _decoders;
@@ -126,7 +116,6 @@ public:
     ~client();
     response send(request &r);
 
-    state_enum state() const;
     const std::string& authority() const;
     bool encrypted() const;
     // TODO: more functions to get more internal variables
