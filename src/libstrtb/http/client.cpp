@@ -613,6 +613,58 @@ client::request&& client::request::with_headers(
     return std::move(*this);
 }
 
+// URL params, automatically percent-escape reserved characters
+template<class T> client::request&& client::request::_with_params(T params) {
+    _valid_state(false);
+    if (_d->path.empty())
+        throw bad_state("cannot set params before setting path");
+    if (_d->path_asterisk)
+        throw bad_state("cannot set params for asterisk path");
+    if (_d->query_set)
+        throw bad_state("query segment already set");
+
+    // create query str from these params
+    std::string query_str = "?";
+    bool first = true;
+
+    for (const auto &param : params) {
+        if (first) {
+            first = false;
+        } else {
+            // & delimiter
+            query_str += '&';
+        }
+
+        // key
+        query_str += uri::percent_encode(param.first);
+
+        // = delimiter
+        query_str += '=';
+
+        // value
+        query_str += uri::percent_encode(param.second);
+    }
+
+    _d->path += query_str;
+    _d->query_set = true;
+
+    return std::move(*this);
+}
+
+client::request&& client::request::with_params(const std::map<std::string, std::string> &params) {
+    return _with_params<const std::map<std::string, std::string>&>(params);
+}
+
+// multiple instances of the same param allowed
+client::request&& client::request::with_params(const std::vector< std::pair<std::string, std::string> > &params) {
+    return _with_params<const std::vector< std::pair<std::string, std::string> >&>(params);
+}
+
+// multiple instances of the same param allowed
+client::request&& client::request::with_params(std::initializer_list< std::pair<std::string_view, std::string_view> > params) {
+    return _with_params<std::initializer_list< std::pair<std::string_view, std::string_view> > >(params);
+}
+
 client::request&& client::request::allow_invalid_cert(bool value) {
     _valid_state(false);
     _d->allow_invalid_cert = value;

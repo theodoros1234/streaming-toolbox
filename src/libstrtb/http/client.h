@@ -19,6 +19,7 @@ public:
         bool _verify_not_sending() const;
         void _with_parsed_host(bool https, std::string_view host, uri::host_type_enum type, unsigned int port);
         void _valid_state(bool running);
+        template<class T> request&& _with_params(T params);
 
     protected:
         friend client;
@@ -51,6 +52,9 @@ public:
         request&& with_headers(const std::map<std::string, std::string> &headers);
         request&& with_headers(const std::vector< std::pair<std::string, std::string> > &headers);
         request&& with_headers(std::initializer_list< std::pair<std::string_view, std::string_view> > headers);
+        request&& with_params(const std::map<std::string, std::string> &params);
+        request&& with_params(const std::vector< std::pair<std::string, std::string> > &params);
+        request&& with_params(std::initializer_list< std::pair<std::string_view, std::string_view> > params);
         request&& allow_invalid_cert(bool value = true);
         request&& allow_unsafe_ports(bool value = true);
 
