@@ -19,6 +19,7 @@ public:
         bool _verify_not_sending() const;
         void _with_parsed_host(bool https, std::string_view host, uri::host_type_enum type, unsigned int port);
         void _valid_state(bool running);
+        template<class T> request&& _with_headers(T headers);
         template<class T> request&& _with_params(T params);
 
     protected:

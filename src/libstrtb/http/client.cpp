@@ -564,7 +564,7 @@ client::request&& client::request::with_header(std::string_view name, std::strin
     return std::move(*this);
 }
 
-client::request&& client::request::with_headers(const std::map<std::string, std::string> &headers) {
+template<class T> client::request&& client::request::_with_headers(T headers) {
     _valid_state(false);
     _d->headers.clear();
 
@@ -580,37 +580,17 @@ client::request&& client::request::with_headers(const std::map<std::string, std:
     return std::move(*this);
 }
 
+client::request&& client::request::with_headers(const std::map<std::string, std::string> &headers) {
+    return _with_headers<const std::map<std::string, std::string> &>(headers);
+}
+
 client::request&& client::request::with_headers(const std::vector< std::pair<std::string, std::string> > &headers) {
-    _valid_state(false);
-    _d->headers.clear();
-
-    try {
-        // replace all headers with the new header list (duplicates will be silently ignored)
-        for (const auto& [name, value] : headers)
-            with_header(name, value);
-    } catch (...) {
-        _d->headers.clear();
-        throw;
-    }
-
-    return std::move(*this);
+    return _with_headers<const std::vector< std::pair<std::string, std::string> > &>(headers);
 }
 
 client::request&& client::request::with_headers(
         std::initializer_list< std::pair<std::string_view, std::string_view> > headers) {
-    _valid_state(false);
-    _d->headers.clear();
-
-    try {
-        // replace all headers with the new header list (duplicates will be silently ignored)
-        for (const auto& [name, value] : headers)
-            with_header(name, value);
-    } catch (...) {
-        _d->headers.clear();
-        throw;
-    }
-
-    return std::move(*this);
+    return _with_headers<std::initializer_list< std::pair<std::string_view, std::string_view> > >(headers);
 }
 
 // URL params, automatically percent-escape reserved characters
