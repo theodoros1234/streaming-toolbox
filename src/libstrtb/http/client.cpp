@@ -57,15 +57,15 @@ void client::shutdown() {
 
 void client::reset() {
     _is_shutdown = false;
+    if (_socket)
+        _socket->reset();
 }
 
 void client::_cancel() {
+    std::lock_guard<std::mutex> guard(_lock);
     if (_socket) {
-        std::lock_guard<std::mutex> guard(_lock);
         if (_socket->is_open())
             _socket->close();
-        _socket = nullptr;
-        _socket_container.emplace<0>(false);
     }
     _decoders.clear();
 }
@@ -91,9 +91,10 @@ client::response client::send(request &r) {
     // request must be prepared
     if (_request || _response)
         throw bad_state("another request is in progress");
+    if (!r._d)
+        throw std::invalid_argument("request object is empty");
 
     try {
-        assert(_socket == nullptr);
         _request = r._d;
         _request->c = this;
         _authority = _request->authority;
@@ -105,8 +106,15 @@ client::response client::send(request &r) {
             {
                 std::lock_guard<std::mutex> guard(_lock);
                 _shutdown_check_early();
-                s = &_socket_container.emplace<2>(true);
-                _socket = s;
+                if (_socket_container.index() == 2) {
+                    // reuse existing socket
+                    _socket->reset();
+                    s = &std::get<2>(_socket_container);
+                } else {
+                    // create required socket type
+                    s = &_socket_container.emplace<2>(true);
+                    _socket = s;
+                }
             }
             s->connect(_request->host, _request->port, false, !_request->allow_invalid_cert);
         } else {
@@ -114,7 +122,10 @@ client::response client::send(request &r) {
             {
                 std::lock_guard<std::mutex> guard(_lock);
                 _shutdown_check_early();
-                _socket = &_socket_container.emplace<1>(true);
+                if (_socket_container.index() == 1) // reuse existing socket
+                    _socket->reset();
+                else                                // create required socket type
+                    _socket = &_socket_container.emplace<1>(true);
             }
             _socket->connect(_request->host, _request->port);
         }
