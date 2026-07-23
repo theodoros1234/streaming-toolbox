@@ -388,6 +388,40 @@ std::pair<const char*, size_t> decoder_zstd::read(size_t max_len) {
     return {ptr, len};
 }
 
+std::initializer_list<std::string_view> get_supported_decoders_list() {
+    static std::initializer_list<std::string_view> list = {"gzip", "deflate", "br", "zstd"};
+    return list;
+}
+
+const std::string& get_supported_decoders_str() {
+    static bool str_set = false;
+    static std::string str;
+
+    if (str_set)    // answer ready
+        return str;
+
+    try {
+        // answer not ready, generate string
+        bool first = true;
+        for (auto item : get_supported_decoders_list()) {
+            // comma delimiter
+            if (first)
+                first = false;
+            else
+                str += ", ";
+
+            // coding name
+            str += item;
+        }
+    } catch (...) {
+        str.clear();
+        throw;
+    }
+
+    str_set = true;
+    return str;
+}
+
 void content_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &decoders,
                                     std::vector<std::string> &content_encoding,
                                     size_t max_decoders) {

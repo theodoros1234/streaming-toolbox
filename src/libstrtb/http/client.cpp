@@ -126,9 +126,9 @@ client::response client::send(request &r) {
         // WARNING: always use lowercase names, and never use values that may contain CRLF
         std::initializer_list< std::pair<std::string, std::string> > priority_headers = {
             {"host"s, _authority},
-            {"user-agent", get_default_user_agent()},
+            {"user-agent"s, get_default_user_agent()},
             {"connection"s, "close"s},
-            {"accept-encoding"s, "gzip, deflate, br, zstd"}     // TODO: get supported encodings from elsewhere
+            {"accept-encoding"s, get_supported_decoders_str()}
         };
 
         for (const auto &h : priority_headers) {

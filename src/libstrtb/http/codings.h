@@ -114,6 +114,9 @@ public:
     std::pair<const char*, size_t> read(size_t max_len);
 };
 
+std::initializer_list<std::string_view> get_supported_decoders_list();
+const std::string& get_supported_decoders_str();
+
 void content_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &decoders,
                                     std::vector<std::string> &content_encoding,
                                     size_t max_decoders = STRTB_HTTP_MAX_DECODERS);
