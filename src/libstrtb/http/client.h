@@ -111,10 +111,13 @@ private:
     std::vector<std::unique_ptr<decoder> > _decoders;
     request::data* _request = nullptr;
     response::data* _response = nullptr;
+    bool _keepalive = false;
 
     void _shutdown_check_early();
     void _shutdown_check();
     void _cancel();
+    bool _connection_reusable(const std::string &authority, bool https, bool autoclose);
+    void _finish_response();
 
 protected:
     std::string_view recv_body();

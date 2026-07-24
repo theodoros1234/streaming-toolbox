@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <charconv>
+#include <set>
 
 #define CRLF "\r\n"
 
@@ -82,9 +83,29 @@ void client::cancel_response() {
     _response = nullptr;
 }
 
+void client::_finish_response() {
+    _response = nullptr;
+    if (!_keepalive)
+        _socket->close();
+    _decoders.clear();
+}
+
 static std::string make_header_line(const std::string &name, const std::string &value) {
     return name + ": " + value + CRLF;
     // TODO: make this send stuff directly after adding std::string_view support to tcp_socket::send();
+}
+
+bool client::_connection_reusable(const std::string &authority, bool https, bool autoclose) {
+    bool sock_open = _socket && _socket->is_open();     // open connection
+    bool auth_matches = _authority == authority &&      // matching authority (host and port)
+                        ((https && _socket_container.index() == 2) ||   // matching encryption
+                         (!https && _socket_container.index() == 1));
+
+    // close socket if we're about to connect to another server
+    if (autoclose && sock_open && !auth_matches)
+        _socket->close();
+
+    return sock_open && auth_matches;
 }
 
 client::response client::send(request &r) {
@@ -97,9 +118,9 @@ client::response client::send(request &r) {
     try {
         _request = r._d;
         _request->c = this;
-        _authority = _request->authority;
 
         // set up the appropriate socket and connect
+        bool connection_reusable = false;
         if (_request->https) {
             // https
             networking::tcp_client_ssl *s = nullptr;
@@ -108,37 +129,57 @@ client::response client::send(request &r) {
                 _shutdown_check_early();
                 if (_socket_container.index() == 2) {
                     // reuse existing socket
+                    connection_reusable = _connection_reusable(_request->authority, true, true);
                     _socket->reset();
                     s = &std::get<2>(_socket_container);
                 } else {
                     // create required socket type
+                    if (_socket && _socket->is_open())  // close the old one
+                        _socket->close();
                     s = &_socket_container.emplace<2>(true);
                     _socket = s;
+                    _authority.clear();
                 }
             }
-            s->connect(_request->host, _request->port, false, !_request->allow_invalid_cert);
+
+            if (!connection_reusable)
+                s->connect(_request->host, _request->port, false, !_request->allow_invalid_cert);
         } else {
             // http
             {
                 std::lock_guard<std::mutex> guard(_lock);
                 _shutdown_check_early();
-                if (_socket_container.index() == 1) // reuse existing socket
+                if (_socket_container.index() == 1) {   // reuse existing socket
+                    connection_reusable = _connection_reusable(_request->authority, false, true);
                     _socket->reset();
-                else                                // create required socket type
+                } else {                                // create required socket type
+                    if (_socket && _socket->is_open())  // close the old one
+                        _socket->close();
                     _socket = &_socket_container.emplace<1>(true);
+                    _authority.clear();
+                }
             }
-            _socket->connect(_request->host, _request->port);
+
+            if (!connection_reusable)
+                _socket->connect(_request->host, _request->port);
         }
+
+        _authority = _request->authority;
 
         // send request line
         _socket->send(_request->method + " " + _request->path + " HTTP/1.1" CRLF);
+
+        // decide connection options
+        // std::string rq_connection_options = "keep-alive";
+        // TODO: option to close, and include TE, Upgrade, etc. when necessary
+        _keepalive = true;
 
         // send headers, prioritizing some, and with default values
         // WARNING: always use lowercase names, and never use values that may contain CRLF
         std::initializer_list< std::pair<std::string, std::string> > priority_headers = {
             {"host"s, _authority},
             {"user-agent"s, get_default_user_agent()},
-            {"connection"s, "close"s},
+            // {"connection"s, std::move(rq_connection_options)},
             {"accept-encoding"s, get_supported_decoders_str()}
         };
 
@@ -187,11 +228,11 @@ client::response client::send(request &r) {
         // receive response headers
         while (true) {
             // TODO: obs-fold is allowed, give a param to enable/disable that
-            // TODO: limit max amount of trailers to receive
+            // TODO: limit max amount of headers and trailers to receive
 
             if (!_socket->recv_line(line, true, CRLF, STRTB_HTTP_FIELD_LINE_MAX_LEN)) {
                 if (line.length() >= STRTB_HTTP_FIELD_LINE_MAX_LEN)
-                    throw invalid_message("response header line too long");
+                    throw unsupported_message("response header line too long");
                 else
                     throw invalid_message("incomplete response header line");
             }
@@ -204,6 +245,22 @@ client::response client::send(request &r) {
                 throw invalid_message("invalid response header line");
         }
 
+        // check connection options
+        std::set<std::string> rs_connection_options;
+        auto rs_connection_options_header = _response->headers.fields.find("connection");
+        if (rs_connection_options_header != _response->headers.fields.end()) {
+            auto rs_connection_options_list = parse_field_token_list(rs_connection_options_header->second, false);
+            if (!rs_connection_options_list.valid)
+                throw invalid_message("invalid response connection header");
+
+            for (const auto &opt : rs_connection_options_list.list)
+                rs_connection_options.insert(std::move(opt));
+        }
+
+        // determine if the connection can be reused
+        if (rs_connection_options.count("close") || _response->version.minor < 1)
+            _keepalive = false;
+
         // TODO: Transfer-Encoding in HTTP/1.0 MUST be treated as faulty framing and close the connection afterwards
 
         // determine if a body is present
@@ -213,7 +270,7 @@ client::response client::send(request &r) {
             // close connection if there's no body
             // TODO: remove this when persistent connections are implemented
             _response->c = nullptr;
-            cancel_response();
+            _finish_response();
         } else {
             auto te = _response->headers.fields.find("transfer-encoding");
             if (te != _response->headers.fields.end()) {
@@ -223,7 +280,8 @@ client::response client::send(request &r) {
                     throw invalid_message("invalid response transfer encoding");
 
                 // TODO: check return value to decide if the connection needs to close afterwards
-                transfer_encoding_make_decoders(_decoders, te_parsed.list, _response->trailers, *_socket, true);
+                if (!transfer_encoding_make_decoders(_decoders, te_parsed.list, _response->trailers, *_socket, true))
+                    _keepalive = false;
             } else {
                 auto ce = _response->headers.fields.find("content-length");
 
@@ -241,6 +299,7 @@ client::response client::send(request &r) {
                 } else {
                     // no encoding or length info
                     _decoders.push_back(std::unique_ptr<decoder>(new body_until_close(*_socket)));
+                    _keepalive = false;
                 }
             }
 
@@ -259,6 +318,10 @@ client::response client::send(request &r) {
         _request = nullptr;
 
         return rs;
+    } catch (in_shutdown_state&) {
+        r._d->c = nullptr;
+        cancel_request();
+        throw;
     } catch (...) {
         r._d->c = nullptr;
         cancel_request();
@@ -283,8 +346,8 @@ std::string_view client::recv_body(size_t max_len) {
 
             if (len == 0) {     // reading 0 bytes means we reached the end of the body
                 // unless a shutdown truncated part of the body and somehow didn't cause an error
-                cancel_response();
                 _shutdown_check();
+                _finish_response();
                 // TODO: attempt graceful shutdown over TLS
             }
 
@@ -292,6 +355,9 @@ std::string_view client::recv_body(size_t max_len) {
         } else {
             return std::string_view();
         }
+    } catch (in_shutdown_state&) {
+        cancel_response();
+        throw;
     } catch (...) {
         cancel_response();
         // check if the error was caused by a shutdown
