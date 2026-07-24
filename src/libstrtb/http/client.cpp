@@ -115,6 +115,7 @@ client::response client::send(request &r) {
     if (!r._d)
         throw std::invalid_argument("request object is empty");
 
+    bool retriable = false;
     try {
         _request = r._d;
         _request->c = this;
@@ -166,6 +167,9 @@ client::response client::send(request &r) {
 
         _authority = _request->authority;
 
+        // connection auto-retriable only if an idempotent request fails on a reused persistent connection
+        retriable = connection_reusable && _request->method_idempotent;
+
         // send request line
         _socket->send(_request->method + " " + _request->path + " HTTP/1.1" CRLF);
 
@@ -208,13 +212,20 @@ client::response client::send(request &r) {
         _response = rs._d;
 
         // receive response status-line
+        // request stops being retriable as soon as any data is received
         std::string line;
         if (!_socket->recv_line(line, true, CRLF, STRTB_HTTP_STATUS_LINE_MAX_LEN)) {
-            if (line.length() == STRTB_HTTP_STATUS_LINE_MAX_LEN)
+            if (line.length() == STRTB_HTTP_STATUS_LINE_MAX_LEN) {
+                retriable = false;
                 throw invalid_message("response status line too long");
-            else
+            } else if (line.empty()) {
+                throw incomplete_message("server closed the connection before anything was received");
+            } else {
+                retriable = false;
                 throw invalid_message("incomplete response status line");
+            }
         }
+        retriable = false;
 
         auto status_line = parse_status_line(line);
         if (!status_line.valid)
@@ -327,7 +338,12 @@ client::response client::send(request &r) {
         cancel_request();
         // check if the error was caused by a shutdown
         _shutdown_check();
-        throw;
+
+        // auto-retry if it's safe to do so
+        if (retriable)
+            return send(r);
+        else
+            throw;
     }
 }
 
