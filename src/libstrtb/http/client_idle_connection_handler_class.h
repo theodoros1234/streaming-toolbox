@@ -9,6 +9,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <chrono>
 #include <poll.h>
 #include <sys/eventfd.h>
 
@@ -34,6 +35,7 @@ private:
     struct socket_info_t {
         networking::tcp_client* socket = nullptr;
         bool https = false;
+        std::chrono::time_point<std::chrono::steady_clock> timeout;
         bool detach_requested = false;
         size_t id = 0;  // used during detach to check if this slot was replaced
     };

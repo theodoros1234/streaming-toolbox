@@ -149,28 +149,30 @@ bool client_idle_connection_handler_class::_attach_apply(socket_info_t &info, st
 #endif
 
     try {
+        using namespace std::literals::chrono_literals;
+        // get socket based on its type (regular or SSL)
         switch (rq.socket_container.index()) {
         case 1:
             info.https = false;
             info.socket = &std::get<1>(rq.socket_container);
-            info.id = _next_id;
-            pfd.fd = info.socket->fd();
-            rq.id = _next_id++;
-            rq.index = index;
             break;
 
         case 2:
             info.https = true;
             info.socket = &std::get<2>(rq.socket_container);
-            info.id = _next_id;
-            pfd.fd = info.socket->fd();
-            rq.id = _next_id++;
-            rq.index = index;
             break;
 
         default:
             pfd.fd = -1;
             _log.error({"Cannot monitor a socket of type ", rq.socket_container.index()});
+        }
+
+        if (info.socket) {
+            info.id = _next_id;
+            info.timeout = std::chrono::steady_clock::now() + 30000ms;  // TODO: make this configurable or based on keep-alive
+            pfd.fd = info.socket->fd();
+            rq.id = _next_id++;
+            rq.index = index;
         }
     } catch (std::exception &e) {
         rq.id = 0;
@@ -191,16 +193,34 @@ void client_idle_connection_handler_class::thread_function() {
     _log.info_one("Background thread started");
     bool error = false;
 
+    bool next_timeout_set = false;
+    std::chrono::time_point<std::chrono::steady_clock> next_timeout;
+    int poll_timeout = -1;
+
     while (true) {
         assert(_eventfd != -1);
         assert(!_pollfd.empty());
 
+        // determine when the next timeout is
+        if (next_timeout_set) {
+            // make sure it's still in the future
+            auto now = std::chrono::steady_clock::now();
+            if (next_timeout > now)
+                poll_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(next_timeout - now).count();
+            else
+                poll_timeout = 0;
+        } else {
+            poll_timeout = -1;
+        }
+
         // wait for something to happen
-        if (poll(_pollfd.data(), _pollfd.size(), -1) < 0) {
+        if (poll(_pollfd.data(), _pollfd.size(), poll_timeout) < 0) {
             int err = errno;
             _log.error({"poll() in background thread returned error: [errno ", err, "] ", std::strerror(err)});
             break;
         }
+
+        next_timeout_set = false;
 
         std::lock_guard<std::mutex> guard(_lock);
 
@@ -220,13 +240,21 @@ void client_idle_connection_handler_class::thread_function() {
 
         // go through all watched sockets
         for (size_t i = 0; i < _socket_info.size(); i++) {
+            using namespace std::literals::chrono_literals;
+
             auto &info = _socket_info[i];
             auto &pfd = _pollfd[i+1];
 
             assert((info.socket == nullptr) == (pfd.fd == -1));
             if (info.socket) {
                 // check if socket needs closing
-                if (pfd.revents & (POLLIN | POLLHUP | POLLERR)) {
+                bool needs_close =
+                    // socket closed or error
+                    (pfd.revents & (POLLIN | POLLHUP | POLLERR)) ||
+                    // timed out (or is about to) from our side
+                    (std::chrono::steady_clock::now() + 1s > info.timeout);
+
+                if (needs_close) {
                     // TODO: attempt a graceful shutdown for SSL/TLS sockets
                     try {
                         info.socket->close();
@@ -235,12 +263,10 @@ void client_idle_connection_handler_class::thread_function() {
                     } catch (...) {
                         _log.warning_one("Exception while closing an idle connection");
                     }
+                }
 
-                    // detach
-                    pfd.fd = -1;
-                    info = {};
-                } else if (info.detach_requested) {
-                    // detach if requested
+                // detach if requested or socket closed
+                if (needs_close || info.detach_requested) {
                     pfd.fd = -1;
                     info = {};
                 }
@@ -250,6 +276,17 @@ void client_idle_connection_handler_class::thread_function() {
             // if empty slot, or we just detached, attach any pending sockets to this (newly freed?) slot
             if (!info.socket && !_attach_requests.empty())
                 error = _attach_apply(info, pfd, i) || error;
+
+            // if we end up with a socket on this slot, consider it for the next timeout
+            if (info.socket) {
+                if (next_timeout_set) {
+                    if (info.timeout < next_timeout)
+                        next_timeout = info.timeout;
+                } else {
+                    next_timeout_set = true;
+                    next_timeout = info.timeout;
+                }
+            }
         }
 
         // handle any remaining attach requests
@@ -350,7 +387,7 @@ client::~client() {
         _response->c = nullptr;
     }
 
-    _idle_handler_detach();
+    _cancel();
 }
 
 void client::_shutdown_check_early() {
