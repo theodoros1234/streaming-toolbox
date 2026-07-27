@@ -1,10 +1,13 @@
 #include "client.h"
 #include "strescape.h"
 #include "../logging.h"
+#include "client_idle_connection_handler_class.h"
 
 #include <assert.h>
 #include <charconv>
 #include <set>
+#include <cstring>
+#include <vector>
 
 #define CRLF "\r\n"
 
@@ -16,6 +19,318 @@ static logging::source log("HTTP Client", false);
 
 static inline unsigned int default_port(bool https) {
     return https ? 443 : 80;
+}
+
+static client_idle_connection_handler_class *idle_connection_handler = nullptr;
+
+client_idle_connection_handler_class::client_idle_connection_handler_class() :
+    _log("HTTP Client: Idle Connection Handler", false) {
+    // only one instance of this can exist
+    if (idle_connection_handler)
+        throw std::logic_error("only one instance of the HTTP client idle connection handler can exist");
+
+    // create eventfd object
+    _eventfd = eventfd(0, EFD_NONBLOCK);
+    if (_eventfd == -1) {
+        int err = errno;
+        _log.error({"Failed to create eventfd object: [errno ", err, "] ", std::strerror(err)});
+        _print_warning();
+        return;
+    }
+
+    // set up polling for eventfd
+    _pollfd.push_back({
+        .fd = _eventfd,
+        .events = POLLIN,
+        .revents = 0
+    });
+
+    // start handler thread
+    try {
+        _t = std::thread(&client_idle_connection_handler_class::thread_function, this);
+    } catch (std::exception &e) {
+        _log.error({"Failed to create background thread: ", e.what()});
+        close(_eventfd);
+        _eventfd = -1;
+        _print_warning();
+        _pollfd.clear();
+    } catch (...) {
+        _log.error_one("Failed to create background thread");
+        close(_eventfd);
+        _eventfd = -1;
+        _print_warning();
+        _pollfd.clear();
+    }
+
+    idle_connection_handler = this;
+}
+
+client_idle_connection_handler_class::~client_idle_connection_handler_class() {
+    // stop background thread
+    if (_t.joinable()) {
+        {
+            std::lock_guard<std::mutex> guard(_lock);
+            _shutdown = true;
+
+            if (_eventfd != -1)
+                _event_write();
+        }
+        _t.join();
+    }
+
+    if (_eventfd != -1)
+        close(_eventfd);
+
+    idle_connection_handler = nullptr;
+}
+
+void client_idle_connection_handler_class::_print_warning() {
+    _log.warning_one("Background cleanup thread failed; this may lead to "
+                     "higher resource usage and more frequent failed requests.");
+}
+
+bool client_idle_connection_handler_class::_event_read() {
+    assert(_eventfd != -1);
+    uint64_t value = 0;
+
+    if (read(_eventfd, &value, sizeof(value)) < 0) {
+        int err = errno;
+        _log.error({"Failed to receive signal over eventfd: [errno ", err, "] ", std::strerror(err)});
+        return true;
+    }
+
+    return false;
+}
+
+bool client_idle_connection_handler_class::_event_write() {
+    assert(_eventfd != -1);
+    const uint64_t value = 1;
+
+    if (write(_eventfd, &value, sizeof(value)) < 0) {
+        int err = errno;
+
+        switch (err) {
+        case EAGAIN:    // eventfd counter already at max value, can be ignored
+            return false;
+
+        default:
+            _log.error({"Failed to send signal over eventfd: [errno ", err, "] ", std::strerror(err)});
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool client_idle_connection_handler_class::_attach_apply(socket_info_t &info, struct pollfd &pfd, size_t index) {
+    assert(!_attach_requests.empty());
+    assert(info.socket == nullptr);
+    if (_next_id == 0) {
+        _log.error_one("Out of usable IDs");
+        _attach_requests.clear();
+        return true;
+    }
+
+    auto &rq = _attach_requests.back();
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+
+#ifndef NDEBUG
+    // make sure we're not attaching the same socket multiple times (only for debug mode)
+    int _assert_fd = -1;
+    if (rq.socket_container.index() == 1)
+        _assert_fd = std::get<1>(rq.socket_container).fd();
+    else if (rq.socket_container.index() == 2)
+        _assert_fd = std::get<2>(rq.socket_container).fd();
+
+    if (_assert_fd != -1)
+        for (const auto &p : _pollfd)
+            assert(p.fd != _assert_fd);
+#endif
+
+    try {
+        switch (rq.socket_container.index()) {
+        case 1:
+            info.https = false;
+            info.socket = &std::get<1>(rq.socket_container);
+            info.id = _next_id;
+            pfd.fd = info.socket->fd();
+            rq.id = _next_id++;
+            rq.index = index;
+            break;
+
+        case 2:
+            info.https = true;
+            info.socket = &std::get<2>(rq.socket_container);
+            info.id = _next_id;
+            pfd.fd = info.socket->fd();
+            rq.id = _next_id++;
+            rq.index = index;
+            break;
+
+        default:
+            pfd.fd = -1;
+            _log.error({"Cannot monitor a socket of type ", rq.socket_container.index()});
+        }
+    } catch (std::exception &e) {
+        rq.id = 0;
+        rq.index = 0;
+        pfd.fd = -1;
+        info.id = 0;
+        info.socket = nullptr;
+        _log.error({"Failed to add socket to idle pool: ", e.what()});
+        _attach_requests.pop_back();
+        return true;
+    }
+
+    _attach_requests.pop_back();
+    return false;
+}
+
+void client_idle_connection_handler_class::thread_function() {
+    _log.info_one("Background thread started");
+    bool error = false;
+
+    while (true) {
+        assert(_eventfd != -1);
+        assert(!_pollfd.empty());
+
+        // wait for something to happen
+        if (poll(_pollfd.data(), _pollfd.size(), -1) < 0) {
+            int err = errno;
+            _log.error({"poll() in background thread returned error: [errno ", err, "] ", std::strerror(err)});
+            break;
+        }
+
+        std::lock_guard<std::mutex> guard(_lock);
+
+        // read event (if any)
+        if (_pollfd[0].revents & POLLIN)
+            if (_event_read())
+                break;  // error (printed to log by _event_read())
+
+        if (_shutdown) {
+            // cleanup and stop thread
+            close(_eventfd);
+            _eventfd = -1;
+            _cv.notify_all();
+            _log.info_one("Background thread stopped normally");
+            return;
+        }
+
+        // go through all watched sockets
+        for (size_t i = 0; i < _socket_info.size(); i++) {
+            auto &info = _socket_info[i];
+            auto &pfd = _pollfd[i+1];
+
+            assert((info.socket == nullptr) == (pfd.fd == -1));
+            if (info.socket) {
+                // check if socket needs closing
+                if (pfd.revents & (POLLIN | POLLHUP | POLLERR)) {
+                    // TODO: attempt a graceful shutdown for SSL/TLS sockets
+                    try {
+                        info.socket->close();
+                    } catch (std::exception &e) {
+                        _log.warning({"Exception while closing an idle connection: ", e.what()});
+                    } catch (...) {
+                        _log.warning_one("Exception while closing an idle connection");
+                    }
+
+                    // detach
+                    pfd.fd = -1;
+                    info = {};
+                } else if (info.detach_requested) {
+                    // detach if requested
+                    pfd.fd = -1;
+                    info = {};
+                }
+            }
+
+            assert((info.socket == nullptr) == (pfd.fd == -1));
+            // if empty slot, or we just detached, attach any pending sockets to this (newly freed?) slot
+            if (!info.socket && !_attach_requests.empty())
+                error = _attach_apply(info, pfd, i) || error;
+        }
+
+        // handle any remaining attach requests
+        while (!_attach_requests.empty()) {
+            size_t index = _socket_info.size();
+            auto &info = _socket_info.emplace_back();
+            auto &pfd = _pollfd.emplace_back();
+            error = _attach_apply(info, pfd, index) || error;
+        }
+
+        if (error) {
+            // handle error before releasing the mutex if it happened in here
+            _print_warning();
+            close(_eventfd);
+            _eventfd = -1;
+            _cv.notify_all();
+            _log.info_one("Background thread stopped prematurely");
+            return;
+        }
+
+        // notify anyone waiting (if we were notified first)
+        if (_pollfd[0].revents & POLLIN)
+            _cv.notify_all();
+    }
+
+    // error handling: wake up anyone waiting and exit
+    _print_warning();
+    std::lock_guard<std::mutex> guard(_lock);
+    close(_eventfd);
+    _eventfd = -1;
+    _cv.notify_all();
+    _log.info_one("Background thread stopped prematurely");
+}
+
+std::pair<uint64_t, size_t> client_idle_connection_handler_class::attach(
+    std::variant<bool, networking::tcp_client, networking::tcp_client_ssl> &socket_container) {
+    std::unique_lock<std::mutex> lock(_lock);
+
+    // make sure the background thread hasn't failed
+    if (_eventfd == -1)
+        return {0, 0};
+
+    try {
+        // request to be attached and wait
+        uint64_t id = 0;    // if it stays at 0 => error
+        size_t index = 0;
+
+        _attach_requests.push_back({socket_container, id, index});
+        if (_event_write()) {
+            _log.error_one("Failed to notify background thread during attach");
+            return {0, 0};
+        }
+        _cv.wait(lock);
+
+        return {id, index};
+    } catch (std::exception &e) {
+        _log.error({"Failed to attach socket: ", e.what()});
+    }
+
+    return {0, 0};
+}
+
+void client_idle_connection_handler_class::detach(uint64_t id, size_t index) {
+    std::unique_lock<std::mutex> lock(_lock);
+
+    // make sure the background thread hasn't failed
+    if (_eventfd == -1)
+        return;
+
+    assert(id);
+    auto& info = _socket_info.at(index);
+
+    // was our socket already closed?
+    if (info.id != id)
+        return;
+
+    // wait until it's detached
+    info.detach_requested = true;
+    if (_event_write())
+        _log.error_one("Failed to notify background thread during detach");
+    _cv.wait(lock);
 }
 
 client::client() {}
@@ -34,6 +349,8 @@ client::~client() {
         shutdown();
         _response->c = nullptr;
     }
+
+    _idle_handler_detach();
 }
 
 void client::_shutdown_check_early() {
@@ -64,6 +381,9 @@ void client::reset() {
 
 void client::_cancel() {
     std::lock_guard<std::mutex> guard(_lock);
+    // first, detach socket from background handler thread
+    _idle_handler_detach();
+
     if (_socket) {
         if (_socket->is_open())
             _socket->close();
@@ -85,9 +405,25 @@ void client::cancel_response() {
 
 void client::_finish_response() {
     _response = nullptr;
-    if (!_keepalive)
+    if (_keepalive)     // pass the socket to the background handler thread
+        _idle_handler_attach();
+    else    // instantly close
         _socket->close();
     _decoders.clear();
+}
+
+void client::_idle_handler_attach() {
+    if (idle_connection_handler)
+        std::tie(_idle_handler_id, _idle_handler_index) =
+            idle_connection_handler->attach(_socket_container);
+}
+
+void client::_idle_handler_detach() {
+    if (_idle_handler_id && idle_connection_handler) {
+        idle_connection_handler->detach(_idle_handler_id, _idle_handler_index);
+        _idle_handler_id = 0;
+        _idle_handler_index = 0;
+    }
 }
 
 static std::string make_header_line(const std::string &name, const std::string &value) {
@@ -128,6 +464,7 @@ client::response client::send(request &r) {
             {
                 std::lock_guard<std::mutex> guard(_lock);
                 _shutdown_check_early();
+                _idle_handler_detach();
                 if (_socket_container.index() == 2) {
                     // reuse existing socket
                     connection_reusable = _connection_reusable(_request->authority, true, true);
@@ -150,6 +487,7 @@ client::response client::send(request &r) {
             {
                 std::lock_guard<std::mutex> guard(_lock);
                 _shutdown_check_early();
+                _idle_handler_detach();
                 if (_socket_container.index() == 1) {   // reuse existing socket
                     connection_reusable = _connection_reusable(_request->authority, false, true);
                     _socket->reset();

@@ -9,6 +9,7 @@
 #include <variant>
 #include <map>
 #include <mutex>
+#include <poll.h>
 
 namespace strtb::http {
 
@@ -112,12 +113,17 @@ private:
     request::data* _request = nullptr;
     response::data* _response = nullptr;
     bool _keepalive = false;
+    // for idle connection handler
+    uint64_t _idle_handler_id = 0;
+    size_t _idle_handler_index = 0;
 
     void _shutdown_check_early();
     void _shutdown_check();
     void _cancel();
     bool _connection_reusable(const std::string &authority, bool https, bool autoclose);
     void _finish_response();
+    void _idle_handler_attach();
+    void _idle_handler_detach();
 
 protected:
     std::string_view recv_body();

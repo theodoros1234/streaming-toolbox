@@ -6,6 +6,7 @@
 #include "../libstrtb/version.h"
 #include "../libstrtb/event/system.h"
 #include "../libstrtb/uri.h"
+#include "../libstrtb/http/client_idle_connection_handler_class.h"
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -29,6 +30,12 @@ int main(int argc, char *argv[]) {
         logging::add_output_file(std::string(home_path) + "/.local/share/streaming-toolbox/streaming-toolbox.log",
                                  logging::INFO, logging::LINUX, false, logging::NONE);
     logging::source log("Main", false);
+
+    // Check if assertions are enabled
+#ifndef NDEBUG
+    log.info_one("This build was compiled with assertions enabled, which is useful for debugging, "
+                 "but may affect performance. For release versions, make sure to define NDEBUG to disable this.");
+#endif
 
     // Check libstrtb version
     if (!versions_equal(get_libstrtb_version(),
@@ -59,6 +66,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // Init HTTP systems
+    http::client_idle_connection_handler_class http_client_idle_connection_handler;
 
     // Init config system
     std::filesystem::path config_path;

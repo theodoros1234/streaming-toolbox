@@ -68,6 +68,7 @@ HEADERS += \
     chat/system.h \
     common/deregistration_interface.h \
     http/client.h \
+    http/client_idle_connection_handler_class.h \
     http/codings.h \
     strescape.h \
     version.h \
