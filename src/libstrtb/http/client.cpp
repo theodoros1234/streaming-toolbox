@@ -553,23 +553,39 @@ client::response client::send(request &r) {
         // TODO: option to close, and include TE, Upgrade, etc. when necessary
         _keepalive = true;
 
-        // send headers, prioritizing some, and with default values
+        // decide if we're sending a body
+        std::string content_length;
+        if (_request->body_set)
+            content_length = std::to_string(_request->body_str.length());   // TODO: locale issues
+
+        // send headers, prioritizing some, with default values, and with restrictions
+        struct priority_headers_t {
+            std::string name, value;
+            bool allow_override,    // allows the requester to override the default value
+                 send_default;      // send the default value (or ignore)
+        };
+
         // WARNING: always use lowercase names, and never use values that may contain CRLF
-        std::initializer_list< std::pair<std::string, std::string> > priority_headers = {
-            {"host"s, _authority},
-            {"user-agent"s, get_default_user_agent()},
+        std::initializer_list<priority_headers_t> priority_headers = {
+            {"host"s, _authority, false, true},
+            {"user-agent"s, get_default_user_agent(), true, true},
             // {"connection"s, std::move(rq_connection_options)},
-            {"accept-encoding"s, get_supported_decoders_str()}
+            {"accept-encoding"s, get_supported_decoders_str(), false, !get_supported_decoders_str().empty()},
+            {"content-length"s, std::move(content_length), false, _request->body_set}
         };
 
         for (const auto &h : priority_headers) {
-            auto h_existing = _request->headers.find(h.first);
+            auto h_existing = _request->headers.find(h.name);
             if (h_existing == _request->headers.end()) {
                 // send the default value we defined above
-                _socket->send(make_header_line(h.first, h.second));
+                if (h.send_default)
+                    _socket->send(make_header_line(h.name, h.value));
             } else {
-                // send existing header
-                _socket->send(make_header_line(h_existing->first, h_existing->second));
+                // send existing header if allowed, otherwise just send the default
+                if (h.allow_override)
+                    _socket->send(make_header_line(h_existing->first, h_existing->second));
+                else if (h.send_default)
+                    _socket->send(make_header_line(h.name, h.value));
                 _request->headers.erase(h_existing);
             }
         }
@@ -580,6 +596,13 @@ client::response client::send(request &r) {
 
         // empty line to mark end of headers
         _socket->send(CRLF);
+
+        // send body (if set)
+        if (_request->body_set)
+            _socket->send(_request->body_str);
+        // TODO: monitor connection while sending body for early response with "connection: close"
+        // TODO: ability to send files or stream the body contents
+
         _socket->flush();
 
         // create response object
@@ -654,7 +677,6 @@ client::response client::send(request &r) {
             _response->status == 304 || _response->status / 100 == 1) {
             // certain methods and status codes cannot have a body
             // close connection if there's no body
-            // TODO: remove this when persistent connections are implemented
             _response->c = nullptr;
             _finish_response();
         } else {
@@ -665,7 +687,6 @@ client::response client::send(request &r) {
                 if (!te_parsed.valid)
                     throw invalid_message("invalid response transfer encoding");
 
-                // TODO: check return value to decide if the connection needs to close afterwards
                 if (!transfer_encoding_make_decoders(_decoders, te_parsed.list, _response->trailers, *_socket, true))
                     _keepalive = false;
             } else {
@@ -1009,6 +1030,20 @@ client::request&& client::request::with_path(std::string_view path) {
     return std::move(*this);
 }
 
+void client::request::_with_header_trust_name(const std::string &name, std::string_view value) {
+    // check value for invalid characters
+    for (char c : value)
+        if (!(is_vchar(c) || is_obs_text(c) || is_whitespace(c)))
+            std::invalid_argument("value contains invalid character " + char_escape(c));
+
+    try {
+        _d->headers[name] = value;
+    } catch (...) {
+        _d->headers.erase(name);
+        throw;
+    }
+}
+
 client::request&& client::request::with_header(std::string_view name, std::string_view value) {
     _valid_state(false);
 
@@ -1017,17 +1052,7 @@ client::request&& client::request::with_header(std::string_view name, std::strin
     if (name_tolower.empty() || name_tolower.length() != name.length())
         throw std::invalid_argument("invalid header name");
 
-    // check value for invalid characters
-    for (char c : value)
-        if (!(is_vchar(c) || is_obs_text(c) || is_whitespace(c)))
-            std::invalid_argument("value contains invalid character " + char_escape(c));
-
-    try {
-        _d->headers[name_tolower] = value;
-    } catch (...) {
-        _d->headers.erase(name_tolower);
-        throw;
-    }
+    _with_header_trust_name(name_tolower, value);
 
     return std::move(*this);
 }
@@ -1234,6 +1259,42 @@ void client::response::clear() {
         delete _d;
         _d = nullptr;
     }
+}
+
+client::request&& client::request::with_content_type(std::string_view type) {
+    _valid_state(false);
+    _with_header_trust_name("content-type"s, type);
+    return std::move(*this);
+}
+
+template<class T> client::request&& client::request::_with_body_str(T body) {
+    _valid_state(false);
+    _d->body_str = body;
+    _d->body_set = true;
+    return std::move(*this);
+}
+
+client::request&& client::request::with_body_str(std::string_view &body) {
+    return _with_body_str<std::string_view>(body);
+}
+
+client::request&& client::request::with_body_str(const std::string &body) {
+    return _with_body_str<const std::string&>(body);
+}
+
+client::request&& client::request::with_body_str(std::string &&body) {
+    return _with_body_str<std::string&&>(std::move(body));
+}
+
+client::request&& client::request::with_body_str(const char *body) {
+    return _with_body_str<const char*>(body);
+}
+
+client::request&& client::request::with_body_str(const char *body, size_t length) {
+    _valid_state(false);
+    _d->body_str.assign(body, length);
+    _d->body_set = true;
+    return std::move(*this);
 }
 
 }

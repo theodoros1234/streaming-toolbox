@@ -20,8 +20,10 @@ public:
         bool _verify_not_sending() const;
         void _with_parsed_host(bool https, std::string_view host, uri::host_type_enum type, unsigned int port);
         void _valid_state(bool running);
+        void _with_header_trust_name(const std::string &name, std::string_view value);
         template<class T> request&& _with_headers(T headers);
         template<class T> request&& _with_params(T params);
+        template<class T> request&& _with_body_str(T body);
 
     protected:
         friend client;
@@ -31,11 +33,12 @@ public:
             // authority: for host header, host: for socket connection
             client *c = nullptr;
 
-            std::string method, authority, host, path;
+            std::string method, authority, host, path, body_str;
             int port = -1;
             bool https = false, allow_invalid_cert = false, allow_unsafe_ports = false,
                  method_safe = false, method_idempotent = false,
-                 path_asterisk = false, query_set = false;
+                 path_asterisk = false, query_set = false,
+                 body_set = false;
             std::map<std::string, std::string> headers;
         } *_d = nullptr;
 
@@ -59,6 +62,12 @@ public:
         request&& with_params(std::initializer_list< std::pair<std::string_view, std::string_view> > params);
         request&& allow_invalid_cert(bool value = true);
         request&& allow_unsafe_ports(bool value = true);
+        request&& with_content_type(std::string_view type);
+        request&& with_body_str(const std::string &body);
+        request&& with_body_str(const char *body);
+        request&& with_body_str(const char *body, size_t length);
+        request&& with_body_str(std::string_view &body);
+        request&& with_body_str(std::string &&body);
 
         void cancel();
         void clear();
@@ -106,7 +115,6 @@ private:
     std::mutex _lock;
     std::variant<bool, networking::tcp_client, networking::tcp_client_ssl> _socket_container = false;
     networking::tcp_client *_socket = nullptr;
-    // TODO: rethink this, especially for persistent connections
     volatile bool _is_shutdown = false;
     std::string _authority;
     std::vector<std::unique_ptr<decoder> > _decoders;
