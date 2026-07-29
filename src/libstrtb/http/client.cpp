@@ -1257,41 +1257,48 @@ client::response& client::response::operator=(response &&other) {
 }
 
 http_version client::response::version() const {
+    _verify_data();
     return _d->version;
 }
 
 int client::response::status() const {
+    _verify_data();
     return _d->status;
 }
 
 const std::string& client::response::status_message() const {
+    _verify_data();
     return _d->status_message;
 }
 
 const std::string& client::response::header(std::string_view name) const {
+    _verify_data();
     return _d->headers.get_field(name);
 }
 
 const std::map<std::string, std::string>& client::response::headers() const {
+    _verify_data();
     return _d->headers.fields;
 }
 
 const std::vector<std::string>& client::response::headers_set_cookie() const {
+    _verify_data();
     return _d->headers_set_cookie;
 }
 
 const std::string& client::response::trailer(std::string_view name) const {
+    _verify_data();
     return _d->trailers.get_field(name);
 }
 
 const std::map<std::string, std::string>& client::response::trailers() const {
+    _verify_data();
     return _d->trailers.fields;
 }
 
 // TODO: mostly duplicate code, tidy this up
 std::string_view client::response::recv_body() {
-    if (!_d)
-        throw bad_state("no response assigned");
+    _verify_data();
     _verify_recv_mode(RECV_STREAM, __func__);
     if (!_d->c)
         return std::string_view();
@@ -1308,8 +1315,7 @@ std::string_view client::response::recv_body() {
 }
 
 std::string_view client::response::recv_body(size_t max_len) {
-    if (!_d)
-        throw bad_state("no response assigned");
+    _verify_data();
     _verify_recv_mode(RECV_STREAM, __func__);
     if (!_d->c)
         return std::string_view();
@@ -1341,15 +1347,19 @@ void client::response::clear() {
 }
 
 std::string client::response::body_str() {
-    if (!_d)
-        throw bad_state("no response assigned");
+    _verify_data();
     _verify_recv_mode(RECV_STR, __func__);
-
     return std::move(_d->body_str);
 }
 
+// make sure a data struct exists before each data access
+void client::response::_verify_data() const {
+    if (!_d)
+        throw bad_state("no response assigned");
+}
+
 // make sure the caller (of the "parent" function) used the correct receive mode
-void client::response::_verify_recv_mode(recv_mode_enum wanted, const char *f_name) {
+void client::response::_verify_recv_mode(recv_mode_enum wanted, const char *f_name) const {
     if (_d->recv_mode != wanted) {
         std::string name;
 

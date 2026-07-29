@@ -87,7 +87,8 @@ public:
 
     class response {
     private:
-        void _verify_recv_mode(recv_mode_enum wanted, const char *f_name);
+        void _verify_data() const;
+        void _verify_recv_mode(recv_mode_enum wanted, const char *f_name) const;
 
     protected:
         friend client;
