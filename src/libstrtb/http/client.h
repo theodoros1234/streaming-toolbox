@@ -123,7 +123,7 @@ public:
         const std::string& trailer(std::string_view name) const;
         const std::map<std::string, std::string>& trailers() const;
         std::string_view recv_body();
-        std::string_view recv_body(size_t max_len);
+        std::string_view recv_body(size_t max_len);     // max_len = 0 => automatically find ideal max_len
         std::string body_str();
 
         void cancel();
@@ -153,7 +153,6 @@ private:
     void _idle_handler_detach();
 
 protected:
-    std::string_view recv_body();
     std::string_view recv_body(size_t max_len);
     void cancel_request();
     void cancel_response();

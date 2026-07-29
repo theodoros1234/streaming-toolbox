@@ -730,7 +730,7 @@ client::response client::send(request &r) {
 
             // receive until we reach end of body or exceed the length limit (error)
             while (true) {
-                std::string_view chunk = recv_body();
+                std::string_view chunk = recv_body(0);
                 // NOTE: recv_body handles detaching on end-of-body or error
 
                 if (chunk.empty())  // end of body
@@ -765,11 +765,6 @@ client::response client::send(request &r) {
         else
             throw;
     }
-}
-
-std::string_view client::recv_body() {
-    return recv_body(_socket->buffer_size());
-    // TODO: determine what's an actual good default max_len
 }
 
 std::string_view client::recv_body(size_t max_len) {
@@ -1296,22 +1291,8 @@ const std::map<std::string, std::string>& client::response::trailers() const {
     return _d->trailers.fields;
 }
 
-// TODO: mostly duplicate code, tidy this up
 std::string_view client::response::recv_body() {
-    _verify_data();
-    _verify_recv_mode(RECV_STREAM, __func__);
-    if (!_d->c)
-        return std::string_view();
-
-    try {
-        auto ret = _d->c->recv_body();
-        if (ret.empty())
-            _d->c = nullptr;
-        return ret;
-    } catch (...) {
-        _d->c = nullptr;
-        throw;
-    }
+    return recv_body(0);
 }
 
 std::string_view client::response::recv_body(size_t max_len) {

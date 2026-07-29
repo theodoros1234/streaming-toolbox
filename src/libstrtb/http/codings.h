@@ -17,12 +17,13 @@ namespace strtb::http {
 
 // TODO: fix potential problems on 32-bit systems mixing size_t and unsigned long long types
 
+// NOTE: read(0) means read as much as possible (e.g. buffer size)
+
 class decoder {
 public:
     decoder() = default;
     decoder(const decoder&) = delete;
     virtual ~decoder() = default;
-    virtual std::pair<const char*, size_t> read() = 0;
     virtual std::pair<const char*, size_t> read(size_t max_len) = 0;
 };
 
@@ -35,7 +36,6 @@ private:
 public:
     body_fixed_length(networking::tcp_socket &socket, size_t content_length);
     ~body_fixed_length() = default;
-    std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
 
@@ -46,7 +46,6 @@ private:
 public:
     body_until_close(networking::tcp_socket &socket);
     ~body_until_close() = default;
-    std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
 
@@ -60,7 +59,6 @@ private:
 public:
     body_chunked(networking::tcp_socket &socket, field_parser &trailers);
     ~body_chunked() = default;
-    std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
 
@@ -76,7 +74,6 @@ private:
 public:
     decoder_zlib(decoder& read_from, bool gzip);
     ~decoder_zlib();
-    std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
 
@@ -93,7 +90,6 @@ private:
 public:
     decoder_brotli(decoder& read_from);
     ~decoder_brotli();
-    std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
 
@@ -110,7 +106,6 @@ private:
 public:
     decoder_zstd(decoder& read_from);
     ~decoder_zstd();
-    std::pair<const char*, size_t> read();
     std::pair<const char*, size_t> read(size_t max_len);
 };
 

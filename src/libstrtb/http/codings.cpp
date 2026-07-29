@@ -15,11 +15,10 @@ static logging::source log("HTTP Codings"s, false);
 body_fixed_length::body_fixed_length(networking::tcp_socket &socket, size_t content_length)
     : _socket(socket), _bytes_remaining(content_length) {}
 
-std::pair<const char*, size_t> body_fixed_length::read() {
-    return read(_socket.buffer_size());
-}
-
 std::pair<const char*, size_t> body_fixed_length::read(size_t max_len) {
+    if (max_len == 0)
+        max_len = _socket.buffer_size();
+
     if (_bytes_remaining == 0)  // message already fully read
         return {0, 0};
 
@@ -35,22 +34,20 @@ std::pair<const char*, size_t> body_fixed_length::read(size_t max_len) {
 
 body_until_close::body_until_close(networking::tcp_socket &socket) : _socket(socket) {}
 
-std::pair<const char*, size_t> body_until_close::read() {
-    return read(_socket.buffer_size());
-}
-
 std::pair<const char*, size_t> body_until_close::read(size_t max_len) {
+    if (max_len == 0)
+        max_len = _socket.buffer_size();
+
     return _socket.recv(max_len);
 }
 
 body_chunked::body_chunked(networking::tcp_socket &socket, field_parser &trailers)
     : _socket(socket), _trailers(trailers) {}
 
-std::pair<const char*, size_t> body_chunked::read() {
-    return read(_socket.buffer_size());
-}
-
 std::pair<const char*, size_t> body_chunked::read(size_t max_len) {
+    if (max_len == 0)
+        max_len = _socket.buffer_size();
+
     if (_done)  // already read entire body
         return {0, 0};
 
@@ -158,11 +155,10 @@ decoder_zlib::~decoder_zlib() {
         log.warning({"zlib infateEnd returned error code ", ret});
 }
 
-std::pair<const char*, size_t> decoder_zlib::read() {
-    return read(sizeof(_buf));
-}
-
 std::pair<const char*, size_t> decoder_zlib::read(size_t max_len) {
+    if (max_len == 0)
+        max_len = sizeof(_buf);
+
     if (_buf_pos >= _buf_filled) {   // no ready data in buffer, must decompress some
         if (_done)  // full stream already read
             return {(char*) _buf, 0};
@@ -179,7 +175,7 @@ std::pair<const char*, size_t> decoder_zlib::read(size_t max_len) {
                 return {(char*) _buf, 0};
             } else if (_stream.avail_in == 0 && !_maybe_more_output) {
                 // need to grab more input data
-                std::tie((const char*&) _stream.next_in, _stream.avail_in) = _read_from.read();
+                std::tie((const char*&) _stream.next_in, _stream.avail_in) = _read_from.read(0);
                 if (_stream.avail_in == 0)
                     throw incomplete_message("incomplete compressed data");
             }
@@ -210,7 +206,7 @@ std::pair<const char*, size_t> decoder_zlib::read(size_t max_len) {
             case Z_STREAM_END:  // end of compressed data
                 // make sure there's no more garbage data afterwards
                 // NOTE: this is also required to finalize any other decoders under this one
-                if (_stream.avail_in > 0 || _read_from.read().second > 0)
+                if (_stream.avail_in > 0 || _read_from.read(0).second > 0)
                     throw invalid_message("invalid or corrupted compressed data: "
                                           "garbage data present after compressed section");
                 _done = true;
@@ -240,11 +236,10 @@ decoder_brotli::~decoder_brotli() {
     BrotliDecoderDestroyInstance(_state);
 }
 
-std::pair<const char*, size_t> decoder_brotli::read() {
-    return read(sizeof(_buf));
-}
-
 std::pair<const char*, size_t> decoder_brotli::read(size_t max_len) {
+    if (max_len == 0)
+        max_len = sizeof(_buf);
+
     if (_buf_pos >= _buf_filled) {  // need to decompress more data
         if (_done)  // full stream already read
             return {_buf, 0};
@@ -261,7 +256,7 @@ std::pair<const char*, size_t> decoder_brotli::read(size_t max_len) {
                 return {_buf, 0};
             } else if (_avail_in == 0 && _ret != BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) {
                 // need to grab more input data
-                std::tie(_next_in, _avail_in) = _read_from.read();
+                std::tie(_next_in, _avail_in) = _read_from.read(0);
                 if (_avail_in == 0)
                     throw incomplete_message("incomplete compressed data");
             }
@@ -284,7 +279,7 @@ std::pair<const char*, size_t> decoder_brotli::read(size_t max_len) {
             case BROTLI_DECODER_RESULT_SUCCESS:     // end of compressed data
                 // make sure there's no more garbage data afterwards
                 // NOTE: this is also required to finalize any other decoders under this one
-                if (_avail_in > 0 || _read_from.read().second > 0)
+                if (_avail_in > 0 || _read_from.read(0).second > 0)
                     throw invalid_message("invalid or corrupted compressed data: "
                                           "garbage data present after compressed section");
                 _done = true;
@@ -325,11 +320,10 @@ decoder_zstd::~decoder_zstd() {
         log.warning({"ZSTD_freeDStream returned an error: ", ZSTD_getErrorName(ret)});
 }
 
-std::pair<const char*, size_t> decoder_zstd::read() {
-    return read(sizeof(_buf));
-}
-
 std::pair<const char*, size_t> decoder_zstd::read(size_t max_len) {
+    if (max_len == 0)
+        max_len = sizeof(_buf);
+
     if (_buf_pos >= _buf_filled) {  // need to decompress more data
         if (_done)  // full stream already read
             return {_buf, 0};
@@ -347,7 +341,7 @@ std::pair<const char*, size_t> decoder_zstd::read(size_t max_len) {
             } else if (_zin.pos >= _zin.size && !_more_output) {
                 // need to grab more input data
                 _zin.pos = 0;
-                std::tie(_zin.src, _zin.size) = _read_from.read();
+                std::tie(_zin.src, _zin.size) = _read_from.read(0);
                 if (_zin.size == 0) {
                     if (_zret == 0) {
                         // done
