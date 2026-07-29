@@ -14,6 +14,13 @@
 namespace strtb::http {
 
 class client {
+protected:
+    enum recv_mode_enum {
+        RECV_STREAM,
+        RECV_STR
+        // TODO: RECV_FILE
+    };
+
 public:
     class request {
     private:
@@ -39,6 +46,8 @@ public:
                  method_safe = false, method_idempotent = false,
                  path_asterisk = false, query_set = false,
                  body_set = false;
+            recv_mode_enum recv_mode = RECV_STREAM;
+            size_t recv_max_len = 0;    // only for automatic receiving
             std::map<std::string, std::string> headers;
         } *_d = nullptr;
 
@@ -68,12 +77,18 @@ public:
         request&& with_body_str(const char *body, size_t length);
         request&& with_body_str(std::string_view &body);
         request&& with_body_str(std::string &&body);
+        request&& recv_as_stream();     // default
+        request&& recv_to_str();
+        request&& recv_to_str(size_t max_len);
 
         void cancel();
         void clear();
     };
 
     class response {
+    private:
+        void _verify_recv_mode(recv_mode_enum wanted, const char *f_name);
+
     protected:
         friend client;
 
@@ -85,6 +100,8 @@ public:
             std::string status_message;
             field_parser headers, trailers;
             std::vector<std::string> headers_set_cookie;
+            recv_mode_enum recv_mode = RECV_STREAM;
+            std::string body_str;
         } *_d = nullptr;
 
         response(client *c);
@@ -106,6 +123,7 @@ public:
         const std::map<std::string, std::string>& trailers() const;
         std::string_view recv_body();
         std::string_view recv_body(size_t max_len);
+        std::string body_str();
 
         void cancel();
         void clear();

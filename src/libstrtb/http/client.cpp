@@ -608,6 +608,7 @@ client::response client::send(request &r) {
         // create response object
         response rs(this);
         _response = rs._d;
+        _response->recv_mode = _request->recv_mode;
 
         // receive response status-line
         // request stops being retriable as soon as any data is received
@@ -718,6 +719,29 @@ client::response client::send(request &r) {
                     throw invalid_message("invalid response content encoding");
 
                 content_encoding_make_decoders(_decoders, ce_parsed.list);
+            }
+        }
+
+        // automatically receive body, if requested
+        if (_request->recv_mode == RECV_STR) {
+            _response->c = nullptr;
+            std::string &body = _response->body_str;
+            size_t max_len = _request->recv_max_len;
+
+            // receive until we reach end of body or exceed the length limit (error)
+            while (true) {
+                std::string_view chunk = recv_body();
+                // NOTE: recv_body handles detaching on end-of-body or error
+
+                if (chunk.empty())  // end of body
+                    break;
+
+                if (chunk.length() + body.length() > max_len) { // exceeded length limit
+                    cancel_response();
+                    throw unsupported_message("body length exceeds the configured limit for this receive method");
+                }
+
+                body += chunk;
             }
         }
 
@@ -1150,6 +1174,59 @@ client::request&& client::request::allow_unsafe_ports(bool value) {
     return std::move(*this);
 }
 
+client::request&& client::request::with_content_type(std::string_view type) {
+    _valid_state(false);
+    _with_header_trust_name("content-type"s, type);
+    return std::move(*this);
+}
+
+template<class T> client::request&& client::request::_with_body_str(T body) {
+    _valid_state(false);
+    _d->body_str = body;
+    _d->body_set = true;
+    return std::move(*this);
+}
+
+client::request&& client::request::with_body_str(std::string_view &body) {
+    return _with_body_str<std::string_view>(body);
+}
+
+client::request&& client::request::with_body_str(const std::string &body) {
+    return _with_body_str<const std::string&>(body);
+}
+
+client::request&& client::request::with_body_str(std::string &&body) {
+    return _with_body_str<std::string&&>(std::move(body));
+}
+
+client::request&& client::request::with_body_str(const char *body) {
+    return _with_body_str<const char*>(body);
+}
+
+client::request&& client::request::with_body_str(const char *body, size_t length) {
+    _valid_state(false);
+    _d->body_str.assign(body, length);
+    _d->body_set = true;
+    return std::move(*this);
+}
+
+client::request&& client::request::recv_as_stream() {
+    _valid_state(false);
+    _d->recv_mode = RECV_STREAM;
+    return std::move(*this);
+}
+
+client::request&& client::request::recv_to_str() {
+    return recv_to_str(STRTB_HTTP_RECV_TO_STR_MAX_LEN_DEFAULT);
+}
+
+client::request&& client::request::recv_to_str(size_t max_len) {
+    _valid_state(false);
+    _d->recv_mode = RECV_STR;
+    _d->recv_max_len = max_len;
+    return std::move(*this);
+}
+
 client::response::response(client *c) {
     _d = new data;
     _d->c = c;
@@ -1215,6 +1292,7 @@ const std::map<std::string, std::string>& client::response::trailers() const {
 std::string_view client::response::recv_body() {
     if (!_d)
         throw bad_state("no response assigned");
+    _verify_recv_mode(RECV_STREAM, __func__);
     if (!_d->c)
         return std::string_view();
 
@@ -1232,6 +1310,7 @@ std::string_view client::response::recv_body() {
 std::string_view client::response::recv_body(size_t max_len) {
     if (!_d)
         throw bad_state("no response assigned");
+    _verify_recv_mode(RECV_STREAM, __func__);
     if (!_d->c)
         return std::string_view();
 
@@ -1261,40 +1340,35 @@ void client::response::clear() {
     }
 }
 
-client::request&& client::request::with_content_type(std::string_view type) {
-    _valid_state(false);
-    _with_header_trust_name("content-type"s, type);
-    return std::move(*this);
+std::string client::response::body_str() {
+    if (!_d)
+        throw bad_state("no response assigned");
+    _verify_recv_mode(RECV_STR, __func__);
+
+    return std::move(_d->body_str);
 }
 
-template<class T> client::request&& client::request::_with_body_str(T body) {
-    _valid_state(false);
-    _d->body_str = body;
-    _d->body_set = true;
-    return std::move(*this);
-}
+// make sure the caller (of the "parent" function) used the correct receive mode
+void client::response::_verify_recv_mode(recv_mode_enum wanted, const char *f_name) {
+    if (_d->recv_mode != wanted) {
+        std::string name;
 
-client::request&& client::request::with_body_str(std::string_view &body) {
-    return _with_body_str<std::string_view>(body);
-}
+        switch (_d->recv_mode) {
+        case RECV_STREAM:
+            name = "as_stream";
+            break;
 
-client::request&& client::request::with_body_str(const std::string &body) {
-    return _with_body_str<const std::string&>(body);
-}
+        case RECV_STR:
+            name = "to_str";
+            break;
 
-client::request&& client::request::with_body_str(std::string &&body) {
-    return _with_body_str<std::string&&>(std::move(body));
-}
+        default:
+            name = "invalid value";
+        }
 
-client::request&& client::request::with_body_str(const char *body) {
-    return _with_body_str<const char*>(body);
-}
-
-client::request&& client::request::with_body_str(const char *body, size_t length) {
-    _valid_state(false);
-    _d->body_str.assign(body, length);
-    _d->body_set = true;
-    return std::move(*this);
+        throw std::logic_error("this function ("s + f_name + ") cannot handle "
+                               "the requested receive mode (" + name + ")");
+    }
 }
 
 }
