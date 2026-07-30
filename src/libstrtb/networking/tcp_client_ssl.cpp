@@ -1,4 +1,5 @@
 #include "tcp_client_ssl.h"
+#include "tcp_socket_ssl_common.h"
 #include "../logging.h"
 #include "sigpipe_suppressor.h"
 #include <sys/eventfd.h>
@@ -44,14 +45,17 @@ static struct default_context_container {
     }
 } default_context;
 
-tcp_client_ssl::tcp_client_ssl(bool buffered_send, size_t recv_buffer_size)
-    : tcp_client(buffered_send, recv_buffer_size) {}
+tcp_client_ssl::tcp_client_ssl(bool buffered_send, bool thread_assisted, size_t recv_buffer_size)
+    : tcp_client(buffered_send, recv_buffer_size),
+    _thread_assisted(thread_assisted),
+    _thread(thread_assisted) {}
 
 tcp_client_ssl::~tcp_client_ssl() {
     if (_ssl) {
         log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the SSL connection and the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
         ::shutdown(_sock, SHUT_RDWR);
-        _thread.stop();
+        if (_thread_assisted)
+            _thread.stop();
         SSL_free(_ssl);
         _ssl = nullptr;
         _sock = -1;
@@ -143,7 +147,8 @@ void tcp_client_ssl::connect(const char* address, uint16_t port, bool allow_abru
     }
 
     try {
-        _thread.start(_sock, _ssl);
+        if (_thread_assisted)
+            _thread.start(_sock, _ssl);
     } catch (...) {
         std::lock_guard<std::recursive_mutex> guard(_lock);
         _sock = -1;
@@ -154,12 +159,18 @@ void tcp_client_ssl::connect(const char* address, uint16_t port, bool allow_abru
 
 size_t tcp_client_ssl::_recv(size_t len) {
     assert((_sock == -1) == (_ssl == nullptr));
-    return _thread.recv(_buffer_recv, len);
+    if (_thread_assisted)
+        return _thread.recv(_buffer_recv, len);
+    else
+        return _ssl_recv(_ssl, _buffer_recv, len);
 }
 
 void tcp_client_ssl::_send(const char* buf, size_t len) {
     assert((_sock == -1) == (_ssl == nullptr));
-    _thread.send(buf, len);
+    if (_thread_assisted)
+        _thread.send(buf, len);
+    else
+        return _ssl_send(_ssl, buf, len);
 }
 
 void tcp_client_ssl::shutdown_gracefully() {
@@ -169,7 +180,10 @@ void tcp_client_ssl::shutdown_gracefully() {
     if (_ssl == nullptr)
         throw connection_closed("socket closed or hasn't been opened yet", 0);
 
-    _thread.shutdown_gracefully();
+    if (_thread_assisted)
+        _thread.shutdown_gracefully();
+    else
+        _ssl_shutdown_gracefully(_ssl);
 }
 
 void tcp_client_ssl::close() {
@@ -184,7 +198,8 @@ void tcp_client_ssl::close() {
     _remote_ip = "";
     _remote_port = 0;
     _sock = -1;
-    _thread.stop();
+    if (_thread_assisted)
+        _thread.stop();
     SSL_free(_ssl);
     _ssl = nullptr;
     _line_leftovers = 0;
@@ -192,4 +207,8 @@ void tcp_client_ssl::close() {
 
 SSL* tcp_client_ssl::ssl() const {
     return _ssl;
+}
+
+bool tcp_client_ssl::thread_assisted() const {
+    return _thread_assisted;
 }

@@ -511,7 +511,7 @@ client::response client::send(request &r) {
                     // create required socket type
                     if (_socket && _socket->is_open())  // close the old one
                         _socket->close();
-                    s = &_socket_container.emplace<2>(true);
+                    s = &_socket_container.emplace<2>(true, false);
                     _socket = s;
                     _authority.clear();
                 }

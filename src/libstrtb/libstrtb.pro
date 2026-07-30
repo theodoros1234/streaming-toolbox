@@ -17,6 +17,7 @@ include( ../../version.pri )
 SOURCES += \
     http/client.cpp \
     http/codings.cpp \
+    networking/tcp_socket_ssl_common.cpp \
     strescape.cpp \
     version.cpp \
     config/system.cpp \
@@ -70,6 +71,7 @@ HEADERS += \
     http/client.h \
     http/client_idle_connection_handler_class.h \
     http/codings.h \
+    networking/tcp_socket_ssl_common.h \
     strescape.h \
     version.h \
     config/id_type.h \

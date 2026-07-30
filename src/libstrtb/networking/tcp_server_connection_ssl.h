@@ -13,11 +13,12 @@ class tcp_server_connection_ssl : public tcp_server_connection {
 private:
     SSL* _ssl;
     tcp_socket_ssl_thread _thread;
-    bool _thread_active = false;
+    bool _thread_assisted = false, _thread_active = false;
 protected:
     friend tcp_server_ssl;
     tcp_server_connection_ssl(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
                               bool buffered_send,
+                              bool thread_assisted,
                               size_t buffer_size,
                               int fd,
                               std::string server_ip,
@@ -33,6 +34,7 @@ public:
     void close();
     void shutdown_gracefully();
     SSL* ssl() const;
+    bool thread_assisted() const;
 };
 
 }

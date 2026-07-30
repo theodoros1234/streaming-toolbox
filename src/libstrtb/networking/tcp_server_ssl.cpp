@@ -3,8 +3,8 @@
 
 using namespace strtb::networking;
 
-tcp_server_ssl::tcp_server_ssl(SSL_CTX* ctx, bool buffered_send, size_t buffer_size)
-    : tcp_server(buffered_send, buffer_size) {
+tcp_server_ssl::tcp_server_ssl(SSL_CTX* ctx, bool buffered_send, bool thread_assisted, size_t buffer_size)
+    : tcp_server(buffered_send, buffer_size), _thread_assisted(thread_assisted) {
     if (ctx) {
         // Caller-provided SSL context
         _ctx = ctx;
@@ -33,7 +33,7 @@ tcp_server_ssl::~tcp_server_ssl() {
 }
 
 tcp_server_connection* tcp_server_ssl::_new_connection(const bound_port& server, int sock, std::string remote_ip, int remote_port) {
-    return new tcp_server_connection_ssl(this, _buffered_send, _buffer_size,
+    return new tcp_server_connection_ssl(this, _buffered_send, _thread_assisted, _buffer_size,
                                          sock, server.server_ip, server.server_port, remote_ip, remote_port, _ctx);
 }
 
@@ -43,4 +43,8 @@ SSL_CTX* tcp_server_ssl::ssl_ctx() const {
 
 tcp_server_connection_ssl* tcp_server_ssl::accept() {
     return (tcp_server_connection_ssl*) tcp_server::accept();
+}
+
+bool tcp_server_ssl::thread_assisted() const {
+    return _thread_assisted;
 }

@@ -13,10 +13,12 @@ using namespace strtb::networking;
 
 static strtb::logging::source log("SSL Helper Thread", false);
 
-tcp_socket_ssl_thread::tcp_socket_ssl_thread() {
-    _eventfd = eventfd(0, 0);
-    if (_eventfd == -1)
-        throw internal_error("failed to create internal synchronization mechanism: " + std::string(std::strerror(errno)), errno);
+tcp_socket_ssl_thread::tcp_socket_ssl_thread(bool thread_assisted) {
+    if (thread_assisted) {
+        _eventfd = eventfd(0, 0);
+        if (_eventfd == -1)
+            throw internal_error("failed to create internal synchronization mechanism: " + std::string(std::strerror(errno)), errno);
+    }
 }
 
 tcp_socket_ssl_thread::~tcp_socket_ssl_thread() {

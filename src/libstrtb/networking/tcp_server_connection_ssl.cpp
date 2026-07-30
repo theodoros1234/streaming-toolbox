@@ -1,4 +1,5 @@
 #include "tcp_server_connection_ssl.h"
+#include "tcp_socket_ssl_common.h"
 #include "../logging.h"
 #include <assert.h>
 #include <stdexcept>
@@ -9,6 +10,7 @@ static strtb::logging::source log("TCP Socket", false);
 
 tcp_server_connection_ssl::tcp_server_connection_ssl(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
                                                      bool buffered_send,
+                                                     bool thread_assisted,
                                                      size_t buffer_size,
                                                      int fd,
                                                      std::string server_ip,
@@ -16,7 +18,8 @@ tcp_server_connection_ssl::tcp_server_connection_ssl(strtb::common::deregistrati
                                                      std::string remote_ip,
                                                      int remote_port,
                                                      SSL_CTX* ctx) :
-    tcp_server_connection(parent, buffered_send, buffer_size, fd, server_ip, server_port, remote_ip, remote_port) {
+    tcp_server_connection(parent, buffered_send, buffer_size, fd, server_ip, server_port, remote_ip, remote_port),
+    _thread(thread_assisted), _thread_assisted(thread_assisted) {
     _ssl = SSL_new(ctx);
     if (!_ssl)
         throw internal_error_ssl("Could not create SSL object", 0);
@@ -89,8 +92,10 @@ void tcp_server_connection_ssl::handshake() {
     }
 
     // SSL IO helper thread
-    _thread_active = true;
-    _thread.start(_sock, _ssl);
+    if (_thread_assisted) {
+        _thread_active = true;
+        _thread.start(_sock, _ssl);
+    }
 }
 
 void tcp_server_connection_ssl::close() {
@@ -118,12 +123,18 @@ void tcp_server_connection_ssl::close() {
 
 size_t tcp_server_connection_ssl::_recv(size_t len) {
     assert((_sock == -1) == (_ssl == nullptr));
-    return _thread.recv(_buffer_recv, len);
+    if (_thread_assisted)
+        return _thread.recv(_buffer_recv, len);
+    else
+        return _ssl_recv(_ssl, _buffer_recv, len);
 }
 
 void tcp_server_connection_ssl::_send(const char* buf, size_t len) {
     assert((_sock == -1) == (_ssl == nullptr));
-    _thread.send(buf, len);
+    if (_thread_assisted)
+        _thread.send(buf, len);
+    else
+        _ssl_send(_ssl, buf, len);
 }
 
 void tcp_server_connection_ssl::shutdown_gracefully() {
@@ -133,9 +144,16 @@ void tcp_server_connection_ssl::shutdown_gracefully() {
     if (_ssl == nullptr)
         throw connection_closed("socket already closed", 0);
 
-    _thread.shutdown_gracefully();
+    if (_thread_assisted)
+        _thread.shutdown_gracefully();
+    else
+        _ssl_shutdown_gracefully(_ssl);
 }
 
 SSL* tcp_server_connection_ssl::ssl() const {
     return _ssl;
+}
+
+bool tcp_server_connection_ssl::thread_assisted() const {
+    return _thread_assisted;
 }
