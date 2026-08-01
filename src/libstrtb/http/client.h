@@ -101,7 +101,6 @@ public:
             int status = 0;
             std::string status_message;
             field_parser headers, trailers;
-            std::vector<std::string> headers_set_cookie;
             recv_mode_enum recv_mode = RECV_STREAM;
             std::string body_str;
         } *_d = nullptr;

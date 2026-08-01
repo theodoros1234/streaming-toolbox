@@ -1278,7 +1278,7 @@ const std::map<std::string, std::string>& client::response::headers() const {
 
 const std::vector<std::string>& client::response::headers_set_cookie() const {
     _verify_data();
-    return _d->headers_set_cookie;
+    return _d->headers.fields_set_cookie;
 }
 
 const std::string& client::response::trailer(std::string_view name) const {
