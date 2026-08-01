@@ -52,6 +52,7 @@ public:
         } *_d = nullptr;
 
     public:
+        request() = default;
         request(std::string_view method);
         ~request();
         request(const request&) = delete;
