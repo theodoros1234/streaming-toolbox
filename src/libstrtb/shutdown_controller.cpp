@@ -85,6 +85,7 @@ void shutdown_controller::detach_parent() {
 
         p = _parent;
         _parent = nullptr;
+        _state_parent = false;
     }
 
     /* detach outside of mutex-locked area to prevent deadlock

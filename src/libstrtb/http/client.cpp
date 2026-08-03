@@ -467,6 +467,7 @@ void client::detach_shutdown_controller() {
 
         p = _shutdown_controller;
         _shutdown_controller = nullptr;
+        _shutdown_controller_state = false;
     }
 
     shutdown_controllable_detach(p);
