@@ -373,6 +373,8 @@ void client_idle_connection_handler_class::detach(uint64_t id, size_t index) {
 client::client() {}
 
 client::~client() {
+    detach_shutdown_controller();
+
     if (_request) {
         log.warning_one("Destroying while a request object is still connected. "
                         "Attempting to disconnect, but this may cause a crash.");
@@ -401,8 +403,7 @@ void client::_shutdown_check() {
     _shutdown_check_early();
 }
 
-void client::shutdown() {
-    std::lock_guard<std::mutex> guard(_lock);
+void client::_shutdown() {
     _is_shutdown = true;
     if (_socket) {
         _socket->cancel_connect();
@@ -410,10 +411,65 @@ void client::shutdown() {
     }
 }
 
-void client::reset() {
+void client::shutdown() {
+    std::lock_guard<std::mutex> guard(_lock);
+    _shutdown();
+}
+
+void client::shutdown_controllable_signal(bool state) {
+    std::lock_guard<std::mutex> guard(_lock);
+    // ignore if in the middle of detaching
+    if (!_shutdown_controller)
+        return;
+
+    _shutdown_controller_state = state;
+    if (state)
+        _shutdown();
+    else
+        _reset();
+}
+
+void client::_reset() {
     _is_shutdown = false;
     if (_socket)
         _socket->reset();
+}
+
+void client::reset() {
+    std::lock_guard<std::mutex> guard(_lock);
+    // only reset if controller isn't shut down
+    if (!_shutdown_controller_state)
+        _reset();
+}
+
+void client::attach_shutdown_controller(shutdown_controller &ctrl) {
+    std::lock_guard<std::mutex> guard(_lock);
+    if (_shutdown_controller)
+        shutdown_controllable_throw_already_attached();
+
+    _shutdown_controller_state = shutdown_controllable_attach(ctrl);
+    _shutdown_controller = &ctrl;
+
+    // handle past shutdown
+    if (_shutdown_controller_state)
+        _shutdown();
+}
+
+void client::detach_shutdown_controller() {
+    shutdown_controller *p;
+
+    {
+        std::lock_guard<std::mutex> guard(_lock);
+
+        // silently ignore no controller
+        if (!_shutdown_controller)
+            return;
+
+        p = _shutdown_controller;
+        _shutdown_controller = nullptr;
+    }
+
+    shutdown_controllable_detach(p);
 }
 
 void client::_cancel() {

@@ -13,8 +13,14 @@ protected:
     friend shutdown_controller;
     virtual ~shutdown_controllable() = default;
     virtual void shutdown_controllable_signal(bool state) = 0;
+    bool shutdown_controllable_attach(shutdown_controller &ctrl);
+    void shutdown_controllable_detach(shutdown_controller *ctrl);
     void shutdown_controllable_throw_already_attached() const;
 };
+
+/* NOTES:
+ * - Make sure all controllables either get destroyed before the controller, or manually detach them.
+ */
 
 class shutdown_controller : public shutdown_controllable {
 private:
@@ -25,6 +31,7 @@ private:
     void _change_state(bool state);
 
 protected:
+    friend shutdown_controllable;
     bool attach(shutdown_controllable *ctrl);
     void detach(shutdown_controllable *ctrl);
     void shutdown_controllable_signal(bool state);

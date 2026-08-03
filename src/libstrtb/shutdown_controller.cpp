@@ -16,7 +16,9 @@ shutdown_controller::~shutdown_controller() {
     detach_parent();
     if (!_set.empty())
         log.warning({"Destroying while ", _set.size(),
-                     " controllable(s) are still attached. This may lead to a crash."});
+                     " controllable(s) are still attached. This may lead to a crash. "
+                     "If you're a plugin dev, make sure that either all controllables "
+                     "get destroyed before the controller, or explicitly detach them."});
 }
 
 bool shutdown_controller::attach(shutdown_controllable *ctrl) {
@@ -94,6 +96,16 @@ void shutdown_controller::detach_parent() {
 bool shutdown_controller::state() const {
     return _state;
 }
+
+bool shutdown_controllable::shutdown_controllable_attach(shutdown_controller &ctrl) {
+    return ctrl.attach(this);
+}
+
+void shutdown_controllable::shutdown_controllable_detach(shutdown_controller *ctrl) {
+    ctrl->detach(this);
+}
+
+void shutdown_controllable_detach();
 
 void shutdown_controllable::shutdown_controllable_throw_already_attached() const {
     throw std::logic_error("another shutdown controller is already attached");

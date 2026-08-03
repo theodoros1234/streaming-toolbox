@@ -6,6 +6,7 @@
 #include "../networking/tcp_client.h"
 #include "../networking/tcp_client_ssl.h"
 #include "../uri.h"
+#include "../shutdown_controller.h"
 #include <variant>
 #include <map>
 #include <mutex>
@@ -13,7 +14,7 @@
 
 namespace strtb::http {
 
-class client {
+class client : public shutdown_controllable {
 protected:
     enum recv_mode_enum {
         RECV_STREAM,
@@ -134,7 +135,8 @@ private:
     std::mutex _lock;
     std::variant<bool, networking::tcp_client, networking::tcp_client_ssl> _socket_container = false;
     networking::tcp_client *_socket = nullptr;
-    volatile bool _is_shutdown = false;
+    volatile bool _is_shutdown = false, _shutdown_controller_state = false;
+    shutdown_controller *_shutdown_controller = nullptr;
     std::string _authority;
     std::vector<std::unique_ptr<decoder> > _decoders;
     request::data* _request = nullptr;
@@ -146,6 +148,8 @@ private:
 
     void _shutdown_check_early();
     void _shutdown_check();
+    void _shutdown();
+    void _reset();
     void _cancel();
     bool _connection_reusable(const std::string &authority, bool https, bool autoclose);
     void _finish_response();
@@ -156,10 +160,13 @@ protected:
     std::string_view recv_body(size_t max_len);
     void cancel_request();
     void cancel_response();
+    void shutdown_controllable_signal(bool state);
 
 public:
     client();
     ~client();
+    void attach_shutdown_controller(shutdown_controller &ctrl);
+    void detach_shutdown_controller();
     response send(request &r);
 
     const std::string& authority() const;
