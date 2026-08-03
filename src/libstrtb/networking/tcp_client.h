@@ -4,14 +4,19 @@
 #include <time.h>
 
 #include "tcp_socket.h"
+#include "../shutdown_controller.h"
 
 namespace strtb::networking {
 
-class tcp_client : public tcp_socket {
+class tcp_client : public tcp_socket, public shutdown_controllable {
 protected:
     std::string _remote_ip;
     int _remote_port = 0;
-    bool _connecting = false, _cancel_sent = false, _connect_restrict = false;
+    bool _connecting = false, _cancel_sent = false,
+         _connect_restrict = false, _shutdown_controller_state = false;
+    shutdown_controller *_shutdown_controller = nullptr;
+
+    void shutdown_controllable_signal(bool state);
 
     // Platform-specific
 #ifdef __linux__
@@ -28,6 +33,8 @@ public:
     void close();
     const std::string& remote_ip() const;
     int remote_port() const;
+    void attach_shutdown_controller(shutdown_controller &ctrl);
+    void detach_shutdown_controller();
 };
 
 }

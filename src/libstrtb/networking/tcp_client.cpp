@@ -26,6 +26,7 @@ tcp_client::tcp_client(bool buffered_send, size_t buffer_size) : tcp_socket(buff
 }
 
 tcp_client::~tcp_client() {
+    detach_shutdown_controller();
     if (_sock != -1)
         log.put(logging::WARNING, {"Destructor called when client connection to ", _remote_ip, ":", _remote_port, " was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
     ::close(_event);
@@ -336,7 +337,8 @@ void tcp_client::connect(const std::string& address, uint16_t port, time_t timeo
 
 void tcp_client::reset() {
     std::lock_guard<std::recursive_mutex> guard(_lock);
-    _connect_restrict = false;
+    if (!_shutdown_controller_state)
+        _connect_restrict = false;
 }
 
 void tcp_client::cancel_connect() {
@@ -348,6 +350,7 @@ void tcp_client::cancel_connect() {
             throw internal_error("error in internal synchronization mechanism: " + std::string(strerror(errno)), errno);
         _cancel_sent = true;
     }
+    shutdown();
 }
 
 void tcp_client::close() {
@@ -364,4 +367,44 @@ const std::string& tcp_client::remote_ip() const {
 
 int tcp_client::remote_port() const {
     return _remote_port;
+}
+
+void tcp_client::attach_shutdown_controller(shutdown_controller &ctrl) {
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    if (_shutdown_controller)
+        shutdown_controllable_throw_already_attached();
+
+    _shutdown_controller_state = shutdown_controllable_attach(ctrl);
+    _shutdown_controller = &ctrl;
+
+    if (_shutdown_controller_state)
+        cancel_connect();
+}
+
+void tcp_client::detach_shutdown_controller() {
+    shutdown_controller *p;
+
+    {
+        std::lock_guard<std::recursive_mutex> guard(_lock);
+        if (!_shutdown_controller)
+            return;
+
+        p = _shutdown_controller;
+        _shutdown_controller = nullptr;
+        _shutdown_controller_state = false;
+    }
+
+    shutdown_controllable_detach(p);
+}
+
+void tcp_client::shutdown_controllable_signal(bool state) {
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    if (!_shutdown_controller)  // in the middle of detaching
+        return;
+
+    _shutdown_controller_state = state;
+    if (state)
+        cancel_connect();
+    else
+        reset();
 }

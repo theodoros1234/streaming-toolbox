@@ -405,10 +405,8 @@ void client::_shutdown_check() {
 
 void client::_shutdown() {
     _is_shutdown = true;
-    if (_socket) {
+    if (_socket)
         _socket->cancel_connect();
-        _socket->shutdown();
-    }
 }
 
 void client::shutdown() {
