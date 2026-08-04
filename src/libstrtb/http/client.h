@@ -98,16 +98,22 @@ public:
         void clear();
     };
 
-    class response {
+    class response : public shutdown_controllable {
     private:
         void _verify_data() const;
         void _verify_recv_mode(recv_mode_enum wanted, const char *f_name) const;
+        void _shutdown();
+        void _cancel();
+        void _move(response &&other);
 
     protected:
         friend client;
 
         struct data {
+            std::mutex lock;
             client *c = nullptr;
+            shutdown_controller *shutdown_ctrl = nullptr;
+            bool shutdown_ctrl_state = false;
 
             http_version version;
             int status = 0;
@@ -118,6 +124,7 @@ public:
         } *_d = nullptr;
 
         response(client *c);
+        void shutdown_controllable_signal(bool state);
 
     public:
         response() = default;
@@ -137,6 +144,8 @@ public:
         std::string_view recv_body();
         std::string_view recv_body(size_t max_len);     // max_len = 0 => automatically find ideal max_len
         std::string body_str();
+        void attach_shutdown_controller(shutdown_controller &ctrl);
+        void detach_shutdown_controller();
 
         void cancel();
         void clear();

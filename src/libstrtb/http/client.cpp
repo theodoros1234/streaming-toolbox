@@ -844,8 +844,21 @@ client::response client::send(request::data *r) {
             }
         }
 
-        _request->c = nullptr;
-        _request = nullptr;
+        shutdown_controller *ctrl = nullptr;
+        // detach from request
+        {
+            std::lock_guard<std::mutex> guard_rq(_request->lock);
+            std::lock_guard<std::mutex> guard(_lock);
+            ctrl = _request->shutdown_ctrl;
+            _request->c = nullptr;
+            _request = nullptr;
+        }
+
+        // any missed shutdown signal in this gap will be delivered by the attachment below
+
+        // attach request's shutdown controller to response
+        if (ctrl)
+            rs.attach_shutdown_controller(*ctrl);
 
         return rs;
     } catch (in_shutdown_state&) {
@@ -1356,6 +1369,7 @@ client::request&& client::request::recv_to_str(size_t max_len) {
 }
 
 client::request&& client::request::with_shutdown_controller(shutdown_controller &ctrl) {
+    // NOTE: the HTTP client will automatically pass the controller to the response object
     _valid_state(false);
     std::lock_guard<std::mutex> guard(_d->lock);
 
@@ -1407,26 +1421,39 @@ client::response::response(client *c) {
 }
 
 client::response::~response() {
-    cancel();
-    if (_d) {
-        delete _d;
-        _d = nullptr;
+    clear();
+}
+
+void client::response::_move(response &&other) {
+    // NOTE: clearing this object's data must be done by caller if necessary
+
+    // temporarily detach any shutdown controller
+    bool ctrl_attached = false;
+    if (other._d && other._d->shutdown_ctrl) {
+        ctrl_attached = true;
+        other.shutdown_controllable_detach(other._d->shutdown_ctrl);
+    }
+
+    // move over the data struct
+    _d = other._d;
+    other._d = nullptr;
+
+    // reattach the shutdown controller
+    if (ctrl_attached) {
+        std::lock_guard<std::mutex> guard(_d->lock);
+        _d->shutdown_ctrl_state = shutdown_controllable_attach(*_d->shutdown_ctrl);
+        if (_d->shutdown_ctrl_state)
+            _shutdown();
     }
 }
 
 client::response::response(response &&other) {
-    _d = other._d;
-    other._d = nullptr;
+    _move(std::move(other));
 }
 
 client::response& client::response::operator=(response &&other) {
-    cancel();
-    if (_d)
-        delete _d;
-
-    _d = other._d;
-    other._d = nullptr;
-
+    clear();
+    _move(std::move(other));
     return *this;
 }
 
@@ -1491,21 +1518,6 @@ std::string_view client::response::recv_body(size_t max_len) {
     }
 }
 
-void client::response::cancel() {
-    if (_d && _d->c) {
-        _d->c->cancel_response();
-        _d->c = nullptr;
-    }
-}
-
-void client::response::clear() {
-    cancel();
-    if (_d) {
-        delete _d;
-        _d = nullptr;
-    }
-}
-
 std::string client::response::body_str() {
     _verify_data();
     _verify_recv_mode(RECV_STR, __func__);
@@ -1539,6 +1551,79 @@ void client::response::_verify_recv_mode(recv_mode_enum wanted, const char *f_na
         throw std::logic_error("this function ("s + f_name + ") cannot handle "
                                "the requested receive mode (" + name + ")");
     }
+}
+
+void client::response::_cancel() {
+    if (_d->c) {
+        _d->c->cancel_response();
+        _d->c = nullptr;
+    }
+}
+
+void client::response::cancel() {
+    if (_d) {
+        std::lock_guard<std::mutex> guard(_d->lock);
+        _cancel();
+    }
+}
+
+void client::response::clear() {
+    if (_d) {
+        if (_d->shutdown_ctrl)
+            shutdown_controllable_detach(_d->shutdown_ctrl);
+        _cancel();
+        delete _d;
+        _d = nullptr;
+    }
+}
+
+void client::response::_shutdown() {
+    if (_d->c)
+        _d->c->shutdown_response();
+}
+
+void client::response::attach_shutdown_controller(shutdown_controller &ctrl) {
+    _verify_data();
+    std::lock_guard<std::mutex> guard(_d->lock);
+    if (_d->shutdown_ctrl)
+        shutdown_controllable_throw_already_attached();
+
+    _d->shutdown_ctrl_state = shutdown_controllable_attach(ctrl);
+    _d->shutdown_ctrl = &ctrl;
+
+    if (_d->shutdown_ctrl_state)
+        _shutdown();
+}
+
+void client::response::detach_shutdown_controller() {
+    if (!_d)
+        return;
+
+    shutdown_controller *p;
+
+    {
+        std::lock_guard<std::mutex> guard(_d->lock);
+        if (!_d->shutdown_ctrl)
+            return;
+
+        p = _d->shutdown_ctrl;
+        _d->shutdown_ctrl = nullptr;
+        _d->shutdown_ctrl_state = false;
+    }
+
+    shutdown_controllable_detach(p);
+}
+
+void client::response::shutdown_controllable_signal(bool state) {
+    assert(_d);
+    std::lock_guard<std::mutex> guard(_d->lock);
+    // ignore mid-detach
+    if (!_d->shutdown_ctrl)
+        return;
+
+    _d->shutdown_ctrl_state = state;
+    if (state)
+        _shutdown();
 }
 
 }
