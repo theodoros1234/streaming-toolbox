@@ -201,6 +201,38 @@ public:
     void reset();       // for undoing shutdown and allowing a new connection
 };
 
+// request creation shortcuts
+client::request get();
+client::request get(std::string_view url);
+client::request get(bool https, std::string_view hostname);
+client::request get(bool https, std::string_view hostname, unsigned int port);
+
+client::request head();
+client::request head(std::string_view url);
+client::request head(bool https, std::string_view hostname);
+client::request head(bool https, std::string_view hostname, unsigned int port);
+
+client::request post();
+client::request post(std::string_view url);
+client::request post(bool https, std::string_view hostname);
+client::request post(bool https, std::string_view hostname, unsigned int port);
+
+client::request put();
+client::request put(std::string_view url);
+client::request put(bool https, std::string_view hostname);
+client::request put(bool https, std::string_view hostname, unsigned int port);
+
+client::request options();
+client::request options(std::string_view url);
+client::request options(bool https, std::string_view hostname);
+client::request options(bool https, std::string_view hostname, unsigned int port);
+
+// delete conflicts with keyword, so the name has to be a little awkward
+client::request delete_m();
+client::request delete_m(std::string_view url);
+client::request delete_m(bool https, std::string_view hostname);
+client::request delete_m(bool https, std::string_view hostname, unsigned int port);
+
 }
 
 #endif // STRTB_HTTP_CLIENT_H

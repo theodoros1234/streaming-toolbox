@@ -1626,4 +1626,32 @@ void client::response::shutdown_controllable_signal(bool state) {
         _shutdown();
 }
 
+// request creation shortcuts
+// using a #define here isn't the prettiest code, but it removes the need for a lot of copy-pasting
+// can't use a template cause I gotta define different function names, too
+
+#define STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(func_name, method_str) \
+    client::request func_name() { \
+        return client::request(method_str); \
+    } \
+    \
+    client::request func_name(std::string_view url) { \
+        return client::request(method_str).with_url(url); \
+    } \
+    \
+    client::request func_name(bool https, std::string_view hostname) { \
+        return client::request(method_str).with_host(https, hostname); \
+    } \
+    \
+    client::request func_name(bool https, std::string_view hostname, unsigned int port) { \
+        return client::request(method_str).with_host(https, hostname, port); \
+    }
+
+STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(get, "GET");
+STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(head, "HEAD");
+STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(post, "POST");
+STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(put, "PUT");
+STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(options, "OPTIONS");
+STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(delete_m, "DELETE");
+
 }
