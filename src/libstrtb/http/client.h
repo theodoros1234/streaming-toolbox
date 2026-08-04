@@ -23,7 +23,7 @@ protected:
     };
 
 public:
-    class request {
+    class request : public shutdown_controllable {
     private:
         bool _verify_not_sending() const;
         void _with_parsed_host(bool https, std::string_view host, uri::host_type_enum type, unsigned int port);
@@ -32,15 +32,21 @@ public:
         template<class T> request&& _with_headers(T headers);
         template<class T> request&& _with_params(T params);
         template<class T> request&& _with_body_str(T body);
+        void _shutdown();
+        void _cancel();
+        void _move(request &&other);
 
     protected:
         friend client;
 
         struct data {
             // TODO: state
-            // authority: for host header, host: for socket connection
+            std::mutex lock;
             client *c = nullptr;
+            shutdown_controller *shutdown_ctrl = nullptr;
+            bool shutdown_ctrl_state = false;
 
+            // authority: for host header, host: for socket connection
             std::string method, authority, host, path, body_str;
             int port = -1;
             bool https = false, allow_invalid_cert = false, allow_unsafe_ports = false,
@@ -51,6 +57,8 @@ public:
             size_t recv_max_len = 0;    // only for automatic receiving
             std::map<std::string, std::string> headers;
         } *_d = nullptr;
+
+        void shutdown_controllable_signal(bool state);
 
     public:
         request() = default;
@@ -79,9 +87,12 @@ public:
         request&& with_body_str(const char *body, size_t length);
         request&& with_body_str(std::string_view &body);
         request&& with_body_str(std::string &&body);
+        request&& with_shutdown_controller(shutdown_controller &ctrl);
         request&& recv_as_stream();     // default
         request&& recv_to_str();
         request&& recv_to_str(size_t max_len);
+
+        void detach_shutdown_controller();
 
         void cancel();
         void clear();
@@ -135,7 +146,8 @@ private:
     std::mutex _lock;
     std::variant<bool, networking::tcp_client, networking::tcp_client_ssl> _socket_container = false;
     networking::tcp_client *_socket = nullptr;
-    volatile bool _is_shutdown = false, _shutdown_controller_state = false;
+    volatile bool _is_shutdown = false, _shutdown_controller_state = false,
+                  _is_shutdown_rq = false, _is_shutdown_rs = false;
     shutdown_controller *_shutdown_controller = nullptr;
     std::string _authority;
     std::vector<std::unique_ptr<decoder> > _decoders;
@@ -160,7 +172,10 @@ protected:
     std::string_view recv_body(size_t max_len);
     void cancel_request();
     void cancel_response();
+    void shutdown_request();
+    void shutdown_response();
     void shutdown_controllable_signal(bool state);
+    response send(request::data *r);
 
 public:
     client();

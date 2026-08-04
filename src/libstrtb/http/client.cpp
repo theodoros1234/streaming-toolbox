@@ -396,6 +396,10 @@ void client::_shutdown_check_early() {
     // try to detect a shutdown early (before the request is sent)
     if (_is_shutdown)
         throw in_shutdown_state("http client was shut down");
+    if (_is_shutdown_rq)
+        throw in_shutdown_state("http request was shut down");
+    if (_is_shutdown_rs)
+        throw in_shutdown_state("http response was shut down");
 }
 
 void client::_shutdown_check() {
@@ -412,6 +416,22 @@ void client::_shutdown() {
 void client::shutdown() {
     std::lock_guard<std::mutex> guard(_lock);
     _shutdown();
+}
+
+void client::shutdown_request() {
+    std::lock_guard<std::mutex> guard(_lock);
+    assert(_request);
+    _is_shutdown_rq = true;
+    if (_socket)
+        _socket->cancel_connect();
+}
+
+void client::shutdown_response() {
+    std::lock_guard<std::mutex> guard(_lock);
+    assert(_response);
+    _is_shutdown_rs = true;
+    if (_socket)
+        _socket->cancel_connect();
 }
 
 void client::shutdown_controllable_signal(bool state) {
@@ -538,25 +558,38 @@ bool client::_connection_reusable(const std::string &authority, bool https, bool
 
 client::response client::send(request &r) {
     // request must be prepared
-    if (_request || _response)
-        throw bad_state("another request is in progress");
     if (!r._d)
         throw std::invalid_argument("request object is empty");
+    return send(r._d);
+}
 
+client::response client::send(request::data *r) {
+    if (_request || _response)
+        throw bad_state("another request is in progress");
+
+    _is_shutdown_rq = false;
+    _is_shutdown_rs = false;
     bool retriable = false;
-    try {
-        _request = r._d;
-        _request->c = this;
 
+    try {
         // set up the appropriate socket and connect
         bool connection_reusable = false;
-        if (_request->https) {
+        if (r->https) {
             // https
             networking::tcp_client_ssl *s = nullptr;
             {
+                std::lock_guard<std::mutex> guard_rq(r->lock);
                 std::lock_guard<std::mutex> guard(_lock);
+
+                // check for request shutdown before attaching to the request
+                _is_shutdown_rq = r->shutdown_ctrl_state;
                 _shutdown_check_early();
+                _request = r;
+                _request->c = this;
+
+                // get back our socket (if we had one)
                 _idle_handler_detach();
+
                 if (_socket_container.index() == 2) {
                     // reuse existing socket
                     connection_reusable = _connection_reusable(_request->authority, true, true);
@@ -577,13 +610,24 @@ client::response client::send(request &r) {
         } else {
             // http
             {
+                std::lock_guard<std::mutex> guard_rq(r->lock);
                 std::lock_guard<std::mutex> guard(_lock);
+
+                // check for request shutdown before attaching to the request
+                _is_shutdown_rq = r->shutdown_ctrl_state;
                 _shutdown_check_early();
+                _request = r;
+                _request->c = this;
+
+                // get back our socket (if we had one)
                 _idle_handler_detach();
-                if (_socket_container.index() == 1) {   // reuse existing socket
+
+                if (_socket_container.index() == 1) {
+                    // reuse existing socket
                     connection_reusable = _connection_reusable(_request->authority, false, true);
                     _socket->reset();
-                } else {                                // create required socket type
+                } else {
+                    // create required socket type
                     if (_socket && _socket->is_open())  // close the old one
                         _socket->close();
                     _socket = &_socket_container.emplace<1>(true);
@@ -805,12 +849,18 @@ client::response client::send(request &r) {
 
         return rs;
     } catch (in_shutdown_state&) {
-        r._d->c = nullptr;
-        cancel_request();
+        if (_request) {
+            std::lock_guard<std::mutex> guard_rq(_request->lock);
+            _request->c = nullptr;
+            cancel_request();
+        }
         throw;
     } catch (...) {
-        r._d->c = nullptr;
-        cancel_request();
+        if (_request) {
+            std::lock_guard<std::mutex> guard_rq(_request->lock);
+            _request->c = nullptr;
+            cancel_request();
+        }
         // check if the error was caused by a shutdown
         _shutdown_check();
 
@@ -876,43 +926,71 @@ client::request::request(std::string_view method) {
 }
 
 client::request::~request() {
-    cancel();
-    if (_d) {
-        delete _d;
-        _d = nullptr;
+    clear();
+}
+
+void client::request::_move(request &&other) {
+    // NOTE: clearing this object's data must be done by caller if necessary
+
+    // temporarily detach any shutdown controller
+    bool ctrl_attached = false;
+    if (other._d && other._d->shutdown_ctrl) {
+        ctrl_attached = true;
+        other.shutdown_controllable_detach(other._d->shutdown_ctrl);
+        // DO NOT clear other._d->shutdown_ctrl cause the client might wanna pass it to a response
+    }
+
+    // move over the data struct
+    _d = other._d;
+    other._d = nullptr;
+
+    // reattach the shutdown controller
+    if (ctrl_attached) {
+        std::lock_guard<std::mutex> guard(_d->lock);
+        _d->shutdown_ctrl_state = shutdown_controllable_attach(*_d->shutdown_ctrl);
+        if (_d->shutdown_ctrl_state)
+            _shutdown();
     }
 }
 
 client::request::request(request &&other) {
-    // WARNING: DO NOT run this while using the other request from another thread
-    _d = other._d;
-    other._d = nullptr;
+    _move(std::move(other));
 }
 
 client::request& client::request::operator=(request &&other) {
-    cancel();
-    if (_d)
-        delete _d;
-
-    _d = other._d;
-    other._d = nullptr;
-
+    clear();
+    _move(std::move(other));
     return *this;
 }
 
-void client::request::cancel() {
-    if (_d && _d->c) {
+void client::request::_cancel() {
+    // TODO: have a look at thread safety again after implementing the request handling system
+    if (_d->c) {
         _d->c->cancel_request();
         _d->c = nullptr;
     }
 }
 
-void client::request::clear() {
-    cancel();
+void client::request::cancel() {
     if (_d) {
+        std::lock_guard<std::mutex> guard(_d->lock);
+        _cancel();
+    }
+}
+
+void client::request::clear() {
+    if (_d) {
+        if (_d->shutdown_ctrl)
+            shutdown_controllable_detach(_d->shutdown_ctrl);
+        _cancel();
         delete _d;
         _d = nullptr;
     }
+}
+
+void client::request::_shutdown() {
+    if (_d->c)
+        _d->c->shutdown_request();
 }
 
 void client::request::_valid_state(bool running) {
@@ -1275,6 +1353,52 @@ client::request&& client::request::recv_to_str(size_t max_len) {
     _d->recv_mode = RECV_STR;
     _d->recv_max_len = max_len;
     return std::move(*this);
+}
+
+client::request&& client::request::with_shutdown_controller(shutdown_controller &ctrl) {
+    _valid_state(false);
+    std::lock_guard<std::mutex> guard(_d->lock);
+
+    if (_d->shutdown_ctrl)
+        shutdown_controllable_throw_already_attached();
+
+    _d->shutdown_ctrl_state = shutdown_controllable_attach(ctrl);
+    _d->shutdown_ctrl = &ctrl;
+    // NOTE: skipping call to shutdown cause this can only run before submission
+
+    return std::move(*this);
+}
+
+void client::request::detach_shutdown_controller() {
+    if (!_d)
+        return;
+    _valid_state(false);
+
+    shutdown_controller *p;
+
+    {
+        std::lock_guard<std::mutex> guard(_d->lock);
+        if (!_d->shutdown_ctrl)
+            return;
+
+        p = _d->shutdown_ctrl;
+        _d->shutdown_ctrl = nullptr;
+        _d->shutdown_ctrl_state = false;
+    }
+
+    shutdown_controllable_detach(p);
+}
+
+void client::request::shutdown_controllable_signal(bool state) {
+    assert(_d);
+    std::lock_guard<std::mutex> guard(_d->lock);
+    // ignore mid-detach
+    if (!_d->shutdown_ctrl)
+        return;
+
+    _d->shutdown_ctrl_state = state;
+    if (state)
+        _shutdown();
 }
 
 client::response::response(client *c) {
