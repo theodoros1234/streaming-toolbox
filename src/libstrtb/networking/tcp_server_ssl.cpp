@@ -26,6 +26,8 @@ tcp_server_ssl::tcp_server_ssl(SSL_CTX* ctx, bool buffered_send, bool thread_ass
 }
 
 tcp_server_ssl::~tcp_server_ssl() {
+    detach_shutdown_controller();
+
     if (!_ctx_caller_provided) {
         SSL_CTX_free(_ctx);
         _ctx = nullptr;

@@ -30,6 +30,7 @@ tcp_server::tcp_server(bool buffered_send, size_t buffer_size) : _max_active(64)
 }
 
 tcp_server::~tcp_server() {
+    detach_shutdown_controller();
     if (!_socks.empty() || !_active_connections.empty()) {
         log.put(logging::WARNING, {"Destructor called when server was still open. Closing the server, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the server."});
         close();
@@ -43,6 +44,8 @@ void tcp_server::listen(const std::string& address, uint16_t port, bool reuseadd
 
 void tcp_server::listen(const char* address, uint16_t port, bool reuseaddr, int backlog) {
     std::lock_guard<std::mutex> guard(_lock);
+    if (_shutdown_controller_state)
+        throw connection_closed("server shut down from shutdown controller", 0);
 
     bound_port sock;
 
@@ -267,8 +270,7 @@ tcp_server_connection* tcp_server::_new_connection(const bound_port& server, int
                                      sock, server.server_ip, server.server_port, remote_ip, remote_port);
 }
 
-bool tcp_server::shutdown() {
-    std::lock_guard<std::mutex> guard(_lock);
+bool tcp_server::_shutdown() {
     // Make sure the socket is still open
     if (_socks.empty())
         return false;
@@ -287,6 +289,11 @@ bool tcp_server::shutdown() {
         conn->shutdown();
 
     return true;
+}
+
+bool tcp_server::shutdown() {
+    std::lock_guard<std::mutex> guard(_lock);
+    return _shutdown();
 }
 
 bool tcp_server::close(bool pre_accept) {
@@ -336,4 +343,43 @@ bool tcp_server::buffered_send() const {
 std::vector<tcp_server::bound_port> tcp_server::bound_ports() {
     std::lock_guard<std::mutex> guard(_lock);
     return _socks;
+}
+
+void tcp_server::attach_shutdown_controller(shutdown_controller &ctrl) {
+    std::lock_guard<std::mutex> guard(_lock);
+    if (_shutdown_controller)
+        shutdown_controllable_throw_already_attached();
+
+    _shutdown_controller_state = shutdown_controllable_attach(ctrl);
+    _shutdown_controller = &ctrl;
+
+    if (_shutdown_controller_state)
+        _shutdown();
+}
+
+void tcp_server::detach_shutdown_controller() {
+    shutdown_controller *p;
+
+    {
+        std::lock_guard<std::mutex> guard(_lock);
+        if (!_shutdown_controller)
+            return;
+
+        p = _shutdown_controller;
+        _shutdown_controller = nullptr;
+        _shutdown_controller_state = false;
+    }
+
+    shutdown_controllable_detach(p);
+}
+
+void tcp_server::shutdown_controllable_signal(bool state) {
+    std::lock_guard<std::mutex> guard(_lock);
+    if (!_shutdown_controller)  // in the middle of detaching
+        return;
+
+    _shutdown_controller_state = state;
+
+    if (state)
+        _shutdown();
 }

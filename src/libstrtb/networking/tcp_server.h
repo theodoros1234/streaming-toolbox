@@ -9,10 +9,18 @@
 #include <vector>
 #include "../common/deregistration_interface.h"
 #include "tcp_server_connection.h"
+#include "../shutdown_controller.h"
 
 namespace strtb::networking {
 
-class tcp_server : protected strtb::common::deregistration_interface<tcp_server_connection*> {
+class tcp_server : protected strtb::common::deregistration_interface<tcp_server_connection*>,
+                   public shutdown_controllable {
+private:
+    shutdown_controller *_shutdown_controller = nullptr;
+    bool _shutdown_controller_state = false;
+
+    bool _shutdown();
+
 public:
 #ifdef __linux__
     struct bound_port {
@@ -37,6 +45,7 @@ protected:
 
     std::set<tcp_server_connection*> _active_connections;
     virtual tcp_server_connection* _new_connection(const bound_port& server, int sock, std::string remote_ip, int remote_port);
+    void shutdown_controllable_signal(bool state);
 
 public:
     tcp_server(bool buffered_send = false, size_t buffer_size = STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT);
@@ -54,6 +63,8 @@ public:
     size_t buffer_size() const;
     bool buffered_send() const;
     void deregister(tcp_server_connection* target);
+    void attach_shutdown_controller(shutdown_controller &ctrl);
+    void detach_shutdown_controller();
 };
 
 }

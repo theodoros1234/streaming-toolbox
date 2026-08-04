@@ -51,6 +51,8 @@ tcp_client_ssl::tcp_client_ssl(bool buffered_send, bool thread_assisted, size_t 
     _thread(thread_assisted) {}
 
 tcp_client_ssl::~tcp_client_ssl() {
+    detach_shutdown_controller();
+
     if (_ssl) {
         log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the SSL connection and the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
         ::shutdown(_sock, SHUT_RDWR);
