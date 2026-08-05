@@ -14,6 +14,8 @@
 
 namespace strtb::http {
 
+class request_handler;
+
 class client : public shutdown_controllable {
 protected:
     enum recv_mode_enum {
@@ -38,6 +40,7 @@ public:
 
     protected:
         friend client;
+        friend request_handler;
 
         struct data {
             // TODO: state
@@ -91,6 +94,8 @@ public:
         request&& recv_as_stream();     // default
         request&& recv_to_str();
         request&& recv_to_str(size_t max_len);
+        // TODO: add send and get_response
+        request&& send_async();
 
         void detach_shutdown_controller();
 

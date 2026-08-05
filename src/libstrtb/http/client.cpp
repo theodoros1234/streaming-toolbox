@@ -1,4 +1,5 @@
 #include "client.h"
+#include "request_handler.h"
 #include "strescape.h"
 #include "../logging.h"
 #include "client_idle_connection_handler_class.h"
@@ -1413,6 +1414,14 @@ void client::request::shutdown_controllable_signal(bool state) {
     _d->shutdown_ctrl_state = state;
     if (state)
         _shutdown();
+}
+
+client::request&& client::request::send_async() {
+    // TODO: properly implement
+    _valid_state(false);
+    std::lock_guard<std::mutex> guard(_d->lock);
+    request_handler::main->send(_d);
+    return std::move(*this);
 }
 
 client::response::response(client *c) {

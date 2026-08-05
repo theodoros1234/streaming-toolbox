@@ -7,6 +7,7 @@
 #include "../libstrtb/event/system.h"
 #include "../libstrtb/uri.h"
 #include "../libstrtb/http/client_idle_connection_handler_class.h"
+#include "../libstrtb/http/request_handler.h"
 
 #include <QApplication>
 #include <QGuiApplication>
@@ -68,6 +69,7 @@ int main(int argc, char *argv[]) {
 
     // Init HTTP systems
     http::client_idle_connection_handler_class http_client_idle_connection_handler;
+    http::request_handler http_request_handler;
 
     // Init config system
     std::filesystem::path config_path;
