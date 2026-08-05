@@ -503,6 +503,13 @@ void client::_cancel() {
     _decoders.clear();
 }
 
+void client::_cancel_response() {
+    assert(_response);
+    _cancel();
+    _response = nullptr;
+    _cv.notify_one();
+}
+
 void client::cancel_request() {
     std::lock_guard<std::mutex> guard(_lock);
     assert(_request);
@@ -513,10 +520,7 @@ void client::cancel_request() {
 
 void client::cancel_response() {
     std::lock_guard<std::mutex> guard(_lock);
-    assert(_response);
-    _cancel();
-    _response = nullptr;
-    _cv.notify_one();
+    _cancel_response();
 }
 
 void client::_finish_response() {
@@ -911,8 +915,10 @@ std::string_view client::recv_body(size_t max_len) {
 
             if (len == 0) {     // reading 0 bytes means we reached the end of the body
                 // unless a shutdown truncated part of the body and somehow didn't cause an error
+                std::lock_guard<std::mutex> guard_rs(_response->lock);
                 std::lock_guard<std::mutex> guard(_lock);
                 _shutdown_check_early();
+                _response->c = nullptr;
                 _finish_response();
                 // TODO: attempt graceful shutdown over TLS
             }
@@ -922,12 +928,17 @@ std::string_view client::recv_body(size_t max_len) {
             return std::string_view();
         }
     } catch (in_shutdown_state&) {
+        std::lock_guard<std::mutex> guard_rs(_response->lock);
+        _response->c = nullptr;
         cancel_response();
         throw;
     } catch (...) {
-        cancel_response();
+        std::lock_guard<std::mutex> guard_rs(_response->lock);
+        std::lock_guard<std::mutex> guard(_lock);
+        _response->c = nullptr;
+        _cancel_response();
         // check if the error was caused by a shutdown
-        _shutdown_check();
+        _shutdown_check_early();
         throw;
     }
 }
@@ -1578,15 +1589,7 @@ std::string_view client::response::recv_body(size_t max_len) {
     if (!_d->c)
         return std::string_view();
 
-    try {
-        auto ret = _d->c->recv_body(max_len);
-        if (ret.empty())
-            _d->c = nullptr;
-        return ret;
-    } catch (...) {
-        _d->c = nullptr;
-        throw;
-    }
+    return _d->c->recv_body(max_len);
 }
 
 std::string client::response::body_str() {

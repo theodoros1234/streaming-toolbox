@@ -187,6 +187,7 @@ private:
     void _shutdown();
     void _reset();
     void _cancel();
+    void _cancel_response();
     bool _connection_reusable(const std::string &authority, bool https, bool autoclose);
     void _finish_response();
     void _idle_handler_attach();
