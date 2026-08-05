@@ -493,7 +493,6 @@ void client::detach_shutdown_controller() {
 }
 
 void client::_cancel() {
-    std::lock_guard<std::mutex> guard(_lock);
     // first, detach socket from background handler thread
     _idle_handler_detach();
 
@@ -505,24 +504,35 @@ void client::_cancel() {
 }
 
 void client::cancel_request() {
+    std::lock_guard<std::mutex> guard(_lock);
     assert(_request);
     _cancel();
     _request = nullptr;
+    _cv.notify_one();
 }
 
 void client::cancel_response() {
+    std::lock_guard<std::mutex> guard(_lock);
     assert(_response);
     _cancel();
     _response = nullptr;
+    _cv.notify_one();
 }
 
 void client::_finish_response() {
     _response = nullptr;
+    _cv.notify_one();
     if (_keepalive)     // pass the socket to the background handler thread
         _idle_handler_attach();
     else    // instantly close
         _socket->close();
     _decoders.clear();
+}
+
+void client::wait_until_idle() {
+    std::unique_lock<std::mutex> lock(_lock);
+    while (_request || _response)
+        _cv.wait(lock);
 }
 
 void client::_idle_handler_attach() {
@@ -561,6 +571,10 @@ client::response client::send(request &r) {
     // request must be prepared
     if (!r._d)
         throw std::invalid_argument("request object is empty");
+    if (r._d->handler_used)
+        throw bad_state("request is already being processed by a request handler");
+    if (r._d->c)
+        throw bad_state("request is already being processed by another client object");
     return send(r._d);
 }
 
@@ -778,6 +792,7 @@ client::response client::send(request::data *r) {
             _response->status == 304 || _response->status / 100 == 1) {
             // certain methods and status codes cannot have a body
             // close connection if there's no body
+            std::lock_guard<std::mutex> guard(_lock);
             _response->c = nullptr;
             _finish_response();
         } else {
@@ -896,7 +911,8 @@ std::string_view client::recv_body(size_t max_len) {
 
             if (len == 0) {     // reading 0 bytes means we reached the end of the body
                 // unless a shutdown truncated part of the body and somehow didn't cause an error
-                _shutdown_check();
+                std::lock_guard<std::mutex> guard(_lock);
+                _shutdown_check_early();
                 _finish_response();
                 // TODO: attempt graceful shutdown over TLS
             }
@@ -1012,7 +1028,7 @@ void client::request::_valid_state(bool running) {
     if (!_d)
         throw bad_state("cannot reuse request after it has been moved");
 
-    if ((_d->c != nullptr) != running) {
+    if ((_d->handler_used || _d->c) != running) {
         if (running)
             throw bad_state("request not in progress");
         else
@@ -1416,12 +1432,58 @@ void client::request::shutdown_controllable_signal(bool state) {
         _shutdown();
 }
 
+void client::request::_send() {
+    _d->handler_queued = request_handler::main->send(_d);
+    _d->handler_used = true;
+}
+
+client::response client::request::_get_response(std::unique_lock<std::mutex> &lock) {
+    // wait for response or exception to be returned
+    while (_d->handler_response.empty() && !_d->handler_exception)
+        _d->cv.wait(lock);
+
+    if (_d->handler_exception) {
+        // clean up and rethrow
+        _d->handler_used = false;
+        std::exception_ptr ptr = std::move(_d->handler_exception);
+        _d->handler_exception = nullptr;
+        _d->handler_response.clear();
+        std::rethrow_exception(ptr);
+    }
+
+    if (!_d->handler_response.empty()) {
+        // clean up and return response
+        _d->handler_used = false;
+        return std::move(_d->handler_response);
+    }
+
+    throw std::logic_error("reached unreachable part in "s + __func__);
+}
+
 client::request&& client::request::send_async() {
-    // TODO: properly implement
     _valid_state(false);
     std::lock_guard<std::mutex> guard(_d->lock);
-    request_handler::main->send(_d);
+    _send();
     return std::move(*this);
+}
+
+client::response client::request::send() {
+    _valid_state(false);
+    std::unique_lock<std::mutex> lock(_d->lock);
+    _send();
+    return _get_response(lock);
+}
+
+client::response client::request::get_response() {
+    _valid_state(true);
+    std::unique_lock<std::mutex> lock(_d->lock);
+    if (!_d->handler_used)
+        throw bad_state(__func__ + " can only be used when sent to the request handler"s);
+    return _get_response(lock);
+}
+
+bool client::request::empty() {
+    return _d == nullptr;
 }
 
 client::response::response(client *c) {
@@ -1633,6 +1695,10 @@ void client::response::shutdown_controllable_signal(bool state) {
     _d->shutdown_ctrl_state = state;
     if (state)
         _shutdown();
+}
+
+bool client::response::empty() {
+    return _d == nullptr;
 }
 
 // request creation shortcuts

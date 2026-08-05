@@ -10,6 +10,7 @@
 #include <variant>
 #include <map>
 #include <mutex>
+#include <condition_variable>
 #include <poll.h>
 
 namespace strtb::http {
@@ -25,84 +26,6 @@ protected:
     };
 
 public:
-    class request : public shutdown_controllable {
-    private:
-        bool _verify_not_sending() const;
-        void _with_parsed_host(bool https, std::string_view host, uri::host_type_enum type, unsigned int port);
-        void _valid_state(bool running);
-        void _with_header_trust_name(const std::string &name, std::string_view value);
-        template<class T> request&& _with_headers(T headers);
-        template<class T> request&& _with_params(T params);
-        template<class T> request&& _with_body_str(T body);
-        void _shutdown();
-        void _cancel();
-        void _move(request &&other);
-
-    protected:
-        friend client;
-        friend request_handler;
-
-        struct data {
-            // TODO: state
-            std::mutex lock;
-            client *c = nullptr;
-            shutdown_controller *shutdown_ctrl = nullptr;
-            bool shutdown_ctrl_state = false;
-
-            // authority: for host header, host: for socket connection
-            std::string method, authority, host, path, body_str;
-            int port = -1;
-            bool https = false, allow_invalid_cert = false, allow_unsafe_ports = false,
-                 method_safe = false, method_idempotent = false,
-                 path_asterisk = false, query_set = false,
-                 body_set = false;
-            recv_mode_enum recv_mode = RECV_STREAM;
-            size_t recv_max_len = 0;    // only for automatic receiving
-            std::map<std::string, std::string> headers;
-        } *_d = nullptr;
-
-        void shutdown_controllable_signal(bool state);
-
-    public:
-        request() = default;
-        request(std::string_view method);
-        ~request();
-        request(const request&) = delete;
-        request(request &&other);
-        request& operator=(request &&other);
-
-        request&& with_url(std::string_view url);
-        request&& with_host(bool https, std::string_view hostname);    // for IPv6, must use square brackets
-        request&& with_host(bool https, std::string_view hostname, unsigned int port);
-        request&& with_path(std::string_view path);
-        request&& with_header(std::string_view name, std::string_view value);
-        request&& with_headers(const std::map<std::string, std::string> &headers);
-        request&& with_headers(const std::vector< std::pair<std::string, std::string> > &headers);
-        request&& with_headers(std::initializer_list< std::pair<std::string_view, std::string_view> > headers);
-        request&& with_params(const std::map<std::string, std::string> &params);
-        request&& with_params(const std::vector< std::pair<std::string, std::string> > &params);
-        request&& with_params(std::initializer_list< std::pair<std::string_view, std::string_view> > params);
-        request&& allow_invalid_cert(bool value = true);
-        request&& allow_unsafe_ports(bool value = true);
-        request&& with_content_type(std::string_view type);
-        request&& with_body_str(const std::string &body);
-        request&& with_body_str(const char *body);
-        request&& with_body_str(const char *body, size_t length);
-        request&& with_body_str(std::string_view &body);
-        request&& with_body_str(std::string &&body);
-        request&& with_shutdown_controller(shutdown_controller &ctrl);
-        request&& recv_as_stream();     // default
-        request&& recv_to_str();
-        request&& recv_to_str(size_t max_len);
-        // TODO: add send and get_response
-        request&& send_async();
-
-        void detach_shutdown_controller();
-
-        void cancel();
-        void clear();
-    };
-
     class response : public shutdown_controllable {
     private:
         void _verify_data() const;
@@ -154,10 +77,97 @@ public:
 
         void cancel();
         void clear();
+        bool empty();
+    };
+
+    class request : public shutdown_controllable {
+    private:
+        void _with_parsed_host(bool https, std::string_view host, uri::host_type_enum type, unsigned int port);
+        void _valid_state(bool running);
+        void _with_header_trust_name(const std::string &name, std::string_view value);
+        template<class T> request&& _with_headers(T headers);
+        template<class T> request&& _with_params(T params);
+        template<class T> request&& _with_body_str(T body);
+        void _shutdown();
+        void _cancel();
+        void _move(request &&other);
+        void _send();
+        response _get_response(std::unique_lock<std::mutex> &lock);
+
+    protected:
+        friend client;
+        friend request_handler;
+
+        struct data {
+            // TODO: state
+            std::mutex lock;
+            std::condition_variable cv;
+            client *c = nullptr;
+            shutdown_controller *shutdown_ctrl = nullptr;
+            bool shutdown_ctrl_state = false;
+
+            // authority: for host header, host: for socket connection
+            std::string method, authority, host, path, body_str;
+            int port = -1;
+            bool https = false, allow_invalid_cert = false, allow_unsafe_ports = false,
+                 method_safe = false, method_idempotent = false,
+                 path_asterisk = false, query_set = false,
+                 body_set = false, handler_used = false, handler_queued = false;
+            recv_mode_enum recv_mode = RECV_STREAM;
+            size_t recv_max_len = 0;    // only for automatic receiving
+            std::map<std::string, std::string> headers;
+            response handler_response;
+            std::exception_ptr handler_exception;
+        } *_d = nullptr;
+
+        void shutdown_controllable_signal(bool state);
+
+    public:
+        request() = default;
+        request(std::string_view method);
+        ~request();
+        request(const request&) = delete;
+        request(request &&other);
+        request& operator=(request &&other);
+
+        request&& with_url(std::string_view url);
+        request&& with_host(bool https, std::string_view hostname);    // for IPv6, must use square brackets
+        request&& with_host(bool https, std::string_view hostname, unsigned int port);
+        request&& with_path(std::string_view path);
+        request&& with_header(std::string_view name, std::string_view value);
+        request&& with_headers(const std::map<std::string, std::string> &headers);
+        request&& with_headers(const std::vector< std::pair<std::string, std::string> > &headers);
+        request&& with_headers(std::initializer_list< std::pair<std::string_view, std::string_view> > headers);
+        request&& with_params(const std::map<std::string, std::string> &params);
+        request&& with_params(const std::vector< std::pair<std::string, std::string> > &params);
+        request&& with_params(std::initializer_list< std::pair<std::string_view, std::string_view> > params);
+        request&& allow_invalid_cert(bool value = true);
+        request&& allow_unsafe_ports(bool value = true);
+        request&& with_content_type(std::string_view type);
+        request&& with_body_str(const std::string &body);
+        request&& with_body_str(const char *body);
+        request&& with_body_str(const char *body, size_t length);
+        request&& with_body_str(std::string_view &body);
+        request&& with_body_str(std::string &&body);
+        request&& with_shutdown_controller(shutdown_controller &ctrl);
+        request&& recv_as_stream();     // default
+        request&& recv_to_str();
+        request&& recv_to_str(size_t max_len);
+        // TODO: add send and get_response
+        request&& send_async();
+        response send();
+        response get_response();
+
+        void detach_shutdown_controller();
+
+        void cancel();
+        void clear();
+        bool empty();
     };
 
 private:
     std::mutex _lock;
+    std::condition_variable _cv;
     std::variant<bool, networking::tcp_client, networking::tcp_client_ssl> _socket_container = false;
     networking::tcp_client *_socket = nullptr;
     volatile bool _is_shutdown = false, _shutdown_controller_state = false,
@@ -183,6 +193,7 @@ private:
     void _idle_handler_detach();
 
 protected:
+    friend request_handler;
     std::string_view recv_body(size_t max_len);
     void cancel_request();
     void cancel_response();
@@ -202,8 +213,9 @@ public:
     bool encrypted() const;
     // TODO: more functions to get more internal variables
 
-    void shutdown();    // fully shutdown current and future connections from another thread
-    void reset();       // for undoing shutdown and allowing a new connection
+    void shutdown();        // fully shutdown current and future connections from another thread
+    void reset();           // for undoing shutdown and allowing a new connection
+    void wait_until_idle(); // wait until any requests and responses are done processing
 };
 
 // request creation shortcuts

@@ -37,8 +37,25 @@ request_handler::~request_handler() {
 
 void request_handler::handler_thread_fn(handler_thread *state, authority_group *group) {
     while (true) {
-        // TODO: handle request
-        // TODO: set state in request object
+        assert(state->rq);
+
+        // handle request
+        try {
+            client::response rs = state->c.send(state->rq);
+
+            // pass the response back to the request object
+            std::lock_guard<std::mutex> guard_rq(state->rq->lock);
+            state->rq->handler_response = std::move(rs);
+            state->rq->cv.notify_one();
+        } catch (...) {
+            // pass any exception back to the request object
+            std::lock_guard<std::mutex> guard_rq(state->rq->lock);
+            state->rq->handler_exception = std::current_exception();
+            state->rq->cv.notify_one();
+        }
+
+        // wait until the full response is received
+        state->c.wait_until_idle();
 
         // wait for something else to happen
         using namespace std::chrono_literals;
@@ -69,10 +86,20 @@ void request_handler::handler_thread_fn(handler_thread *state, authority_group *
             if (state->rq)
                 break;
 
-            // grab pending request from queue
-            if (!group->queued_requests.empty()) {
+            // grab uncancelled pending request from queue
+            while (!group->queued_requests.empty()) {
                 state->rq = group->queued_requests.front();
-                group->queued_requests.pop();
+                group->queued_requests.pop_front();
+
+                if (state->rq)
+                    break;
+            }
+
+            if (state->rq) {
+                lock.unlock();
+                std::lock_guard<std::mutex> guard_rq(state->rq->lock);
+                // only use this value as a hint, cause we had to release our lock before setting it
+                state->rq->handler_queued = false;
                 break;
             }
 
@@ -105,7 +132,7 @@ void request_handler::handler_thread_fn(handler_thread *state, authority_group *
     }
 }
 
-void request_handler::send(client::request::data *rq) {
+bool request_handler::send(client::request::data *rq) {
     std::lock_guard<std::mutex> guard(_lock);
 
     // find the group that corresponds to this authority (or create it)
@@ -117,7 +144,7 @@ void request_handler::send(client::request::data *rq) {
         if (!t->rq) {
             t->rq = rq;
             t->cv.notify_one();
-            return;
+            return false;
         }
     }
 
@@ -129,8 +156,9 @@ void request_handler::send(client::request::data *rq) {
             created = true;
             handler_thread *state = group.threads.back().get();
             state->thread = std::thread(&request_handler::handler_thread_fn, this, state, &group);
+            state->rq = rq;
             _thread_count++;
-            return;
+            return false;
         } catch (...) {
             if (created)
                 group.threads.pop_back();
@@ -139,8 +167,20 @@ void request_handler::send(client::request::data *rq) {
     }
 
     // reached max threads, put request into a waiting queue
-    group.queued_requests.push(rq);
-    // TODO: set appropriate state in request object
+    group.queued_requests.push_back(rq);
+    return true;
+}
+
+void request_handler::cancel(client::request::data *rq) {
+    std::lock_guard<std::mutex> guard(_lock);
+
+    // remove this request from the queue
+    for (auto &p : _groups[rq->https].at(rq->authority).queued_requests) {
+        if (p == rq) {
+            p = nullptr;
+            return;
+        }
+    }
 }
 
 }
