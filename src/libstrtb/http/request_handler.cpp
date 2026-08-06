@@ -37,7 +37,7 @@ request_handler::~request_handler() {
 
 void request_handler::handler_thread_fn(handler_thread *state, authority_group *group) {
     while (true) {
-        assert(state->rq);
+        assert(state->rq != nullptr);
 
         // handle request
         try {
@@ -155,8 +155,8 @@ bool request_handler::send(client::request::data *rq) {
             group.threads.push_back(std::unique_ptr<handler_thread>(new handler_thread));
             created = true;
             handler_thread *state = group.threads.back().get();
-            state->thread = std::thread(&request_handler::handler_thread_fn, this, state, &group);
             state->rq = rq;
+            state->thread = std::thread(&request_handler::handler_thread_fn, this, state, &group);
             _thread_count++;
             return false;
         } catch (...) {
@@ -171,16 +171,18 @@ bool request_handler::send(client::request::data *rq) {
     return true;
 }
 
-void request_handler::cancel(client::request::data *rq) {
+bool request_handler::cancel(client::request::data *rq) {
     std::lock_guard<std::mutex> guard(_lock);
 
     // remove this request from the queue
     for (auto &p : _groups[rq->https].at(rq->authority).queued_requests) {
         if (p == rq) {
             p = nullptr;
-            return;
+            return true;
         }
     }
+
+    return false;
 }
 
 }

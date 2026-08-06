@@ -54,7 +54,7 @@ protected:
 
     void handler_thread_fn(handler_thread *state, authority_group *group);
     bool send(client::request::data *rq);   // return true if queued
-    void cancel(client::request::data *rq);
+    bool cancel(client::request::data *rq);
 
 public:
     static request_handler *main;

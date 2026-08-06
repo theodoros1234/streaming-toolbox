@@ -89,7 +89,7 @@ public:
         template<class T> request&& _with_params(T params);
         template<class T> request&& _with_body_str(T body);
         void _shutdown();
-        void _cancel();
+        void _cancel(std::unique_lock<std::mutex> &lock);
         void _move(request &&other);
         void _send();
         response _get_response(std::unique_lock<std::mutex> &lock);
@@ -99,12 +99,11 @@ public:
         friend request_handler;
 
         struct data {
-            // TODO: state
             std::mutex lock;
             std::condition_variable cv;
             client *c = nullptr;
             shutdown_controller *shutdown_ctrl = nullptr;
-            bool shutdown_ctrl_state = false;
+            bool shutdown_ctrl_state = false, cancelling = false;
 
             // authority: for host header, host: for socket connection
             std::string method, authority, host, path, body_str;
@@ -153,7 +152,9 @@ public:
         request&& recv_as_stream();     // default
         request&& recv_to_str();
         request&& recv_to_str(size_t max_len);
-        // TODO: add send and get_response
+        /* NOTE: when using streamed recv, make sure to pull data
+         *       from the first requests to avoid blocking later ones
+         */
         request&& send_async();
         response send();
         response get_response();

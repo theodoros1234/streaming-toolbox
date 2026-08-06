@@ -601,7 +601,7 @@ client::response client::send(request::data *r) {
                 std::lock_guard<std::mutex> guard(_lock);
 
                 // check for request shutdown before attaching to the request
-                _is_shutdown_rq = r->shutdown_ctrl_state;
+                _is_shutdown_rq = r->shutdown_ctrl_state || r->cancelling;
                 _shutdown_check_early();
                 _request = r;
                 _request->c = this;
@@ -633,7 +633,7 @@ client::response client::send(request::data *r) {
                 std::lock_guard<std::mutex> guard(_lock);
 
                 // check for request shutdown before attaching to the request
-                _is_shutdown_rq = r->shutdown_ctrl_state;
+                _is_shutdown_rq = r->shutdown_ctrl_state || r->cancelling;
                 _shutdown_check_early();
                 _request = r;
                 _request->c = this;
@@ -1004,34 +1004,61 @@ client::request& client::request::operator=(request &&other) {
     return *this;
 }
 
-void client::request::_cancel() {
+void client::request::_cancel(std::unique_lock<std::mutex> &lock) {
     // TODO: have a look at thread safety again after implementing the request handling system
-    if (_d->c) {
-        _d->c->cancel_request();
-        _d->c = nullptr;
+    if (_d->handler_used) {
+        // request handler used, shut down and wait
+        _d->cancelling = true;
+        _shutdown();
+
+        while (_d->handler_response.empty() && !_d->handler_exception)
+            _d->cv.wait(lock);
+
+        // ignore returned stuff and clean up
+        _d->cancelling = false;
+        _d->handler_response.clear();
+        _d->handler_exception = nullptr;
+        _d->handler_used = false;
+    } else {
+        // http client used, safe to cancel from here
+        if (_d->c) {
+            _d->c->cancel_request();
+            _d->c = nullptr;
+        }
     }
 }
 
 void client::request::cancel() {
     if (_d) {
-        std::lock_guard<std::mutex> guard(_d->lock);
-        _cancel();
+        std::unique_lock<std::mutex> lock(_d->lock);
+        _cancel(lock);
     }
 }
 
 void client::request::clear() {
     if (_d) {
-        if (_d->shutdown_ctrl)
-            shutdown_controllable_detach(_d->shutdown_ctrl);
-        _cancel();
+        {
+            std::unique_lock<std::mutex> lock(_d->lock);
+            if (_d->shutdown_ctrl)
+                shutdown_controllable_detach(_d->shutdown_ctrl);
+            _cancel(lock);
+        }
         delete _d;
         _d = nullptr;
     }
 }
 
 void client::request::_shutdown() {
-    if (_d->c)
+    if (_d->c) {    // being processed by a client
         _d->c->shutdown_request();
+    } else if (_d->handler_queued) {    // sitting in a handler queue
+        if (request_handler::main->cancel(_d)) {
+            // successfully removed from queue, wake up waiting thread
+            _d->handler_exception = std::make_exception_ptr(in_shutdown_state("http request was shut down"));
+            _d->cv.notify_one();
+        }
+        // if not removed, a handler thread has just grabbed it and will handle the shutdown
+    }
 }
 
 void client::request::_valid_state(bool running) {
@@ -1444,6 +1471,8 @@ void client::request::shutdown_controllable_signal(bool state) {
 }
 
 void client::request::_send() {
+    if (_d->shutdown_ctrl_state)
+        throw in_shutdown_state("http request was shut down");
     _d->handler_queued = request_handler::main->send(_d);
     _d->handler_used = true;
 }
