@@ -382,38 +382,34 @@ std::pair<const char*, size_t> decoder_zstd::read(size_t max_len) {
     return {ptr, len};
 }
 
+static std::initializer_list<std::string_view> supported_decoders_list = {"gzip", "deflate", "br", "zstd"};
+
+std::string make_supported_decoders_str() {
+    std::string str;
+    bool first = true;
+
+    for (auto item : supported_decoders_list) {
+        // comma delimiter
+        if (first)
+            first = false;
+        else
+            str += ", ";
+
+        // coding name
+        str += item;
+    }
+
+    return str;
+}
+
+static std::string supported_decoders_str = make_supported_decoders_str();
+
 std::initializer_list<std::string_view> get_supported_decoders_list() {
-    static std::initializer_list<std::string_view> list = {"gzip", "deflate", "br", "zstd"};
-    return list;
+    return supported_decoders_list;
 }
 
 const std::string& get_supported_decoders_str() {
-    static bool str_set = false;
-    static std::string str;
-
-    if (str_set)    // answer ready
-        return str;
-
-    try {
-        // answer not ready, generate string
-        bool first = true;
-        for (auto item : get_supported_decoders_list()) {
-            // comma delimiter
-            if (first)
-                first = false;
-            else
-                str += ", ";
-
-            // coding name
-            str += item;
-        }
-    } catch (...) {
-        str.clear();
-        throw;
-    }
-
-    str_set = true;
-    return str;
+    return supported_decoders_str;
 }
 
 void content_encoding_make_decoders(std::vector< std::unique_ptr<decoder> > &decoders,
