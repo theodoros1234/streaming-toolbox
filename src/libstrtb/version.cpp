@@ -1,10 +1,18 @@
 #include "version.h"
-#include <cstdio>
+#include <string>
 #include <cstring>
 
-static char version_string[32];
-
 namespace strtb {
+
+std::string make_libstrtb_version_string() {
+    // TODO: possible issues with certain locales for std::to_string
+    return 'v' + std::to_string(STRTB_SRC_VERSION_MAJOR) + '.'
+               + std::to_string(STRTB_SRC_VERSION_MINOR) + '.'
+               + std::to_string(STRTB_SRC_VERSION_PATCH) + '-'
+               + STRTB_SRC_VERSION_PHASE;
+}
+
+static std::string version_string = make_libstrtb_version_string();
 
 version_t get_libstrtb_version() {
     return {
@@ -15,10 +23,7 @@ version_t get_libstrtb_version() {
     };
 }
 
-const char* get_libstrtb_version_string() {
-    if (!version_string[0])
-        std::snprintf(version_string, 32, "v%d.%d.%d-%s", STRTB_SRC_VERSION_MAJOR, STRTB_SRC_VERSION_MINOR, STRTB_SRC_VERSION_PATCH, STRTB_SRC_VERSION_PHASE);
-
+const std::string& get_libstrtb_version_string() {
     return version_string;
 }
 

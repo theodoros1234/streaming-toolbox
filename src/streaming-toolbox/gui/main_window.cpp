@@ -31,7 +31,7 @@ main_window::main_window(plugins::list *plugin_list, QWidget *parent)
 
     // Set up window and tabs
     ui->setupUi(this);
-    ui->statusbar->showMessage(get_libstrtb_version_string());
+    ui->statusbar->showMessage(QString::fromStdString(get_libstrtb_version_string()));
     ui->mainTabView->addTab(&_plugin_tab, "Plugins");
     ui->mainTabView->addTab(&_chat_tab, "Chat");
     ui->mainTabView->addTab(&_event_viewer, "Event Viewer");
