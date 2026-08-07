@@ -2287,20 +2287,16 @@ via_field_ret parse_field_via(std::string_view field_value) {
     return parse_field_via(field_value.data(), 0, field_value.length());
 }
 
+std::string make_default_user_agent() {
+    auto v = get_libstrtb_version();
+    // TODO: possible issues with certain locales for std::to_string
+    return "StreamingToolbox/" + std::to_string(v.major) + '.' + std::to_string(v.minor);
+}
+
+static std::string default_user_agent = make_default_user_agent();
+
 const std::string &get_default_user_agent() {
-    static std::string str;
-    if (!str.empty()) {
-        // return already existing string
-        return str;
-    } else {
-        // create string
-        auto v = get_libstrtb_version();
-        str.append("StreamingToolbox/");
-        str.append(std::to_string(v.major));    // TODO: possible issues with certain locales
-        str.push_back('.');
-        str.append(std::to_string(v.minor));
-        return str;
-    }
+    return default_user_agent;
 }
 
 bool is_unsafe_port(int port) {
