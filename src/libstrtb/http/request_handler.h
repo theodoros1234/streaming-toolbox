@@ -7,7 +7,6 @@
 #include <mutex>
 #include <condition_variable>
 #include <deque>
-#include <vector>
 #include <map>
 #include <memory>
 #include <string>
@@ -33,10 +32,11 @@ private:
 
     // group of handler threads and queued requests for a common authority
     struct authority_group {
-        std::vector< std::unique_ptr<handler_thread> > threads;
+        std::unique_ptr<handler_thread> threads[STRTB_HTTP_REQUEST_HANDLER_MAX_CONNECTIONS_PER_SERVER];
         std::deque<client::request::data*> queued_requests;
         bool https;
         std::string authority;
+        size_t thread_count = 0;
 
         authority_group(bool https, const std::string &authority);
     };
@@ -52,7 +52,7 @@ protected:
     friend client::request;
     friend std::thread;
 
-    void handler_thread_fn(handler_thread *state, authority_group *group);
+    void handler_thread_fn(handler_thread *state, size_t index, authority_group *group);
     bool send(client::request::data *rq);   // return true if queued
     bool cancel(client::request::data *rq);
 

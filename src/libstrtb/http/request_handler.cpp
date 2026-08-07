@@ -26,7 +26,8 @@ request_handler::~request_handler() {
     for (auto &outer_group : _groups)
         for (auto &group : outer_group)
             for (auto &t : group.second.threads)
-                t->cv.notify_one();
+                if (t)
+                    t->cv.notify_one();
 
     // wait until they have all exited
     if (_thread_count > 0)
@@ -35,7 +36,7 @@ request_handler::~request_handler() {
     main = nullptr;
 }
 
-void request_handler::handler_thread_fn(handler_thread *state, authority_group *group) {
+void request_handler::handler_thread_fn(handler_thread *state, size_t index, authority_group *group) {
     while (true) {
         assert(state->rq != nullptr);
 
@@ -105,24 +106,16 @@ void request_handler::handler_thread_fn(handler_thread *state, authority_group *
 
             // timed out, stop this thread
             if (timed_out == std::cv_status::timeout) {
-                _thread_count--;
-                state->thread.detach();
-
                 // delete thread state
-                for (auto itr = group->threads.begin(); itr < group->threads.end(); itr++) {
-                    if (itr->get() == state) {
-                        group->threads.erase(itr);
+                state->thread.detach();
+                group->threads[index].reset();
+                group->thread_count--;
+                _thread_count--;
 
-                        // delete entire group if it was emptied
-                        if (group->threads.empty())
-                            _groups[group->https].erase(group->authority);
+                // delete entire group if it was emptied
+                if (group->thread_count == 0)
+                    _groups[group->https].erase(group->authority);
 
-                        return;
-                    }
-                }
-
-                _log.warning({"Failed to delete state on handler thread for ",
-                              string_escape(group->authority)});
                 return;
             }
 
@@ -139,29 +132,45 @@ bool request_handler::send(client::request::data *rq) {
     authority_group &group = _groups[rq->https]
                                  .try_emplace(rq->authority, rq->https, rq->authority).first->second;
 
-    // find a waiting thread
-    for (auto &t : group.threads) {
-        if (!t->rq) {
-            t->rq = rq;
-            t->cv.notify_one();
-            return false;
+    // find a waiting thread or an empty slot
+    unsigned int threads_remaining = group.thread_count;
+    int empty_slot = -1;
+
+    // search until we've exhausted all active threads and found an empty slot
+    for (unsigned int i = 0; i < std::size(group.threads) && (threads_remaining || empty_slot == -1); i++) {
+        auto &t = group.threads[i];
+        if (t) {
+            threads_remaining--;
+
+            if (t->rq == nullptr) {
+                // found idle thread, pass on the request
+                t->rq = rq;
+                t->cv.notify_one();
+                return false;
+            }
+        } else if (empty_slot == -1) {
+            // found empty slot to possibly use for a new thread
+            empty_slot = i;
         }
     }
 
     // no waiting threads, start a new one
-    if (group.threads.size() < STRTB_HTTP_REQUEST_HANDLER_MAX_CONNECTIONS_PER_SERVER) {
-        bool created = false;
+    if (empty_slot != -1) {
+        auto &t = group.threads[empty_slot];
+
         try {
-            group.threads.push_back(std::unique_ptr<handler_thread>(new handler_thread));
-            created = true;
-            handler_thread *state = group.threads.back().get();
+            // create state struct
+            t.reset(new handler_thread);
+            handler_thread *state = t.get();
+
+            // start thread
             state->rq = rq;
-            state->thread = std::thread(&request_handler::handler_thread_fn, this, state, &group);
+            state->thread = std::thread(&request_handler::handler_thread_fn, this, state, empty_slot, &group);
+            group.thread_count++;
             _thread_count++;
             return false;
         } catch (...) {
-            if (created)
-                group.threads.pop_back();
+            t.reset();
             throw;
         }
     }
