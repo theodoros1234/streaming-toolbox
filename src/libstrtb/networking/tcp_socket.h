@@ -27,6 +27,7 @@ protected:
 
     virtual size_t _recv(size_t len);
     virtual void _send(const char* buf, size_t len);
+    virtual bool _available();
 
 public:
     tcp_socket(bool buffered_send = false, size_t buffer_size = STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT);
@@ -51,6 +52,7 @@ public:
     size_t buffer_size() const;
     void buffer_clear_recv();
     void buffer_clear_send();
+    bool available();
 #ifdef __linux__
     int fd() const;
 #endif

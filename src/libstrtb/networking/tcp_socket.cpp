@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <cstring>
 #include <cstdlib>
+#include <poll.h>
 
 using namespace strtb;
 using namespace strtb::networking;
@@ -274,3 +275,24 @@ bool tcp_socket::buffered_send() const {
 #ifdef __linux__
 int tcp_socket::fd() const {return _sock;}
 #endif
+
+bool tcp_socket::available() {
+    if (_sock == -1)
+        throw connection_closed("socket closed or hasn't been opened yet", 0);
+
+    if (_line_leftovers)    // leftovers immediately available
+        return true;
+    else    // check for immediately available data from the socket
+        return _available();
+}
+
+bool tcp_socket::_available() {
+    // check if there's any data immediately available to read (or shutdown/error)
+    struct pollfd p = {_sock, POLLIN, 0};
+    int ret = poll(&p, 1, 0);
+
+    if (ret < -1)
+        throw internal_error(errno);
+    else
+        return ret;
+}
