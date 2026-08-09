@@ -14,6 +14,7 @@ private:
     SSL* _ssl;
     tcp_socket_ssl_thread _thread;
     bool _thread_assisted = false, _thread_active = false;
+
 protected:
     friend tcp_server_ssl;
     tcp_server_connection_ssl(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
@@ -28,6 +29,8 @@ protected:
                               SSL_CTX* ctx);
     virtual size_t _recv(size_t len);
     virtual void _send(const char* buf, size_t len);
+    virtual bool _available();
+
 public:
     ~tcp_server_connection_ssl();
     void handshake();

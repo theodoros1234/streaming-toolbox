@@ -282,8 +282,13 @@ bool tcp_socket::available() {
 
     if (_line_leftovers)    // leftovers immediately available
         return true;
-    else    // check for immediately available data from the socket
+    else    // check for immediately available data (or shutdown/error) from the socket
         return _available();
+
+    /* Note that some error conditions might immediately raise an exception (particularly SSL),
+     * because it is unsafe to keep using the socket afterwards. Others (cleartext sockets)
+     * may defer the error to the next recv call. Callers must be ready to handle both cases.
+     */
 }
 
 bool tcp_socket::_available() {

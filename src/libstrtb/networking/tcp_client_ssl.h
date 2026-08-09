@@ -16,6 +16,7 @@ protected:
     tcp_socket_ssl_thread _thread;
     virtual size_t _recv(size_t len);
     virtual void _send(const char* buf, size_t len);
+    virtual bool _available();
 
 public:
     tcp_client_ssl(bool buffered_send = false, bool thread_assisted = false,

@@ -52,6 +52,7 @@ void tcp_socket_ssl_thread::start(int sock, SSL* ssl) {
     _ssl = ssl;
     _requested_read = false;
     _requested_write = false;
+    _requested_available = false;
     _requested_shutdown = false;
     _requested_close = false;
     _shutdown_sent = false;
@@ -101,7 +102,7 @@ size_t tcp_socket_ssl_thread::recv(char* buffer, size_t length) {
         _decide_exception();
 
     if (_requested_read)
-        throw bad_threading("recv seems to be waiting already from another thread");
+        throw bad_threading("recv() or available() seem to be waiting already from another thread");
 
     _buffer_read = buffer;
     _length_read = length;
@@ -122,6 +123,32 @@ size_t tcp_socket_ssl_thread::recv(char* buffer, size_t length) {
     return _length_read;
 }
 
+bool tcp_socket_ssl_thread::available() {
+    std::unique_lock<std::mutex> guard(_lock);
+
+    if (!_thread_active)
+        _decide_exception();
+
+    if (_requested_read)
+        throw bad_threading("recv() or available() seem to be waiting already from another thread");
+
+    // Wakeup SSL thread
+    _requested_read = true;
+    _requested_available = true;
+    uint64_t u = 1;
+    if (write(_eventfd, &u, sizeof(uint64_t)) != sizeof(uint64_t))
+        throw internal_error("error in internal synchronization mechanism: " + std::string(std::strerror(errno)), errno);
+
+    // Wait to receive data
+    _successful_read = false;
+    _cv_read.wait(guard);
+
+    if (!_successful_read)
+        _decide_exception();
+
+    return _available;
+}
+
 void tcp_socket_ssl_thread::send(const char* buffer, size_t length) {
     std::unique_lock<std::mutex> guard(_lock);
 
@@ -132,7 +159,7 @@ void tcp_socket_ssl_thread::send(const char* buffer, size_t length) {
         _decide_exception();
 
     if (_requested_write)
-        throw bad_threading("send or shutdown_gracefully seem to be already waiting from another thread");
+        throw bad_threading("send() or shutdown_gracefully() seem to be already waiting from another thread");
 
     if (_requested_shutdown)
         throw connection_closed("the send side of the SSL connection was already shutdown", 0);
@@ -161,7 +188,7 @@ void tcp_socket_ssl_thread::shutdown_gracefully() {
         _decide_exception();
 
     if (_requested_write)
-        throw bad_threading("send or shutdown_gracefully seem to be already waiting from another thread");
+        throw bad_threading("send() or shutdown_gracefully() seem to be already waiting from another thread");
 
     // Wakeup SSL thread
     _requested_write = true;
@@ -278,36 +305,71 @@ void tcp_socket_ssl_thread::thread_loop() {
             break;
 
         if (_requested_read && !incomplete_write) {
-            ret = SSL_read(_ssl, _buffer_read, _length_read);
-            if (ret > 0) {
-                _length_read = ret;
-                _successful_read = true;
-                _requested_read = false;
-                _cv_read.notify_one();
+            if (_requested_available) {
+                // Check if incoming data (or shutdown/error) is available
+                char b;
+                ret = SSL_peek(_ssl, &b, 1);
+                if (ret > 0) {
+                    _available = true;
+                    _successful_read = true;
+                    _requested_read = false;
+                    _requested_available = false;
+                    _cv_read.notify_one();
+                } else {
+                    int errno_ssl = SSL_get_error(_ssl, ret);
+                    switch (errno_ssl) {
+                    case SSL_ERROR_WANT_READ:
+                    case SSL_ERROR_WANT_WRITE:
+                    case SSL_ERROR_ZERO_RETURN:
+                        _available = errno_ssl == SSL_ERROR_ZERO_RETURN;
+                        _successful_read = true;
+                        _requested_read = false;
+                        _requested_available = false;
+                        _cv_read.notify_one();
+                        break;
+
+                    case SSL_ERROR_SYSCALL:
+                        _errno_syscall = errno;
+                        [[fallthrough]];
+                    default:
+                        _errno_ssl = errno_ssl;
+                        _thread_active = false;
+                    }
+                }
+
             } else {
-                int errno_ssl = SSL_get_error(_ssl, ret);
-                switch (errno_ssl) {
-                case SSL_ERROR_WANT_READ:
-                    poll_read = true;
-                    break;
-
-                case SSL_ERROR_WANT_WRITE:
-                    poll_write = true;
-                    break;
-
-                case SSL_ERROR_ZERO_RETURN:
-                    _length_read = 0;
+                // Read data
+                ret = SSL_read(_ssl, _buffer_read, _length_read);
+                if (ret > 0) {
+                    _length_read = ret;
                     _successful_read = true;
                     _requested_read = false;
                     _cv_read.notify_one();
-                    break;
+                } else {
+                    int errno_ssl = SSL_get_error(_ssl, ret);
+                    switch (errno_ssl) {
+                    case SSL_ERROR_WANT_READ:
+                        poll_read = true;
+                        break;
 
-                case SSL_ERROR_SYSCALL:
-                    _errno_syscall = errno;
-                    [[fallthrough]];
-                default:
-                    _errno_ssl = errno_ssl;
-                    _thread_active = false;
+                    case SSL_ERROR_WANT_WRITE:
+                        poll_write = true;
+                        break;
+
+                    case SSL_ERROR_ZERO_RETURN:
+                        _length_read = 0;
+                        _successful_read = true;
+                        _requested_read = false;
+                        _cv_read.notify_one();
+                        break;
+
+                    case SSL_ERROR_SYSCALL:
+                        _errno_syscall = errno;
+                        [[fallthrough]];
+                    default:
+                        _errno_ssl = errno_ssl;
+                        _thread_active = false;
+                    }
                 }
             }
         }

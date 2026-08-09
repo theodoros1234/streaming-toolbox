@@ -20,8 +20,9 @@ private:
     char* _buffer_read = nullptr;
     const char* _buffer_write = nullptr;
     size_t _length_read, _length_write;
-    bool _successful_read, _successful_write;
-    bool _requested_read, _requested_write, _requested_shutdown, _requested_close, _shutdown_sent;
+    bool _successful_read, _successful_write, _available;
+    bool _requested_read, _requested_write, _requested_shutdown,
+         _requested_available, _requested_close, _shutdown_sent;
     int _errno_ssl, _errno_syscall;
     void _decide_exception();
 
@@ -39,6 +40,7 @@ public:
     size_t recv(char* buffer, size_t length);
     void send(const char* buffer, size_t length);
     void shutdown_gracefully();
+    bool available();
 };
 
 }

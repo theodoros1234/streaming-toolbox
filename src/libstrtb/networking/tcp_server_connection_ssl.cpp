@@ -157,3 +157,11 @@ SSL* tcp_server_connection_ssl::ssl() const {
 bool tcp_server_connection_ssl::thread_assisted() const {
     return _thread_assisted;
 }
+
+bool tcp_server_connection_ssl::_available() {
+    assert((_sock == -1) == (_ssl == nullptr));
+    if (_thread_assisted)
+        return _thread.available();
+    else
+        return _ssl_available(_ssl, _sock);
+}

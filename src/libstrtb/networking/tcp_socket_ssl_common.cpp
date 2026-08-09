@@ -1,6 +1,7 @@
 #include "tcp_socket_ssl_common.h"
 #include "exceptions.h"
 #include "sigpipe_suppressor.h"
+#include <fcntl.h>
 
 namespace strtb::networking {
 
@@ -63,6 +64,48 @@ void _ssl_shutdown_gracefully(SSL *ssl) {
         int errno_ssl = SSL_get_error(ssl, ret);
         _ssl_decide_exception(errno_ssl);
     }
+}
+
+bool _ssl_available(SSL *ssl, int fd) {
+    sigpipe_suppressor shutup;
+
+    // temporarily set to non-blocking to avoid a hang
+    int flags = fcntl(fd, F_GETFL);
+    if (flags == -1)
+        throw internal_error(errno);
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+        throw internal_error(errno);
+
+    // check for available data (or shutdown/error)
+    char b;
+    int ret = SSL_peek(ssl, &b, 1);
+
+    // restore socket flags
+    if (fcntl(fd, F_SETFL, flags) == -1)
+        throw internal_error(errno);
+
+    if (ret > 0) {
+        // data immediately available
+        return true;
+    } else {
+        int error = SSL_get_error(ssl, ret);
+
+        switch (error) {
+        case SSL_ERROR_WANT_READ:
+        case SSL_ERROR_WANT_WRITE:
+            // no ready data available
+            return false;
+
+        case SSL_ERROR_ZERO_RETURN:
+            // EOF
+            return true;
+
+        default:
+            _ssl_decide_exception(error);
+        }
+    }
+
+    return false;
 }
 
 }

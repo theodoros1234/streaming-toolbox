@@ -9,6 +9,7 @@ namespace strtb::networking {
 size_t _ssl_recv(SSL *ssl, char *buf, size_t len);
 void _ssl_send(SSL *ssl, const char *buf, size_t len);
 void _ssl_shutdown_gracefully(SSL *ssl);
+bool _ssl_available(SSL *ssl, int fd);
 
 }
 
