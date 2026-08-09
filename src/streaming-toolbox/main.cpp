@@ -14,8 +14,41 @@
 #include <cstdlib>
 #include <string>
 #include <QMessageBox>
+#include <QtLogging>
 
 using namespace strtb;
+
+strtb::logging::source log_qt("Qt", false);
+
+void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
+    using namespace strtb::logging;
+    std::string msg_full = qFormatLogMessage(type, context, msg).toStdString();
+    level type_strtb = INFO;
+
+    switch (type) {
+    case QtDebugMsg:
+        type_strtb = DEBUG;
+        break;
+
+    case QtInfoMsg:
+        type_strtb = INFO;
+        break;
+
+    case QtWarningMsg:
+        type_strtb = WARNING;
+        break;
+
+    case QtCriticalMsg:
+        type_strtb = ERROR;
+        break;
+
+    case QtFatalMsg:
+        type_strtb = CRITICAL;
+        break;
+    }
+
+    log_qt.put_one(type_strtb, msg_full);
+}
 
 int main(int argc, char *argv[]) {
     char* home_path = getenv("HOME");
@@ -31,6 +64,7 @@ int main(int argc, char *argv[]) {
         logging::add_output_file(std::string(home_path) + "/.local/share/streaming-toolbox/streaming-toolbox.log",
                                  logging::INFO, logging::LINUX, false, logging::NONE);
     logging::source log("Main", false);
+    qInstallMessageHandler(qt_log_message_handler);
 
     // Check if assertions are enabled
 #ifndef NDEBUG
