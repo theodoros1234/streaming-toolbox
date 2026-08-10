@@ -715,172 +715,54 @@ client::response client::send(request::data *r) {
         // empty line to mark end of headers
         _socket->send(CRLF);
 
-        // send body (if set)
-        if (_request->body_set)
-            _socket->send(_request->body_str);
-        // TODO: monitor connection while sending body for early response with "connection: close"
-        // TODO: ability to send files or stream the body contents
-
-        _socket->flush();
-
         // create response object
         response rs(this);
         _response = rs._d;
         _response->recv_mode = _request->recv_mode;
+        bool response_handled = false;
 
-        // receive response status-line
-        // request stops being retriable as soon as any data is received
-        std::string line;
-        if (!_socket->recv_line(line, true, CRLF, STRTB_HTTP_STATUS_LINE_MAX_LEN)) {
-            if (line.length() == STRTB_HTTP_STATUS_LINE_MAX_LEN) {
-                retriable = false;
-                throw invalid_message("response status line too long");
-            } else if (line.empty()) {
-                throw incomplete_message("server closed the connection before anything was received");
-            } else {
-                retriable = false;
-                throw invalid_message("incomplete response status line");
-            }
-        }
-        retriable = false;
+        // send body (if set)
+        if (_request->body_set) {
+            size_t chunk_size = _socket->buffer_size();
+            size_t total = _request->body_str.length();
+            const char *data = _request->body_str.data();
 
-        auto status_line = parse_status_line(line);
-        if (!status_line.valid)
-            throw invalid_message("invalid response status line");
-        if (status_line.version.major != 1)
-            throw invalid_message("incompatible response HTTP version");
-        _response->status = status_line.status_code;
-        _response->status_message = std::move(status_line.reason_phrase);
-        _response->version = status_line.version;
+            for (size_t i = 0; i < total; i += chunk_size) {
+                // monitor for error/closure response
+                if (!response_handled && _socket->available()) {
+                    _handle_response(rs, retriable);
+                    response_handled = true;
 
-        // receive response headers
-        while (true) {
-            // TODO: obs-fold is allowed, give a param to enable/disable that
-            // TODO: limit max amount of headers and trailers to receive
+                    // abort upload on connecture closure or error response
+                    if (!_keepalive || (rs.status() / 100) != 2) {
+                        std::lock_guard<std::mutex> guard(_lock);
 
-            if (!_socket->recv_line(line, true, CRLF, STRTB_HTTP_FIELD_LINE_MAX_LEN)) {
-                if (line.length() >= STRTB_HTTP_FIELD_LINE_MAX_LEN)
-                    throw unsupported_message("response header line too long");
-                else
-                    throw invalid_message("incomplete response header line");
-            }
+                        // make sure this connection won't be reused
+                        _keepalive = false;
 
-            // empty line marks end of headers
-            if (line.empty())
-                break;
+                        // if we handled receiving the response body, close immediately
+                        if (!_response)
+                            _cancel();
 
-            if (!_response->headers.process_line(line))
-                throw invalid_message("invalid response header line");
-        }
-
-        // check connection options
-        std::set<std::string> rs_connection_options;
-        auto rs_connection_options_header = _response->headers.fields.find("connection");
-        if (rs_connection_options_header != _response->headers.fields.end()) {
-            auto rs_connection_options_list = parse_field_token_list(rs_connection_options_header->second, false);
-            if (!rs_connection_options_list.valid)
-                throw invalid_message("invalid response connection header");
-
-            for (const auto &opt : rs_connection_options_list.list)
-                rs_connection_options.insert(std::move(opt));
-        }
-
-        // determine if the connection can be reused
-        if (rs_connection_options.count("close") || _response->version.minor < 1)
-            _keepalive = false;
-
-        // TODO: Transfer-Encoding in HTTP/1.0 MUST be treated as faulty framing and close the connection afterwards
-
-        // determine if a body is present
-        if (_request->method == "HEAD" || _response->status == 204 ||
-            _response->status == 304 || _response->status / 100 == 1) {
-            // certain methods and status codes cannot have a body
-            // close connection if there's no body
-            std::lock_guard<std::mutex> guard(_lock);
-            _response->c = nullptr;
-            _finish_response();
-        } else {
-            auto te = _response->headers.fields.find("transfer-encoding");
-            if (te != _response->headers.fields.end()) {
-                // parse transfer-encoding header
-                auto te_parsed = parse_field_token_params_list(te->second, false, true);
-                if (!te_parsed.valid)
-                    throw invalid_message("invalid response transfer encoding");
-
-                if (!transfer_encoding_make_decoders(_decoders, te_parsed.list, _response->trailers, *_socket, true))
-                    _keepalive = false;
-            } else {
-                auto ce = _response->headers.fields.find("content-length");
-
-                if (ce != _response->headers.fields.end()) {
-                    // parse content-length header
-                    auto ce_parsed = parse_field_integer(ce->second);
-                    if (!ce_parsed.valid) {
-                        if (ce_parsed.overflow)
-                            throw unsupported_message("response content length is too long");
-                        else
-                            throw invalid_message("invalid response content length");
+                        throw incomplete_upload(std::move(rs));
                     }
-
-                    _decoders.push_back(std::unique_ptr<decoder>(new body_fixed_length(*_socket, ce_parsed.number)));
-                } else {
-                    // no encoding or length info
-                    _decoders.push_back(std::unique_ptr<decoder>(new body_until_close(*_socket)));
-                    _keepalive = false;
-                }
-            }
-
-            // check, parse and handle content-encoding
-            auto ce = _response->headers.fields.find("content-encoding");
-            if (ce != _response->headers.fields.end()) {
-                auto ce_parsed = parse_field_token_list(ce->second, false);
-                if (!ce_parsed.valid)
-                    throw invalid_message("invalid response content encoding");
-
-                content_encoding_make_decoders(_decoders, ce_parsed.list);
-            }
-        }
-
-        // automatically receive body, if requested
-        if (_request->recv_mode == RECV_STR) {
-            _response->c = nullptr;
-            std::string &body = _response->body_str;
-            size_t max_len = _request->recv_max_len;
-
-            // receive until we reach end of body or exceed the length limit (error)
-            while (true) {
-                std::string_view chunk = recv_body(0);
-                // NOTE: recv_body handles detaching on end-of-body or error
-
-                if (chunk.empty())  // end of body
-                    break;
-
-                if (chunk.length() + body.length() > max_len) { // exceeded length limit
-                    cancel_response();
-                    throw unsupported_message("body length exceeds the configured limit for this receive method");
+                    // TODO: handle 1xx responses (especially 100-continue), and adapt _handle_response for it
                 }
 
-                body += chunk;
+                // don't send more data than is left
+                chunk_size = std::min(chunk_size, total - i);
+                _socket->send(data + i, chunk_size);
             }
         }
+        _socket->flush();
+        // TODO: ability to send files or stream the body contents
 
-        shutdown_controller *ctrl = nullptr;
-        // detach from request
-        {
-            std::lock_guard<std::mutex> guard_rq(_request->lock);
-            std::lock_guard<std::mutex> guard(_lock);
-            ctrl = _request->shutdown_ctrl;
-            _request->c = nullptr;
-            _request = nullptr;
-        }
-
-        // any missed shutdown signal in this gap will be delivered by the attachment below
-
-        // attach request's shutdown controller to response
-        if (ctrl)
-            rs.attach_shutdown_controller(*ctrl);
+        if (!response_handled)
+            _handle_response(rs, retriable);
 
         return rs;
+    } catch (incomplete_upload&) {
+        throw;
     } catch (in_shutdown_state&) {
         if (_request) {
             std::lock_guard<std::mutex> guard_rq(_request->lock);
@@ -903,6 +785,160 @@ client::response client::send(request::data *r) {
         else
             throw;
     }
+}
+
+void client::_handle_response(response &rs, bool &retriable) {
+    // receive response status-line
+    // request stops being retriable as soon as any data is received
+    std::string line;
+    if (!_socket->recv_line(line, true, CRLF, STRTB_HTTP_STATUS_LINE_MAX_LEN)) {
+        if (line.length() == STRTB_HTTP_STATUS_LINE_MAX_LEN) {
+            retriable = false;
+            throw invalid_message("response status line too long");
+        } else if (line.empty()) {
+            throw incomplete_message("server closed the connection before anything was received");
+        } else {
+            retriable = false;
+            throw invalid_message("incomplete response status line");
+        }
+    }
+    retriable = false;
+
+    auto status_line = parse_status_line(line);
+    if (!status_line.valid)
+        throw invalid_message("invalid response status line");
+    if (status_line.version.major != 1)
+        throw invalid_message("incompatible response HTTP version");
+    _response->status = status_line.status_code;
+    _response->status_message = std::move(status_line.reason_phrase);
+    _response->version = status_line.version;
+
+    // receive response headers
+    while (true) {
+        // TODO: obs-fold is allowed, give a param to enable/disable that
+        // TODO: limit max amount of headers and trailers to receive
+
+        if (!_socket->recv_line(line, true, CRLF, STRTB_HTTP_FIELD_LINE_MAX_LEN)) {
+            if (line.length() >= STRTB_HTTP_FIELD_LINE_MAX_LEN)
+                throw unsupported_message("response header line too long");
+            else
+                throw invalid_message("incomplete response header line");
+        }
+
+        // empty line marks end of headers
+        if (line.empty())
+            break;
+
+        if (!_response->headers.process_line(line))
+            throw invalid_message("invalid response header line");
+    }
+
+    // check connection options
+    std::set<std::string> rs_connection_options;
+    auto rs_connection_options_header = _response->headers.fields.find("connection");
+    if (rs_connection_options_header != _response->headers.fields.end()) {
+        auto rs_connection_options_list = parse_field_token_list(rs_connection_options_header->second, false);
+        if (!rs_connection_options_list.valid)
+            throw invalid_message("invalid response connection header");
+
+        for (const auto &opt : rs_connection_options_list.list)
+            rs_connection_options.insert(std::move(opt));
+    }
+
+    // determine if the connection can be reused
+    if (rs_connection_options.count("close") || _response->version.minor < 1)
+        _keepalive = false;
+
+    // TODO: Transfer-Encoding in HTTP/1.0 MUST be treated as faulty framing and close the connection afterwards
+
+    // determine if a body is present
+    if (_request->method == "HEAD" || _response->status == 204 ||
+        _response->status == 304 || _response->status / 100 == 1) {
+        // certain methods and status codes cannot have a body
+        // close connection if there's no body
+        std::lock_guard<std::mutex> guard(_lock);
+        _response->c = nullptr;
+        _finish_response();
+    } else {
+        auto te = _response->headers.fields.find("transfer-encoding");
+        if (te != _response->headers.fields.end()) {
+            // parse transfer-encoding header
+            auto te_parsed = parse_field_token_params_list(te->second, false, true);
+            if (!te_parsed.valid)
+                throw invalid_message("invalid response transfer encoding");
+
+            if (!transfer_encoding_make_decoders(_decoders, te_parsed.list, _response->trailers, *_socket, true))
+                _keepalive = false;
+        } else {
+            auto ce = _response->headers.fields.find("content-length");
+
+            if (ce != _response->headers.fields.end()) {
+                // parse content-length header
+                auto ce_parsed = parse_field_integer(ce->second);
+                if (!ce_parsed.valid) {
+                    if (ce_parsed.overflow)
+                        throw unsupported_message("response content length is too long");
+                    else
+                        throw invalid_message("invalid response content length");
+                }
+
+                _decoders.push_back(std::unique_ptr<decoder>(new body_fixed_length(*_socket, ce_parsed.number)));
+            } else {
+                // no encoding or length info
+                _decoders.push_back(std::unique_ptr<decoder>(new body_until_close(*_socket)));
+                _keepalive = false;
+            }
+        }
+
+        // check, parse and handle content-encoding
+        auto ce = _response->headers.fields.find("content-encoding");
+        if (ce != _response->headers.fields.end()) {
+            auto ce_parsed = parse_field_token_list(ce->second, false);
+            if (!ce_parsed.valid)
+                throw invalid_message("invalid response content encoding");
+
+            content_encoding_make_decoders(_decoders, ce_parsed.list);
+        }
+    }
+
+    // automatically receive body, if requested
+    if (_request->recv_mode == RECV_STR) {
+        _response->c = nullptr;
+        std::string &body = _response->body_str;
+        size_t max_len = _request->recv_max_len;
+
+        // receive until we reach end of body or exceed the length limit (error)
+        while (true) {
+            std::string_view chunk = recv_body(0);
+            // NOTE: recv_body handles detaching on end-of-body or error
+
+            if (chunk.empty())  // end of body
+                break;
+
+            if (chunk.length() + body.length() > max_len) { // exceeded length limit
+                cancel_response();
+                throw unsupported_message("body length exceeds the configured limit for this receive method");
+            }
+
+            body += chunk;
+        }
+    }
+
+    shutdown_controller *ctrl = nullptr;
+    // detach from request
+    {
+        std::lock_guard<std::mutex> guard_rq(_request->lock);
+        std::lock_guard<std::mutex> guard(_lock);
+        ctrl = _request->shutdown_ctrl;
+        _request->c = nullptr;
+        _request = nullptr;
+    }
+
+    // any missed shutdown signal in this gap will be delivered by the attachment below
+
+    // attach request's shutdown controller to response
+    if (ctrl)
+        rs.attach_shutdown_controller(*ctrl);
 }
 
 std::string_view client::recv_body(size_t max_len) {
@@ -1760,5 +1796,14 @@ STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(post, "POST");
 STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(put, "PUT");
 STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(options, "OPTIONS");
 STRTB_HTTP_CLIENT_DEFINE_REQUEST_CREATOR(delete_m, "DELETE");
+
+incomplete_upload::incomplete_upload(client::response &&rs) :
+    exception("upload aborted by an early "s + std::to_string(rs.status()) +
+              " (" + rs.status_message() + ") response"),
+    _rs(std::move(rs)) {}
+
+client::response& incomplete_upload::response() {
+    return _rs;
+}
 
 }

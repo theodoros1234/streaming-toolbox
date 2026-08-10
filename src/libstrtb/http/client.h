@@ -193,6 +193,7 @@ private:
     void _finish_response();
     void _idle_handler_attach();
     void _idle_handler_detach();
+    void _handle_response(client::response &rs, bool &retriable);
 
 protected:
     friend request_handler;
@@ -218,6 +219,16 @@ public:
     void shutdown();        // fully shutdown current and future connections from another thread
     void reset();           // for undoing shutdown and allowing a new connection
     void wait_until_idle(); // wait until any requests and responses are done processing
+};
+
+// thrown when an upload is aborted by an error response or connection: close
+class incomplete_upload : public exception {
+private:
+    client::response _rs;
+public:
+    incomplete_upload(client::response &&rs);
+    client::response& response();   // can be used with std::move(), or without for direct access
+    // NOTE: when moving the response, if it's streamed, make sure to handle its body or close it to avoid stalling
 };
 
 // request creation shortcuts
