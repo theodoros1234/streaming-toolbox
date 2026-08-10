@@ -227,6 +227,8 @@ private:
     client::response _rs;
 public:
     incomplete_upload(client::response &&rs);
+    incomplete_upload(incomplete_upload &other);
+    incomplete_upload(incomplete_upload &&other);
     client::response& response();   // can be used with std::move(), or without for direct access
     // NOTE: when moving the response, if it's streamed, make sure to handle its body or close it to avoid stalling
 };

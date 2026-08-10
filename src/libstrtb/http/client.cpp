@@ -1802,6 +1802,15 @@ incomplete_upload::incomplete_upload(client::response &&rs) :
               " (" + rs.status_message() + ") response"),
     _rs(std::move(rs)) {}
 
+/* fake copy constructor (moves response object) to avoid issues
+ * with implementations of std::current_exception() that copy
+ */
+incomplete_upload::incomplete_upload(incomplete_upload &other) :
+    exception(other), _rs(std::move(other._rs)) {}
+
+incomplete_upload::incomplete_upload(incomplete_upload &&other) :
+    exception(std::move(other)), _rs(std::move(other._rs)) {}
+
 client::response& incomplete_upload::response() {
     return _rs;
 }
