@@ -1439,7 +1439,7 @@ template<class T> client::request&& client::request::_with_body_str(T body) {
     return std::move(*this);
 }
 
-client::request&& client::request::with_body_str(std::string_view &body) {
+client::request&& client::request::with_body_str(std::string_view body) {
     return _with_body_str<std::string_view>(body);
 }
 

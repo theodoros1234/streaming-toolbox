@@ -148,7 +148,7 @@ public:
         request&& with_body_str(const std::string &body);
         request&& with_body_str(const char *body);
         request&& with_body_str(const char *body, size_t length);
-        request&& with_body_str(std::string_view &body);
+        request&& with_body_str(std::string_view body);
         request&& with_body_str(std::string &&body);
         request&& with_shutdown_controller(shutdown_controller &ctrl);
         request&& recv_as_stream();     // default
