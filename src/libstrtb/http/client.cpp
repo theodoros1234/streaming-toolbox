@@ -573,12 +573,7 @@ bool client::_connection_reusable(const std::string &authority, bool https, bool
 
 client::response client::send(request &r) {
     // request must be prepared
-    if (!r._d)
-        throw std::invalid_argument("request object is empty");
-    if (r._d->handler_used)
-        throw bad_state("request is already being processed by a request handler");
-    if (r._d->c)
-        throw bad_state("request is already being processed by another client object");
+    r._ready_to_send();
     return send(r._d);
 }
 
@@ -1100,7 +1095,7 @@ void client::request::_shutdown() {
 void client::request::_valid_state(bool running) {
     // make sure this request is in a valid state (not moved or (not) in-progress)
     if (!_d)
-        throw bad_state("cannot reuse request after it has been moved");
+        throw bad_state("request is empty (moved or not set)");
 
     if ((_d->handler_used || _d->c) != running) {
         if (running)
@@ -1506,6 +1501,14 @@ void client::request::shutdown_controllable_signal(bool state) {
         _shutdown();
 }
 
+void client::request::_ready_to_send() {
+    _valid_state(false);
+    if (_d->host.empty())
+        throw std::invalid_argument("invalid request: host not set");
+    if (_d->path.empty())
+        throw std::invalid_argument("invalid request: path not set");
+}
+
 void client::request::_send() {
     if (_d->shutdown_ctrl_state)
         throw in_shutdown_state("http request was shut down");
@@ -1537,14 +1540,14 @@ client::response client::request::_get_response(std::unique_lock<std::mutex> &lo
 }
 
 client::request&& client::request::send_async() {
-    _valid_state(false);
+    _ready_to_send();
     std::lock_guard<std::mutex> guard(_d->lock);
     _send();
     return std::move(*this);
 }
 
 client::response client::request::send() {
-    _valid_state(false);
+    _ready_to_send();
     std::unique_lock<std::mutex> lock(_d->lock);
     _send();
     return _get_response(lock);

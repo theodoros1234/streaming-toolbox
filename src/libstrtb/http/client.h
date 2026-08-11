@@ -93,6 +93,7 @@ public:
         void _move(request &&other);
         void _send();
         response _get_response(std::unique_lock<std::mutex> &lock);
+        void _ready_to_send();
 
     protected:
         friend client;
