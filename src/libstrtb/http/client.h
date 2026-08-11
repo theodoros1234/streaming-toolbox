@@ -152,6 +152,9 @@ public:
         request&& recv_as_stream();     // default
         request&& recv_to_str();
         request&& recv_to_str(size_t max_len);
+        request&& treat_as_safe();
+        request&& treat_as_idempotent();
+        request&& treat_as_non_idempotent();
         /* NOTE: when using streamed recv, make sure to pull data
          *       from the first requests to avoid blocking later ones
          */

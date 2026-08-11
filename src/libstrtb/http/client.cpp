@@ -1562,6 +1562,27 @@ bool client::request::empty() {
     return _d == nullptr;
 }
 
+client::request&& client::request::treat_as_safe() {
+    _valid_state(false);
+    _d->method_safe = true;
+    _d->method_idempotent = true;
+    return std::move(*this);
+}
+
+client::request&& client::request::treat_as_idempotent() {
+    _valid_state(false);
+    _d->method_safe = false;
+    _d->method_idempotent = true;
+    return std::move(*this);
+}
+
+client::request&& client::request::treat_as_non_idempotent() {
+    _valid_state(false);
+    _d->method_safe = false;
+    _d->method_idempotent = false;
+    return std::move(*this);
+}
+
 client::response::response(client *c) {
     _d = new data;
     _d->c = c;
