@@ -725,23 +725,31 @@ client::response client::send(request::data *r) {
             for (size_t i = 0; i < total; i += chunk_size) {
                 // monitor for error/closure response
                 if (!response_handled && _socket->available()) {
-                    _handle_response(rs, retriable);
-                    response_handled = true;
+                    if (_handle_response(rs, retriable)) {
+                        // 1xx informational response
+                        // TODO: handle protocol switching when appropriate (after the upload)
+                        // TODO: handle 100-continue responses
+                        if (rs.status() == 101)
+                            throw unsupported_message("server unexpectedly switched protocols");
+                        else    // ignore other status codes
+                            rs.soft_clear();
+                    } else {
+                        response_handled = true;
 
-                    // abort upload on connecture closure or error response
-                    if (!_keepalive || (rs.status() / 100) != 2) {
-                        std::lock_guard<std::mutex> guard(_lock);
+                        // abort upload on connecture closure or error response
+                        if (!_keepalive || (rs.status() / 100) != 2) {
+                            std::lock_guard<std::mutex> guard(_lock);
 
-                        // make sure this connection won't be reused
-                        _keepalive = false;
+                            // make sure this connection won't be reused
+                            _keepalive = false;
 
-                        // if we handled receiving the response body, close immediately
-                        if (!_response)
-                            _cancel();
+                            // if we handled receiving the response body, close immediately
+                            if (!_response)
+                                _cancel();
 
-                        throw incomplete_upload(std::move(rs));
+                            throw incomplete_upload(std::move(rs));
+                        }
                     }
-                    // TODO: handle 1xx responses (especially 100-continue), and adapt _handle_response for it
                 }
 
                 // don't send more data than is left
@@ -752,8 +760,19 @@ client::response client::send(request::data *r) {
         _socket->flush();
         // TODO: ability to send files or stream the body contents
 
-        if (!response_handled)
-            _handle_response(rs, retriable);
+        while (!response_handled) {
+            if (_handle_response(rs, retriable)) {
+                // 1xx informational response
+                // TODO: handle protocol switching for WebSocket, HTTP/2 and upgrade options specified by the request
+                if (rs.status() == 101)
+                    throw unsupported_message("server unexpectedly switched protocols");
+                else    // ignore other status codes
+                    rs.soft_clear();
+            } else {
+                // regular response
+                response_handled = true;
+            }
+        }
 
         return rs;
     } catch (incomplete_upload&) {
@@ -782,7 +801,7 @@ client::response client::send(request::data *r) {
     }
 }
 
-void client::_handle_response(response &rs, bool &retriable) {
+bool client::_handle_response(response &rs, bool &retriable) {
     // receive response status-line
     // request stops being retriable as soon as any data is received
     std::string line;
@@ -846,9 +865,13 @@ void client::_handle_response(response &rs, bool &retriable) {
 
     // TODO: Transfer-Encoding in HTTP/1.0 MUST be treated as faulty framing and close the connection afterwards
 
+    // stop here if it's a 1xx informational request
+    if (_response->status / 100 == 1)
+        return true;
+
     // determine if a body is present
     if (_request->method == "HEAD" || _response->status == 204 ||
-        _response->status == 304 || _response->status / 100 == 1) {
+        _response->status == 304) {
         // certain methods and status codes cannot have a body
         // close connection if there's no body
         std::lock_guard<std::mutex> guard(_lock);
@@ -934,6 +957,8 @@ void client::_handle_response(response &rs, bool &retriable) {
     // attach request's shutdown controller to response
     if (ctrl)
         rs.attach_shutdown_controller(*ctrl);
+
+    return false;
 }
 
 std::string_view client::recv_body(size_t max_len) {
@@ -1791,6 +1816,17 @@ void client::response::shutdown_controllable_signal(bool state) {
 
 bool client::response::empty() {
     return _d == nullptr;
+}
+
+/* clears status and header data; used by http::client to reuse the object
+ * after processing an 1xx informational response
+ */
+void client::response::soft_clear() {
+    assert(_d);
+    _d->version = version();
+    _d->status = 0;
+    _d->status_message.clear();
+    _d->headers.clear();
 }
 
 // request creation shortcuts

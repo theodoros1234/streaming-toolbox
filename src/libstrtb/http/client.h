@@ -53,6 +53,7 @@ public:
 
         response(client *c);
         void shutdown_controllable_signal(bool state);
+        void soft_clear();
 
     public:
         response() = default;
@@ -197,7 +198,7 @@ private:
     void _finish_response();
     void _idle_handler_attach();
     void _idle_handler_detach();
-    void _handle_response(client::response &rs, bool &retriable);
+    bool _handle_response(client::response &rs, bool &retriable);
 
 protected:
     friend request_handler;
