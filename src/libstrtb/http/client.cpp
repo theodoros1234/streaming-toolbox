@@ -1611,6 +1611,12 @@ client::request&& client::request::treat_as_non_idempotent() {
     return std::move(*this);
 }
 
+client::request&& client::request::with_auth_bearer(std::string_view token) {
+    _valid_state(false);
+    _with_header_trust_name("authorization"s, "Bearer " + token);
+    return std::move(*this);
+}
+
 client::response::response(client *c) {
     _d = new data;
     _d->c = c;

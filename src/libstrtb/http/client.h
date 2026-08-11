@@ -157,6 +157,7 @@ public:
         request&& treat_as_safe();
         request&& treat_as_idempotent();
         request&& treat_as_non_idempotent();
+        request&& with_auth_bearer(std::string_view token);
         /* NOTE: when using streamed recv, make sure to pull data
          *       from the first requests to avoid blocking later ones
          */
