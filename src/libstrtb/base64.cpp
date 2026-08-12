@@ -133,6 +133,9 @@ static inline std::string base64_decode_fn(std::string_view str, bool strict_pad
     if (strict_padding && str.length() % 4)
         throw std::invalid_argument("improper padding");
 
+    // reserve the needed memory
+    out.reserve((str.length() * 6) / 8);
+
     // process all chunks except the last one
     for (i = 0; i+4 < str.length(); i += 4) {
         // decode into 6-bit parts
