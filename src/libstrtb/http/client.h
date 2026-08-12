@@ -177,7 +177,7 @@ public:
 private:
     std::mutex _lock;
     std::condition_variable _cv;
-    std::variant<bool, networking::tcp_client, networking::tcp_client_ssl> _socket_container = false;
+    std::variant<std::monostate, networking::tcp_client, networking::tcp_client_ssl> _socket_container;
     networking::tcp_client *_socket = nullptr;
     volatile bool _is_shutdown = false, _shutdown_controller_state = false,
                   _is_shutdown_rq = false, _is_shutdown_rs = false;

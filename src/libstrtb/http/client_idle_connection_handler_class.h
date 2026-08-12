@@ -26,7 +26,7 @@ class client;
 class client_idle_connection_handler_class {
 private:
     struct attach_request_t {
-        std::variant<bool, networking::tcp_client, networking::tcp_client_ssl> &socket_container;
+        std::variant<std::monostate, networking::tcp_client, networking::tcp_client_ssl> &socket_container;
         // returned values
         uint64_t &id;   // 0 => error, usage explained in socket info
         size_t &index;  // array index to quickly find the slot during detach
@@ -62,7 +62,7 @@ protected:
     friend client;
     void thread_function();
     std::pair<uint64_t, size_t> attach(
-        std::variant<bool, networking::tcp_client, networking::tcp_client_ssl> &socket_container);
+        std::variant<std::monostate, networking::tcp_client, networking::tcp_client_ssl> &socket_container);
     void detach(uint64_t id, size_t index);
 
 public:

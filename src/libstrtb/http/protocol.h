@@ -115,7 +115,7 @@ struct auth_params_ret {
 
 struct credentials {    // or challenge
     std::string auth_scheme;
-    std::variant<bool, std::string, parameter_map> value = false;   // no value, token68, #auth_param
+    std::variant<std::monostate, std::string, parameter_map> value;     // no value, token68, #auth_param
 };
 
 struct credentials_ret {

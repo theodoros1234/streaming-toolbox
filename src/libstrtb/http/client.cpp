@@ -324,7 +324,7 @@ void client_idle_connection_handler_class::thread_function() {
 }
 
 std::pair<uint64_t, size_t> client_idle_connection_handler_class::attach(
-    std::variant<bool, networking::tcp_client, networking::tcp_client_ssl> &socket_container) {
+    std::variant<std::monostate, networking::tcp_client, networking::tcp_client_ssl> &socket_container) {
     std::unique_lock<std::mutex> lock(_lock);
 
     // make sure the background thread hasn't failed

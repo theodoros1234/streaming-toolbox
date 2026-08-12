@@ -1711,7 +1711,7 @@ credentials_ret parse_credentials_or_challenge(const char *str, size_t from, siz
     size_t pos_pre_space = pos;
     // space
     if (!parse_char(str, pos, to, ' '))
-        return {pos, true, {std::move(auth_scheme), false}};
+        return {pos, true, {std::move(auth_scheme), std::monostate()}};
     pos++;
 
     // try both token68 and #auth-param
@@ -1725,7 +1725,7 @@ credentials_ret parse_credentials_or_challenge(const char *str, size_t from, siz
     else if (params_valid && !params.empty())   // return params
         return {params_to, true, {std::move(auth_scheme), std::move(params)}};
     else
-        return {pos_pre_space, true, {std::move(auth_scheme), false}};
+        return {pos_pre_space, true, {std::move(auth_scheme), std::monostate()}};
 }
 
 authenticate_field_ret parse_field_authenticate(const std::string &field_value) {
