@@ -281,6 +281,10 @@ inline bool is_qdtext(unsigned char c) {
     return (0x20 <= c && c <= 0x7E && c != 0x22 && c != 0x5C) || c == '\t' || is_obs_text(c);
 }
 
+inline bool is_ctl(unsigned char c) {
+    return c < 0x20 || c == 0x1F;
+}
+
 inline char to_lower(char c) {
     return 'A' <= c && c <= 'Z' ? c + ('a' - 'A') : c;
 }

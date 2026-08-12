@@ -158,6 +158,8 @@ public:
         request&& treat_as_idempotent();
         request&& treat_as_non_idempotent();
         request&& with_auth_bearer(std::string_view token);
+        request&& with_auth_basic(std::string_view username, std::string_view password);
+        request&& with_auth_basic(std::string_view userinfo);
         /* NOTE: when using streamed recv, make sure to pull data
          *       from the first requests to avoid blocking later ones
          */

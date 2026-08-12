@@ -3,6 +3,7 @@
 #include "strescape.h"
 #include "../logging.h"
 #include "client_idle_connection_handler_class.h"
+#include "../base64.h"
 
 #include <assert.h>
 #include <charconv>
@@ -1614,6 +1615,52 @@ client::request&& client::request::treat_as_non_idempotent() {
 client::request&& client::request::with_auth_bearer(std::string_view token) {
     _valid_state(false);
     _with_header_trust_name("authorization"s, "Bearer " + token);
+    return std::move(*this);
+}
+
+client::request&& client::request::with_auth_basic(std::string_view username, std::string_view password) {
+    _valid_state(false);
+    /* check username and password for invalid characters:
+     * neither can contain control characters,
+     * username also can't contain a colon, as it's used
+     * as a separator between the username and password
+     */
+    for (char c : username)
+        if (is_ctl(c) || c == ':')
+            throw std::invalid_argument("username contains invalid character " + char_escape(c));
+    for (char c : password)
+        if (is_ctl(c))
+            throw std::invalid_argument("password contains invalid character " + char_escape(c));
+
+    // encode and set header
+    _with_header_trust_name("authorization"s, "Basic " + base64_encode(username + ":" + password));
+
+    return std::move(*this);
+}
+
+client::request&& client::request::with_auth_basic(std::string_view userinfo) {
+    _valid_state(false);
+    // this expects the userinfo segment from a URL
+
+    bool has_colon = false;
+
+    /* check username and password for invalid characters and form:
+     * neither can contain control characters,
+     * at least one colon to separate username from password
+     */
+    for (char c : userinfo) {
+        if (is_ctl(c))
+            throw std::invalid_argument("userinfo contains invalid character " + char_escape(c));
+        else if (c == ':')
+            has_colon = true;
+    }
+
+    if (!has_colon)
+        throw std::invalid_argument("missing colon ':' separator between username and password");
+
+    // encode and set header
+    _with_header_trust_name("authorization"s, "Basic " + base64_encode(userinfo));
+
     return std::move(*this);
 }
 
