@@ -16,6 +16,7 @@ tcp_server_connection::tcp_server_connection(strtb::common::deregistration_inter
     _remote_ip(remote_ip),
     _server_port(server_port),
     _remote_port(remote_port) {
+    _prepare_buffers();
     _sock = fd;
 }
 

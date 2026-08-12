@@ -33,9 +33,6 @@ tcp_client::~tcp_client() {
 }
 
 void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
-    buffer_clear_recv();
-    buffer_clear_send();
-
     int sock_tmp = -1;
     {
         std::lock_guard<std::recursive_mutex> guard(_lock);
@@ -48,6 +45,8 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
         _connecting = true;
         _cancel_sent = false;
     }
+
+    _prepare_buffers();
 
     // Get target host info
     struct addrinfo gai_hints = {

@@ -1,5 +1,6 @@
 #include "tcp_socket.h"
 #include "../logging.h"
+#include <cassert>
 #include <stdexcept>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -15,22 +16,10 @@ using namespace strtb::networking;
 
 static logging::source log("TCP Socket", false);
 
-tcp_socket::tcp_socket(bool buffered_send, size_t buffer_size) : _buffer_size(buffer_size) {
+tcp_socket::tcp_socket(bool buffered_send, size_t buffer_size) :
+    _buffer_size(buffer_size), _buffered_send(buffered_send) {
     if (buffer_size < STRTB_NETWORKING_RECV_BUFFER_SIZE_MIN)
         throw std::invalid_argument("tcp_socket recv_buffer_size must be at least 256 bytes");
-    _buffer_recv = (char*) std::malloc(buffer_size);
-    if (!_buffer_recv)
-        throw internal_error(errno);
-    buffer_clear_recv();
-    buffer_clear_send();
-
-    if (buffered_send) {
-        _buffer_send = (char*) std::malloc(buffer_size);
-        if (!_buffer_send) {
-            std::free(_buffer_recv);
-            throw internal_error(errno);
-        }
-    }
 }
 
 tcp_socket::~tcp_socket() {
@@ -41,9 +30,29 @@ tcp_socket::~tcp_socket() {
         buffer_clear_recv();
         buffer_clear_send();
     }
-    free(_buffer_recv);
+    if (_buffer_recv)
+        free(_buffer_recv);
     if (_buffer_send)
         free(_buffer_send);
+}
+
+void tcp_socket::_prepare_buffers() {
+    // allocate buffers if not already allocated
+
+    if (!_buffer_recv) {
+        _buffer_recv = (char*) std::malloc(_buffer_size);
+        if (!_buffer_recv)
+            throw internal_error(errno);
+    }
+
+    if (_buffered_send && !_buffer_send) {
+        _buffer_send = (char*) std::malloc(_buffer_size);
+        if (!_buffer_send)
+            throw internal_error(errno);
+    }
+
+    buffer_clear_recv();
+    buffer_clear_send();
 }
 
 size_t tcp_socket::_recv(size_t len) {
@@ -69,6 +78,8 @@ std::pair<const char *, size_t> tcp_socket::recv(size_t max_len) {
 
     if (max_len > _buffer_size)
         max_len = _buffer_size;
+
+    assert(_buffer_recv);
 
     // Return from recv_line's leftovers if there are any
     if (_line_leftovers) {
@@ -115,7 +126,9 @@ void tcp_socket::send(const char* buf, size_t len) {
     if (_sock == -1)
         throw connection_closed("socket closed or hasn't been opened yet", 0);
 
-    if (_buffer_send) {
+    if (_buffered_send) {
+        assert(_buffer_send);
+
         while (len > 0) {
             if (len >= _buffer_size && _send_pos == 0) {
                 // empty buffer and input is bigger than it => send directly without storing in buffer
@@ -147,11 +160,12 @@ void tcp_socket::send(const std::string& buf) {
 void tcp_socket::flush() {
     if (_sock == -1)
         throw connection_closed("socket closed or hasn't been opened yet", 0);
-    if (_buffer_send == nullptr)
+    if (!_buffered_send)
         throw connection_error("buffered send is not enabled", 0);
     if (_send_pos == 0)
         return;
 
+    assert(_buffer_send);
     _send(_buffer_send, _send_pos);
     _send_pos = 0;
 }
@@ -192,6 +206,8 @@ std::pair<std::string, bool> tcp_socket::recv_line(bool strip_endline, const std
 // WARNING: CRLF won't be detected when hitting the length limit in the middle of it
 bool tcp_socket::recv_line(std::string& line, bool strip_endline, const std::string& endline, size_t max_len) {
     line.clear();
+    if (_sock == -1)
+        throw connection_closed("socket closed or hasn't been opened yet", 0);
     // Up to 2 characters allowed for endline argument
     if (endline.size() > 2)
         throw std::invalid_argument("recv_line: endline must have at most 2 characters");
@@ -202,6 +218,7 @@ bool tcp_socket::recv_line(std::string& line, bool strip_endline, const std::str
     if (max_len < endline.size())
         throw std::invalid_argument("recv_line: max_len must be at least as long as the endline");
 
+    assert(_buffer_recv);
     size_t received = 0, i = 0;
     const char* buf = nullptr;
     bool more = true, endline_reached = false;
@@ -279,6 +296,7 @@ int tcp_socket::fd() const {return _sock;}
 bool tcp_socket::available() {
     if (_sock == -1)
         throw connection_closed("socket closed or hasn't been opened yet", 0);
+    assert(_buffer_recv);
 
     if (_line_leftovers)    // leftovers immediately available
         return true;

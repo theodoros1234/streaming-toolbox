@@ -17,6 +17,7 @@ class tcp_socket {
 protected:
     char *_buffer_recv = nullptr, *_buffer_send = nullptr;
     const size_t _buffer_size;
+    bool _buffered_send = false;
     size_t _line_leftovers_pos = 0, _line_leftovers = 0, _send_pos = 0;
     std::recursive_mutex _lock;
 
@@ -24,6 +25,8 @@ protected:
 #ifdef __linux__
     int _sock = -1;
 #endif
+
+    void _prepare_buffers();
 
     virtual size_t _recv(size_t len);
     virtual void _send(const char* buf, size_t len);
