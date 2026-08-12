@@ -15,6 +15,7 @@ include( ../../version.pri )
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    base64.cpp \
     http/client.cpp \
     http/codings.cpp \
     http/request_handler.cpp \
@@ -63,6 +64,7 @@ SOURCES += \
     uri_known_tlds_default.cpp
 
 HEADERS += \
+    base64.h \
     chat/channel.h \
     chat/message.h \
     chat/provider.h \
