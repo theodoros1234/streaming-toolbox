@@ -165,3 +165,20 @@ bool tcp_server_connection_ssl::_available() {
     else
         return _ssl_available(_ssl, _sock);
 }
+
+void tcp_server_connection_ssl::thread_assist_enable() {
+    if (!_thread_assisted) {
+        _thread_assisted = true;
+        if (is_open())
+            _thread.start(_sock, _ssl);
+    }
+}
+
+void tcp_server_connection_ssl::thread_assist_disable() {
+    if (_thread_assisted) {
+        _thread_assisted = false;
+        if (is_open())
+            _thread.stop();
+        _thread.release();
+    }
+}

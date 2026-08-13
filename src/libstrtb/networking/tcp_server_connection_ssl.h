@@ -38,6 +38,8 @@ public:
     void shutdown_gracefully();
     SSL* ssl() const;
     bool thread_assisted() const;
+    void thread_assist_enable();
+    void thread_assist_disable();
 };
 
 }

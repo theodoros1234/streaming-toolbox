@@ -63,10 +63,6 @@ tcp_client_ssl::~tcp_client_ssl() {
     }
 }
 
-void tcp_client_ssl::connect(const char* address, uint16_t port, time_t timeout) {
-    connect(address, port, false, true, nullptr, timeout);
-}
-
 void tcp_client_ssl::connect(const std::string& address, uint16_t port, bool allow_abrupt_shutdown, bool verify_certificate, SSL_CTX* ssl_context, time_t timeout) {
     connect(address.c_str(), port, allow_abrupt_shutdown, verify_certificate, ssl_context, timeout);
 }
@@ -220,4 +216,27 @@ bool tcp_client_ssl::_available() {
         return _thread.available();
     else
         return _ssl_available(_ssl, _sock);
+}
+
+void tcp_client_ssl::thread_assist_enable() {
+    if (_connecting)
+        throw std::logic_error("cannot enable thread assistance while connecting");
+
+    if (!_thread_assisted) {
+        _thread_assisted = true;
+        if (is_open())
+            _thread.start(_sock, _ssl);
+    }
+}
+
+void tcp_client_ssl::thread_assist_disable() {
+    if (_connecting)
+        throw std::logic_error("cannot disable thread assistance while connecting");
+
+    if (_thread_assisted) {
+        _thread_assisted = false;
+        if (is_open())
+            _thread.stop();
+        _thread.release();
+    }
 }
