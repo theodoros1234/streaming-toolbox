@@ -47,8 +47,7 @@ static struct default_context_container {
 
 tcp_client_ssl::tcp_client_ssl(bool buffered_send, bool thread_assisted, size_t recv_buffer_size)
     : tcp_client(buffered_send, recv_buffer_size),
-    _thread_assisted(thread_assisted),
-    _thread(thread_assisted) {}
+    _thread_assisted(thread_assisted) {}
 
 tcp_client_ssl::~tcp_client_ssl() {
     detach_shutdown_controller();

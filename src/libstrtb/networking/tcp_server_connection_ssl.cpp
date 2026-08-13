@@ -19,7 +19,7 @@ tcp_server_connection_ssl::tcp_server_connection_ssl(strtb::common::deregistrati
                                                      int remote_port,
                                                      SSL_CTX* ctx) :
     tcp_server_connection(parent, buffered_send, buffer_size, fd, server_ip, server_port, remote_ip, remote_port),
-    _thread(thread_assisted), _thread_assisted(thread_assisted) {
+    _thread_assisted(thread_assisted) {
     _ssl = SSL_new(ctx);
     if (!_ssl)
         throw internal_error_ssl("Could not create SSL object", 0);

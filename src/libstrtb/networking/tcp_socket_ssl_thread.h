@@ -31,7 +31,7 @@ protected:
     friend std::thread;
 
 public:
-    tcp_socket_ssl_thread(bool thread_assisted);
+    tcp_socket_ssl_thread();
     ~tcp_socket_ssl_thread();
     tcp_socket_ssl_thread(const tcp_socket_ssl_thread&) = delete;
     tcp_socket_ssl_thread(tcp_socket_ssl_thread&&) = delete;
@@ -41,6 +41,7 @@ public:
     void send(const char* buffer, size_t length);
     void shutdown_gracefully();
     bool available();
+    void release();
 };
 
 }

@@ -13,28 +13,24 @@ using namespace strtb::networking;
 
 static strtb::logging::source log("SSL Helper Thread", false);
 
-tcp_socket_ssl_thread::tcp_socket_ssl_thread(bool thread_assisted) {
-    if (thread_assisted) {
-        _eventfd = eventfd(0, 0);
-        if (_eventfd == -1)
-            throw internal_error("failed to create internal synchronization mechanism: " + std::string(std::strerror(errno)), errno);
-    }
-}
+tcp_socket_ssl_thread::tcp_socket_ssl_thread() {}
 
 tcp_socket_ssl_thread::~tcp_socket_ssl_thread() {
     if (_t.joinable()) {
         log.put(strtb::logging::WARNING, {"Object destroyed while thread was still open or not properly closed. Stopping thread, but this could cause a crash. Please report this bug."});
         stop();
     }
-    if (_eventfd != -1)
-        ::close(_eventfd);
+    release();
 }
 
 void tcp_socket_ssl_thread::start(int sock, SSL* ssl) {
     if (_t.joinable())
         throw internal_error("SSL helper thread already started", 0);
-    if (_eventfd == -1)
-        throw internal_error("error in internal synchronization mechanism", 0);
+    if (_eventfd == -1) {
+        _eventfd = eventfd(0, 0);
+        if (_eventfd == -1)
+            throw internal_error("failed to create internal synchronization mechanism: " + std::string(std::strerror(errno)), errno);
+    }
     if (sock == -1)
         throw std::invalid_argument("invalid socket");
     if (ssl == nullptr)
@@ -407,5 +403,14 @@ void tcp_socket_ssl_thread::_decide_exception() {
         }
     default:
         throw internal_error_ssl("SSL/TLS internal error (error code " + std::to_string(_errno_ssl) + ")", _errno_ssl);
+    }
+}
+
+void tcp_socket_ssl_thread::release() {
+    // release internal resources (they'll be automatically recreated if object is reused)
+    assert(!_t.joinable());
+    if (_eventfd != -1) {
+        ::close(_eventfd);
+        _eventfd = -1;
     }
 }
