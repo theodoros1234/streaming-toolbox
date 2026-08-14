@@ -18,18 +18,90 @@ using namespace strtb::networking;
 
 static strtb::logging::source log("TCP Client", false);
 
-tcp_client::tcp_client(bool buffered_send, size_t buffer_size) : tcp_socket(buffered_send, buffer_size) {
-    // Create new eventfd (used for shutting down server from another thread)
-    _event = eventfd(0, 0);
-    if (_event == -1)
-        throw internal_error("failed to setup internal synchronization mechanism: " + std::string(strerror(errno)), errno);
-}
+tcp_client::tcp_client(bool buffered_send, size_t buffer_size) :
+    tcp_socket(buffered_send, buffer_size) {}
 
 tcp_client::~tcp_client() {
     detach_shutdown_controller();
     if (_sock != -1)
         log.put(logging::WARNING, {"Destructor called when client connection to ", _remote_ip, ":", _remote_port, " was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
-    ::close(_event);
+    if (_event != -1)
+        ::close(_event);
+}
+
+void tcp_client::_movable(tcp_client &other, const std::type_info &type) {
+    tcp_socket::_movable(other, type);
+    if (_connecting)
+        throw std::logic_error("cannot move socket object while the destination object is connecting");
+    if (other._connecting)
+        throw std::logic_error("cannot move socket object while the source object is connecting");
+}
+
+void tcp_client::_move(tcp_client &&other) {
+    tcp_socket::_move(std::move(other));
+    _remote_ip = std::move(other._remote_ip);
+    _remote_port = std::exchange(other._remote_port, 0);
+    _connect_restrict = std::exchange(other._connect_restrict, false);
+    _event = std::exchange(other._event, -1);
+}
+
+void tcp_client::_move_assign(tcp_client &&other) {
+    tcp_socket::_move_assign(std::move(other));
+    _remote_ip = std::move(other._remote_ip);
+    _remote_port = std::exchange(other._remote_port, 0);
+    _connect_restrict = std::exchange(other._connect_restrict, false);
+    if (_event == -1)   // only steal eventfd if we don't already have one
+        _event = std::exchange(other._event, -1);
+}
+
+tcp_client::tcp_client(tcp_client &&other) {
+    // check if we can move (type and this socket closed)
+    _movable(other, typeid(tcp_client));
+
+    // temporarily detach shutdown controller from other
+    shutdown_controller *s_ctrl = nullptr;
+    if (other._shutdown_controller) {
+        s_ctrl = other._shutdown_controller;
+        other.detach_shutdown_controller();
+    }
+
+    // move
+    {
+        std::lock_guard<std::recursive_mutex> guard(other._lock);
+        _move(std::move(other));
+    }
+
+    // reattach the shutdown controller
+    if (s_ctrl)
+        attach_shutdown_controller(*s_ctrl);
+}
+
+tcp_client& tcp_client::operator=(tcp_client &&other) {
+    // check if we can move (type and this socket closed)
+    _movable(other, typeid(tcp_client));
+
+    // detach our own shutdown controller
+    detach_shutdown_controller();
+
+    // temporarily detach shutdown controller from other
+    shutdown_controller *s_ctrl = nullptr;
+    if (other._shutdown_controller) {
+        s_ctrl = other._shutdown_controller;
+        other.detach_shutdown_controller();
+    }
+
+    // move
+    {
+        std::lock_guard<std::recursive_mutex> guard(_lock);
+        std::lock_guard<std::recursive_mutex> guard_o(other._lock);
+        _move_assign(std::move(other));
+    }
+
+    // reattach the shutdown controller
+    if (s_ctrl)
+        attach_shutdown_controller(*s_ctrl);
+
+    return *this;
 }
 
 void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
@@ -42,6 +114,15 @@ void tcp_client::connect(const char* address, uint16_t port, time_t timeout) {
             throw connection_error("connect was called by another thread", EALREADY);
         else if (_connect_restrict)
             throw connection_closed("Connection cancelled", 0);
+
+        // Create new eventfd (used for cancelling connection from another thread)
+        if (_event == -1) {
+            _event = eventfd(0, 0);
+            if (_event == -1)
+                throw internal_error("failed to setup internal synchronization mechanism: " +
+                                         std::string(strerror(errno)), errno);
+        }
+
         _connecting = true;
         _cancel_sent = false;
     }

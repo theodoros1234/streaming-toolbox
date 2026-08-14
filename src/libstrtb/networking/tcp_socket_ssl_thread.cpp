@@ -8,6 +8,7 @@
 #include <cstring>
 #include <unistd.h>
 #include <fcntl.h>
+#include <utility>
 
 using namespace strtb::networking;
 
@@ -413,4 +414,11 @@ void tcp_socket_ssl_thread::release() {
         ::close(_eventfd);
         _eventfd = -1;
     }
+}
+
+void tcp_socket_ssl_thread::steal_event_signaller(tcp_socket_ssl_thread &other) {
+    assert(!_t.joinable());
+    assert(!other._t.joinable());
+    if (_eventfd == -1)
+        _eventfd = std::exchange(other._eventfd, -1);
 }

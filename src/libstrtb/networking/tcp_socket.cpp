@@ -10,9 +10,11 @@
 #include <cstring>
 #include <cstdlib>
 #include <poll.h>
+#include <string>
 
 using namespace strtb;
 using namespace strtb::networking;
+using namespace std::string_literals;
 
 static logging::source log("TCP Socket", false);
 
@@ -53,6 +55,49 @@ void tcp_socket::_prepare_buffers() {
 
     buffer_clear_recv();
     buffer_clear_send();
+}
+
+void tcp_socket::_movable(tcp_socket &other, const std::type_info &type) {
+    if (_sock != -1)
+        throw std::logic_error("cannot move socket object while the destination object is already open");
+    const std::type_info &other_type = typeid(other);
+    if (type != other_type)
+        throw std::invalid_argument("cannot move "s + type.name() + " to " + other_type.name());
+}
+
+void tcp_socket::_move(tcp_socket &&other) {
+    _buffer_recv = std::exchange(other._buffer_recv, nullptr);
+    _buffer_send = std::exchange(other._buffer_send, nullptr);
+    _buffer_size = other._buffer_size;
+    _buffered_send = other._buffered_send;
+    _line_leftovers_pos = std::exchange(other._line_leftovers_pos, 0);
+    _line_leftovers = std::exchange(other._line_leftovers, 0);
+    _send_pos = std::exchange(other._send_pos, 0);
+    _sock = std::exchange(other._sock, -1);
+}
+
+void tcp_socket::_move_assign(tcp_socket &&other) {
+    if (_buffer_recv)
+        free(_buffer_recv);
+    if (_buffer_send)
+        free(_buffer_send);
+    _move(std::move(other));
+}
+
+tcp_socket::tcp_socket(tcp_socket &&other) {
+    // check if types match and move
+    _movable(other, typeid(tcp_socket));
+    std::lock_guard<std::recursive_mutex> guard(other._lock);
+    _move(std::move(other));
+}
+
+tcp_socket& tcp_socket::operator=(tcp_socket &&other) {
+    // check if types match and move
+    _movable(other, typeid(tcp_socket));
+    std::lock_guard<std::recursive_mutex> guard(_lock);
+    std::lock_guard<std::recursive_mutex> guard_o(other._lock);
+    _move_assign(std::move(other));
+    return *this;
 }
 
 size_t tcp_socket::_recv(size_t len) {

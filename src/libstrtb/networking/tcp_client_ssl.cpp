@@ -63,6 +63,100 @@ tcp_client_ssl::~tcp_client_ssl() {
     }
 }
 
+void tcp_client_ssl::_move(tcp_client_ssl &&other) {
+    // stop thread assist on other
+    bool restart_thread = false;
+    if (other._thread_assisted && other.is_open()) {
+        restart_thread = true;
+        other._thread.stop();
+    }
+
+    tcp_client::_move(std::move(other));
+    _ssl = std::exchange(other._ssl, nullptr);
+    _thread_assisted = other._thread_assisted;
+
+    // steal helper thread's eventfd if it makes sense to do so
+    if (_thread_assisted)
+        _thread.steal_event_signaller(other._thread);
+
+    // restart thread here
+    if (restart_thread)
+        _thread.start(_sock, _ssl);
+}
+
+void tcp_client_ssl::_move_assign(tcp_client_ssl &&other) {
+    assert(_ssl == nullptr);
+
+    // stop thread assist on other
+    bool restart_thread = false;
+    if (other._thread_assisted && other.is_open()) {
+        restart_thread = true;
+        other._thread.stop();
+    }
+
+    tcp_client::_move_assign(std::move(other));
+    _ssl = std::exchange(other._ssl, nullptr);
+    _thread_assisted = other._thread_assisted;
+
+    // steal helper thread's eventfd if it makes sense to do so
+    if (_thread_assisted)
+        _thread.steal_event_signaller(other._thread);
+
+    // restart thread here
+    if (restart_thread)
+        _thread.start(_sock, _ssl);
+}
+
+tcp_client_ssl::tcp_client_ssl(tcp_client_ssl &&other) {
+    // check if we can move (type and this socket closed)
+    _movable(other, typeid(tcp_client_ssl));
+
+    // temporarily detach shutdown controller from other
+    shutdown_controller *s_ctrl = nullptr;
+    if (other._shutdown_controller) {
+        s_ctrl = other._shutdown_controller;
+        other.detach_shutdown_controller();
+    }
+
+    // move
+    {
+        std::lock_guard<std::recursive_mutex> guard(other._lock);
+        _move(std::move(other));
+    }
+
+    // reattach the shutdown controller
+    if (s_ctrl)
+        attach_shutdown_controller(*s_ctrl);
+}
+
+tcp_client_ssl& tcp_client_ssl::operator=(tcp_client_ssl &&other) {
+    // check if we can move (type and this socket closed)
+    _movable(other, typeid(tcp_client_ssl));
+
+    // detach our own shutdown controller
+    detach_shutdown_controller();
+
+    // temporarily detach shutdown controller from other
+    shutdown_controller *s_ctrl = nullptr;
+    if (other._shutdown_controller) {
+        s_ctrl = other._shutdown_controller;
+        other.detach_shutdown_controller();
+    }
+
+    // move
+    {
+        std::lock_guard<std::recursive_mutex> guard(_lock);
+        std::lock_guard<std::recursive_mutex> guard_o(other._lock);
+        _move_assign(std::move(other));
+    }
+
+    // reattach the shutdown controller
+    if (s_ctrl)
+        attach_shutdown_controller(*s_ctrl);
+
+    return *this;
+}
+
 void tcp_client_ssl::connect(const std::string& address, uint16_t port, bool allow_abrupt_shutdown, bool verify_certificate, SSL_CTX* ssl_context, time_t timeout) {
     connect(address.c_str(), port, allow_abrupt_shutdown, verify_certificate, ssl_context, timeout);
 }

@@ -18,10 +18,17 @@ protected:
     virtual void _send(const char* buf, size_t len);
     virtual bool _available();
 
+    void _move(tcp_client_ssl &&other);
+    void _move_assign(tcp_client_ssl &&other);
+
 public:
     tcp_client_ssl(bool buffered_send = false, bool thread_assisted = false,
                    size_t buffer_size = STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT_SSL);
+    tcp_client_ssl(tcp_client_ssl &&other);
     ~tcp_client_ssl();
+    tcp_client_ssl& operator=(tcp_client_ssl &&other);
+    void connect(const char* address, uint16_t port, time_t timeout) = delete;
+    void connect(const std::string& address, uint16_t port, time_t timeout) = delete;
     void connect(const char* address, uint16_t port, bool allow_abrupt_shutdown = false, bool verify_certificate = true, SSL_CTX* ssl_context = nullptr, time_t timeout = 30);
     void connect(const std::string& address, uint16_t port, bool allow_abrupt_shutdown = false, bool verify_certificate = true, SSL_CTX* ssl_context = nullptr, time_t timeout = 30);
     void shutdown_gracefully();

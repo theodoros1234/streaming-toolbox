@@ -42,6 +42,7 @@ public:
     void shutdown_gracefully();
     bool available();
     void release();
+    void steal_event_signaller(tcp_socket_ssl_thread &other);
 };
 
 }
