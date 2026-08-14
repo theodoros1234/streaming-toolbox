@@ -1,5 +1,6 @@
 #include "tcp_server_connection_ssl.h"
 #include "tcp_socket_ssl_common.h"
+#include "sigpipe_suppressor.h"
 #include "../logging.h"
 #include <assert.h>
 #include <stdexcept>
@@ -68,6 +69,7 @@ void tcp_server_connection_ssl::handshake() {
     if (_thread_active)
         throw std::logic_error("handshake() called after it was already successful");
 
+    sigpipe_suppressor shutup;
     int ret = SSL_accept(_ssl);
     if (ret <= 0) {
         int errno_ssl = SSL_get_error(_ssl, ret);
