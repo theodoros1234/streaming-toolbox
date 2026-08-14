@@ -21,7 +21,7 @@ static logging::source log("TCP Socket", false);
 tcp_socket::tcp_socket(bool buffered_send, size_t buffer_size) :
     _buffer_size(buffer_size), _buffered_send(buffered_send) {
     if (buffer_size < STRTB_NETWORKING_RECV_BUFFER_SIZE_MIN)
-        throw std::invalid_argument("tcp_socket recv_buffer_size must be at least 256 bytes");
+        throw std::invalid_argument("tcp_socket buffer_size must be at least 256 bytes");
 }
 
 tcp_socket::~tcp_socket() {
@@ -77,10 +77,7 @@ void tcp_socket::_move(tcp_socket &&other) {
 }
 
 void tcp_socket::_move_assign(tcp_socket &&other) {
-    if (_buffer_recv)
-        free(_buffer_recv);
-    if (_buffer_send)
-        free(_buffer_send);
+    release();
     _move(std::move(other));
 }
 
@@ -363,4 +360,27 @@ bool tcp_socket::_available() {
         throw internal_error(errno);
     else
         return ret;
+}
+
+// release memory held by buffers
+void tcp_socket::release() {
+    if (is_open())
+        throw std::logic_error("cannot change or release buffers and other resources while the socket is open");
+
+    if (_buffer_recv) {
+        free(_buffer_recv);
+        _buffer_recv = nullptr;
+    }
+
+    if (_buffer_send) {
+        free(_buffer_send);
+        _buffer_send = nullptr;
+    }
+}
+
+void tcp_socket::buffer_resize(size_t size) {
+    release();  // also makes sure socket is closed
+    if (size < STRTB_NETWORKING_RECV_BUFFER_SIZE_MIN)
+        throw std::invalid_argument("buffer size must be at least 256 bytes");
+    _buffer_size = size;
 }

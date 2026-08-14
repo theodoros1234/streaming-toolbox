@@ -41,6 +41,7 @@ public:
     int remote_port() const;
     void attach_shutdown_controller(shutdown_controller &ctrl);
     void detach_shutdown_controller();
+    void release();
 };
 
 }

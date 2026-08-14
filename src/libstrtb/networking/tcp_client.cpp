@@ -488,3 +488,15 @@ void tcp_client::shutdown_controllable_signal(bool state) {
     else
         reset();
 }
+
+void tcp_client::release() {
+    // release buffers and eventfd (only when closed)
+    if (_connecting)
+        throw std::logic_error("cannot release resources while the socket is connecting");
+
+    tcp_socket::release();
+    if (_event != -1) {
+        ::close(_event);
+        _event = -1;
+    }
+}

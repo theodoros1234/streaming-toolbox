@@ -58,9 +58,11 @@ public:
     bool is_open() const;
     bool buffered_send() const;
     size_t buffer_size() const;
+    void buffer_resize(size_t size);
     void buffer_clear_recv();
     void buffer_clear_send();
     bool available();
+    void release();
 #ifdef __linux__
     int fd() const;
 #endif
