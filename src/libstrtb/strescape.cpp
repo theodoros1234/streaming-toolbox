@@ -35,10 +35,10 @@ std::string char_escape(char c, char escape_quote_char, bool quoted) {
         escaped.append("\\t");
         break;
     default:
-        if (c == escape_quote_char) {       // Quotation mark
+        if (c == escape_quote_char) {                       // Quotation mark
             escaped.push_back('\\');
             escaped.push_back(escape_quote_char);
-        } else if (0 <= c && c <= 0x1f) {   // Other control character
+        } else if ((0 <= c && c <= 0x1f) || c == 0x7f) {    // Other control character
             // Convert to hex escape code
             std::stringstream str_stream(std::ios_base::out);
             str_stream << "\\u" << std::hex << std::setw(4) << std::setfill('0') << (unsigned int)c;
@@ -123,10 +123,10 @@ QString char_escape(QChar c, QChar escape_quote_char, bool quoted) {
         escaped.append("\\t");
         break;
     default:
-        if (c == escape_quote_char) {       // Quotation mark
+        if (c == escape_quote_char) {           // Quotation mark
             escaped.push_back('\\');
             escaped.push_back(escape_quote_char);
-        } else if (0 <= cu && cu <= 0x1f) {   // Other control character
+        } else if (cu <= 0x1f || cu == 0x7f) {  // Other control character
             // Convert to hex escape code
             std::stringstream str_stream(std::ios_base::out);
             str_stream << "\\u" << std::hex << std::setw(4) << std::setfill('0') << (unsigned int) cu;
