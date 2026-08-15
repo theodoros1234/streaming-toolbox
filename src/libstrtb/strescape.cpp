@@ -76,6 +76,10 @@ std::string string_escape(const char* str, char escape_quote_char, bool quoted) 
 }
 
 std::string string_escape(const std::string &str, char escape_quote_char, bool quoted) {
+    return string_escape(std::string_view(str), escape_quote_char, quoted);
+}
+
+std::string string_escape(std::string_view str, char escape_quote_char, bool quoted) {
     std::string escaped;
 
     // Opening quote
