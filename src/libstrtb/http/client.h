@@ -49,6 +49,8 @@ public:
             field_parser headers, trailers;
             recv_mode_enum recv_mode = RECV_STREAM;
             std::string body_str;
+            std::variant<std::monostate, networking::tcp_client, networking::tcp_client_ssl> socket;
+            std::vector<product> upgrade;
         } *_d = nullptr;
 
         response(client *c);
@@ -73,6 +75,9 @@ public:
         std::string_view recv_body();
         std::string_view recv_body(size_t max_len);     // max_len = 0 => automatically find ideal max_len
         std::string body_str();
+        std::variant<std::monostate, networking::tcp_client, networking::tcp_client_ssl> socket();
+        const std::vector<product>& upgrade() const;
+
         void attach_shutdown_controller(shutdown_controller &ctrl);
         void detach_shutdown_controller();
 
@@ -89,6 +94,8 @@ public:
         template<class T> request&& _with_headers(T headers);
         template<class T> request&& _with_params(T params);
         template<class T> request&& _with_body_str(T body);
+        template<class T> request&& _upgrade(T protocols);
+        void _upgrade(std::string_view protocol);
         void _shutdown();
         void _cancel(std::unique_lock<std::mutex> &lock);
         void _move(request &&other);
@@ -117,6 +124,7 @@ public:
             recv_mode_enum recv_mode = RECV_STREAM;
             size_t recv_max_len = 0;    // only for automatic receiving
             std::map<std::string, std::string> headers;
+            std::vector<product> upgrade;
             response handler_response;
             std::exception_ptr handler_exception;
         } *_d = nullptr;
@@ -160,6 +168,10 @@ public:
         request&& with_auth_bearer(std::string_view token);
         request&& with_auth_basic(std::string_view username, std::string_view password);
         request&& with_auth_basic(std::string_view userinfo);
+        request&& upgrade(std::string_view protocol);
+        request&& upgrade(const std::vector<std::string> &protocols);
+        request&& upgrade(const std::vector<std::string_view> &protocols);
+        request&& upgrade(std::initializer_list<std::string_view> protocols);
         /* NOTE: when using streamed recv, make sure to pull data
          *       from the first requests to avoid blocking later ones
          */
@@ -198,10 +210,10 @@ private:
     void _cancel();
     void _cancel_response();
     bool _connection_reusable(const std::string &authority, bool https, bool autoclose);
-    void _finish_response();
+    void _finish_response(bool detach = false);
     void _idle_handler_attach();
     void _idle_handler_detach();
-    bool _handle_response(client::response &rs, bool &retriable);
+    bool _handle_response(client::response &rs, bool &retriable, const std::vector<product> &rq_upgrade);
 
 protected:
     friend request_handler;

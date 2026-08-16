@@ -82,6 +82,8 @@ struct parameters_ret {
 
 struct product {
     std::string name, version;  // version may be empty if not specified
+    operator std::string() const;
+    bool operator==(const product &other) const;
 };
 
 struct product_ret {
@@ -99,6 +101,7 @@ struct integer_ret {
 struct entity_tag {
     bool is_weak = false;
     std::string tag;
+    operator std::string();
 };
 
 struct entity_tag_ret {
@@ -467,7 +470,30 @@ public:
 const char* get_status_code_phrase(int status_code);
 std::string timestamp_to_string(time_t timestamp);
 bool etag_compare(const entity_tag &a, const entity_tag &b, bool strong);
-std::string etag_to_string(const entity_tag &etag);
+// some returned structs have automatic conversion to std::string
+std::string list_to_string(const std::vector<std::string> &list);
+std::string list_to_string(const std::vector<std::string_view> &list);
+std::string list_to_string(std::initializer_list<std::string> list);
+std::string list_to_string(std::initializer_list<std::string_view> list);
+
+template<class T> std::string list_to_string(const std::vector<T> &list) {
+    std::string str;
+
+    for (std::string item : list) {
+        // skip empty items
+        if (item.empty())
+            continue;
+
+        // add comma inbetween items
+        if (!str.empty())
+            str.append(", ");
+
+        str.append(item);
+    }
+
+    return str;
+}
+
 bool is_unsafe_port(int port);
 const std::string &get_default_user_agent();
 

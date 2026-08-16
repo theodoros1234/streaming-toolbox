@@ -451,7 +451,7 @@ status_line_ret parse_status_line(const char *line, size_t length) {
     // 3-digit status code
     bool status_code_valid;
     std::tie(pos, status_code_valid, ret.status_code) = parse_digits(line, pos, length, 3);
-    if (!status_code_valid)
+    if (!status_code_valid || ret.status_code < 100 || ret.status_code >= 600)
         return {};
 
     // single space
@@ -1454,15 +1454,15 @@ bool etag_compare(const entity_tag &a, const entity_tag &b, bool strong) {
     return true;
 }
 
-std::string etag_to_string(const entity_tag &etag) {
+entity_tag::operator std::string() {
     using namespace std::string_literals;
 
     std::string str;
-    if (etag.is_weak)
+    if (is_weak)
         str += "W/";
 
     str.push_back('"');     // opening quote
-    for (char c : etag.tag) {   // check for invalid characters
+    for (char c : tag) {    // check for invalid characters
         if ((is_vchar(c) && c != '"') || is_obs_text(c))
             str.push_back(c);
         else
@@ -2376,6 +2376,54 @@ integer_ret parse_integer_hex(const char *str, size_t from, size_t to) {
     }
 
     return {i, i > from, false, number};
+}
+
+product::operator std::string() const {
+    std::string str = name;
+    if (!version.empty()) {
+        str.push_back('/');
+        str.append(version);
+    }
+
+    return str;
+}
+
+bool product::operator==(const product &other) const {
+    return name == other.name && version == other.version;
+}
+
+template<class T> std::string _list_to_string(T list) {
+    std::string str;
+
+    for (const auto &item : list) {
+        // skip empty items
+        if (item.empty())
+            continue;
+
+        // add comma inbetween items
+        if (!str.empty())
+            str.append(", ");
+
+        str.append(item);
+    }
+
+    return str;
+}
+
+std::string list_to_string(const std::vector<std::string> &list) {
+    return _list_to_string<const std::vector<std::string>&>(list);
+}
+
+std::string list_to_string(const std::vector<std::string_view> &list) {
+    return _list_to_string<const std::vector<std::string_view>&>(list);
+}
+
+std::string list_to_string(std::initializer_list<std::string> list) {
+    return _list_to_string<std::initializer_list<std::string> >(list);
+}
+
+std::string list_to_string(std::initializer_list<std::string_view> list) {
+    return _list_to_string<std::initializer_list<std::string_view> >(list);
 }
 
 }

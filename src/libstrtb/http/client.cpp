@@ -524,13 +524,15 @@ void client::cancel_response() {
     _cancel_response();
 }
 
-void client::_finish_response() {
+void client::_finish_response(bool detach) {
     _response = nullptr;
     _cv.notify_one();
-    if (_keepalive)     // pass the socket to the background handler thread
-        _idle_handler_attach();
-    else    // instantly close
-        _socket->close();
+    if (!detach) {
+        if (_keepalive)     // pass the socket to the background handler thread
+            _idle_handler_attach();
+        else    // instantly close
+            _socket->close();
+    }
     _decoders.clear();
 }
 
@@ -662,8 +664,14 @@ client::response client::send(request::data *r) {
         // send request line
         _socket->send(_request->method + " " + _request->path + " HTTP/1.1" CRLF);
 
-        // decide connection options
-        // std::string rq_connection_options = "keep-alive";
+        // upgrade options
+        // TODO: after implementing HTTP/2, copy this vector and add h2 as an option
+        const std::vector<product> &upgrade = _request->upgrade;
+
+        // connection options
+        std::vector<std::string> connection;
+        if (!upgrade.empty())
+            connection.push_back("upgrade");
         // TODO: option to close, and include TE, Upgrade, etc. when necessary
         _keepalive = true;
 
@@ -683,7 +691,8 @@ client::response client::send(request::data *r) {
         std::initializer_list<priority_headers_t> priority_headers = {
             {"host"s, _authority, false, true},
             {"user-agent"s, get_default_user_agent(), true, true},
-            // {"connection"s, std::move(rq_connection_options)},
+            {"connection"s, list_to_string(connection), false, !connection.empty()},
+            {"upgrade"s, list_to_string(upgrade), false, !upgrade.empty()},
             {"accept-encoding"s, get_supported_decoders_str(), false, !get_supported_decoders_str().empty()},
             {"content-length"s, std::move(content_length), false, _request->body_set}
         };
@@ -726,19 +735,18 @@ client::response client::send(request::data *r) {
             for (size_t i = 0; i < total; i += chunk_size) {
                 // monitor for error/closure response
                 if (!response_handled && _socket->available()) {
-                    if (_handle_response(rs, retriable)) {
+                    if (_handle_response(rs, retriable, upgrade)) {
                         // 1xx informational response
-                        // TODO: handle protocol switching when appropriate (after the upload)
                         // TODO: handle 100-continue responses
-                        if (rs.status() == 101)
-                            throw unsupported_message("server unexpectedly switched protocols");
-                        else    // ignore other status codes
+                        if (_response->status == 101)   // switching protocol after finishing request
+                            response_handled = true;
+                        else
                             rs.soft_clear();
                     } else {
                         response_handled = true;
 
                         // abort upload on connecture closure or error response
-                        if (!_keepalive || (rs.status() / 100) != 2) {
+                        if (!_keepalive || (_response->status / 100) != 2) {
                             std::lock_guard<std::mutex> guard(_lock);
 
                             // make sure this connection won't be reused
@@ -762,17 +770,42 @@ client::response client::send(request::data *r) {
         // TODO: ability to send files or stream the body contents
 
         while (!response_handled) {
-            if (_handle_response(rs, retriable)) {
-                // 1xx informational response
-                // TODO: handle protocol switching for WebSocket, HTTP/2 and upgrade options specified by the request
-                if (rs.status() == 101)
-                    throw unsupported_message("server unexpectedly switched protocols");
-                else    // ignore other status codes
-                    rs.soft_clear();
+            if (_handle_response(rs, retriable, upgrade) && _response->status != 101) {
+                // 1xx informational response (except for valid 101 switching protocol)
+                rs.soft_clear();
             } else {
-                // regular response
+                // regular response or valid 101
                 response_handled = true;
             }
+        }
+
+        // detach socket when switching protocol
+        if (_response->status == 101) {
+            networking::tcp_client* s = _socket;
+            shutdown_controller *ctrl = nullptr;
+
+            {
+                std::lock_guard<std::mutex> guard_rq(_request->lock);
+                std::lock_guard<std::mutex> guard(_lock);
+
+                // move socket to response and detach from it
+                _response->socket = std::move(_socket_container);
+                _socket = nullptr;
+                _response->c = nullptr;
+                _finish_response(true);
+
+                // detach from request
+                ctrl = _request->shutdown_ctrl;
+                _request->c = nullptr;
+                _request = nullptr;
+            }
+
+            // any missed shutdown signal in this gap will be delivered by the attachment below
+
+            // attach request's shutdown controller to socket
+            if (ctrl)
+                s->attach_shutdown_controller(*ctrl);
+
         }
 
         return rs;
@@ -802,7 +835,7 @@ client::response client::send(request::data *r) {
     }
 }
 
-bool client::_handle_response(response &rs, bool &retriable) {
+bool client::_handle_response(response &rs, bool &retriable, const std::vector<product> &rq_upgrade) {
     // receive response status-line
     // request stops being retriable as soon as any data is received
     std::string line;
@@ -867,8 +900,38 @@ bool client::_handle_response(response &rs, bool &retriable) {
     // TODO: Transfer-Encoding in HTTP/1.0 MUST be treated as faulty framing and close the connection afterwards
 
     // stop here if it's a 1xx informational request
-    if (_response->status / 100 == 1)
+    if (_response->status / 100 == 1) {
+        // switching protocols
+        if (_response->status == 101) {
+            // check if upgrade is valid
+            auto rs_upgrade_header = _response->headers.fields.find("upgrade");
+            if (!rs_connection_options.count("upgrade") || rs_upgrade_header == _response->headers.fields.end())
+                throw invalid_message("server switched protocols without sending the required headers");
+
+            auto rs_upgrade = parse_field_upgrade(rs_upgrade_header->second);
+            if (!rs_upgrade.valid || rs_upgrade.list.empty())
+                throw invalid_message("invalid response upgrade header");
+
+            // check if the new protocol was in our choices
+            // using a crappy O(N^2) search cause there shouldn't be many upgrade options
+            for (const auto &rs_option : rs_upgrade.list) {
+                bool found = false;
+                for (const auto &rq_option : rq_upgrade) {
+                    if (rs_option == rq_option) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                    throw invalid_message("server upgraded to a protocol we didn't ask for");
+            }
+
+            _response->upgrade = std::move(rs_upgrade.list);
+        }
+
         return true;
+    }
 
     // determine if a body is present
     if (_request->method == "HEAD" || _response->status == 204 ||
@@ -1664,6 +1727,48 @@ client::request&& client::request::with_auth_basic(std::string_view userinfo) {
     return std::move(*this);
 }
 
+template<class T> client::request&& client::request::_upgrade(T protocols) {
+    _valid_state(false);
+
+    try {
+        _d->upgrade.clear();
+        for (const auto &p : protocols)
+            _upgrade(std::string_view(p));
+    } catch (...) {
+        _d->upgrade.clear();
+        throw;
+    }
+
+    return std::move(*this);
+}
+
+void client::request::_upgrade(std::string_view protocol) {
+    auto ret = parse_product_or_protocol(protocol);
+    if (!ret.valid || ret.to != protocol.length())
+        throw std::invalid_argument("invalid syntax: " + string_escape(protocol));
+
+    _d->upgrade.push_back(std::move(ret.pr));
+}
+
+client::request&& client::request::upgrade(std::string_view protocol) {
+    _valid_state(false);
+    _d->upgrade.clear();
+    _upgrade(protocol);
+    return std::move(*this);
+}
+
+client::request&& client::request::upgrade(const std::vector<std::string> &protocols) {
+    return _upgrade<const std::vector<std::string> &>(protocols);
+}
+
+client::request&& client::request::upgrade(const std::vector<std::string_view> &protocols) {
+    return _upgrade<const std::vector<std::string_view>&>(protocols);
+}
+
+client::request&& client::request::upgrade(std::initializer_list<std::string_view> protocols) {
+    return _upgrade<std::initializer_list<std::string_view> >(protocols);
+}
+
 client::response::response(client *c) {
     _d = new data;
     _d->c = c;
@@ -1880,6 +1985,16 @@ void client::response::soft_clear() {
     _d->status = 0;
     _d->status_message.clear();
     _d->headers.clear();
+}
+
+std::variant<std::monostate, networking::tcp_client, networking::tcp_client_ssl> client::response::socket() {
+    _verify_data();
+    return std::move(_d->socket);
+}
+
+const std::vector<product>& client::response::upgrade() const {
+    _verify_data();
+    return _d->upgrade;
 }
 
 // request creation shortcuts
