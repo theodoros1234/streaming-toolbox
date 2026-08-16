@@ -904,10 +904,16 @@ bool client::_handle_response(response &rs, bool &retriable, const std::vector<p
         // switching protocols
         if (_response->status == 101) {
             // check if upgrade is valid
+            // only HTTP/1.1
+            if (_response->version.major != 1 || _response->version.minor != 1)
+                throw invalid_message("protocol switching only allowed in HTTP/1.1");
+
+            // connection: upgrade
             auto rs_upgrade_header = _response->headers.fields.find("upgrade");
             if (!rs_connection_options.count("upgrade") || rs_upgrade_header == _response->headers.fields.end())
                 throw invalid_message("server switched protocols without sending the required headers");
 
+            // upgrade header
             auto rs_upgrade = parse_field_upgrade(rs_upgrade_header->second);
             if (!rs_upgrade.valid || rs_upgrade.list.empty())
                 throw invalid_message("invalid response upgrade header");
