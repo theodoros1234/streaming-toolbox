@@ -383,26 +383,7 @@ std::pair<const char*, size_t> decoder_zstd::read(size_t max_len) {
 }
 
 static std::initializer_list<std::string_view> supported_decoders_list = {"gzip", "deflate", "br", "zstd"};
-
-std::string make_supported_decoders_str() {
-    std::string str;
-    bool first = true;
-
-    for (auto item : supported_decoders_list) {
-        // comma delimiter
-        if (first)
-            first = false;
-        else
-            str += ", ";
-
-        // coding name
-        str += item;
-    }
-
-    return str;
-}
-
-static std::string supported_decoders_str = make_supported_decoders_str();
+static std::string supported_decoders_str = list_to_string(supported_decoders_list);
 
 std::initializer_list<std::string_view> get_supported_decoders_list() {
     return supported_decoders_list;

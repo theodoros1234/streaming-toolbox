@@ -1439,22 +1439,20 @@ etag_field_ret parse_field_etag(const char *field_value, size_t from, size_t to)
         return {};
 }
 
-bool etag_compare(const entity_tag &a, const entity_tag &b, bool strong) {
+bool entity_tag::compare(const entity_tag &other, bool strong) const {
     // strong comparison requires both tags to not be weak
-    if (strong && (a.is_weak || b.is_weak))
+    if (strong && (is_weak || other.is_weak))
         return false;
 
     // contents must match
-    if (a.tag.length() != b.tag.length())
-        return false;
-    for (size_t i = 0; i < a.tag.length(); i++)
-        if (a.tag[i] != b.tag[i])
-            return false;
-
-    return true;
+    return tag == other.tag;
 }
 
-entity_tag::operator std::string() {
+bool entity_tag::operator==(const entity_tag &other) const {
+    return compare(other, true);
+}
+
+entity_tag::operator std::string() const {
     using namespace std::string_literals;
 
     std::string str;
@@ -1633,7 +1631,7 @@ auth_params_ret parse_auth_params(const std::string &str, size_t from, size_t to
 }
 
 auth_params_ret parse_auth_params(const char *str, size_t from, size_t to) {
-    parameter_map params;
+    auth_parameter_map params;
     bool params_duplicate = false;
 
     auto [list_to, valid] = parse_list(str, from, to,
@@ -2390,6 +2388,135 @@ product::operator std::string() const {
 
 bool product::operator==(const product &other) const {
     return name == other.name && version == other.version;
+}
+
+parameter_map::operator std::string() const {
+    std::string str;
+
+    for (const auto &[name, value] : *this) {
+        // separator
+        str.append("; ");
+
+        // name
+        str.append(name);
+
+        // =
+        str.push_back('=');
+
+        // decide if quotes are needed or not
+        auto [valid, length] = parse_token(value);
+        if (valid && length == value.length()) {
+            // token
+            str.append(value);
+        } else {
+            // quoted-string
+            str.push_back('"');
+            // NOTE: not checking for invalid characters, but those will be caught when setting the header
+            for (char c : value) {
+                switch (c) {
+                case '"':
+                case '\\':
+                    str.push_back('\\');
+                    [[fallthrough]];
+                default:
+                    str.push_back(c);
+                }
+            }
+            str.push_back('"');
+        }
+    }
+
+    return str;
+}
+
+std::string to_optional_quoted_string(const std::string &str) {
+    std::string out;
+
+    // decide if quotes are needed or not
+    auto [valid, length] = parse_token(str);
+    if (valid && length == str.length()) {
+        // token
+        out.append(str);
+    } else {
+        // quoted-string
+        out.push_back('"');
+        // NOTE: not checking for invalid characters, but those will be caught when setting the header
+        for (char c : str) {
+            switch (c) {
+            case '"':
+            case '\\':
+                out.push_back('\\');
+                [[fallthrough]];
+            default:
+                out.push_back(c);
+            }
+        }
+        out.push_back('"');
+    }
+
+    return out;
+}
+
+auth_parameter_map::operator std::string() const {
+    std::string str;
+
+    for (const auto &[name, value] : *this) {
+        // separator
+        if (!str.empty())
+            str.append(", ");
+
+        // name
+        str.append(name);
+
+        // =
+        str.push_back('=');
+
+        // value
+        str.append(to_optional_quoted_string(value));
+    }
+
+    return str;
+}
+
+credentials::operator std::string() const {
+    std::string str = auth_scheme;
+
+    switch (value.index()) {
+    case 1: // token68
+        str.push_back(' ');
+        str.append(std::get<1>(value));
+        break;
+
+    case 2: // #auth_param
+        str.push_back(' ');
+        str.append(std::get<2>(value));
+        break;
+    }
+
+    return str;
+}
+
+media_type::operator std::string() const {
+    return type + '/' + subtype;
+}
+
+expectation::operator std::string() const {
+    std::string str = name;
+
+    // optional value
+    if (!value.empty()) {
+        str.push_back('=');
+        str.append(to_optional_quoted_string(value));
+    }
+
+    // parameters
+    str.append(params);
+
+    return str;
+}
+
+token_params::operator std::string() const {
+    return token + std::string(params);
 }
 
 template<class T> std::string _list_to_string(T list) {

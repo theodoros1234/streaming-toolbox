@@ -40,7 +40,18 @@ class internal_error : public exception {using exception::exception;};
 
 typedef std::pair<size_t, bool> parser_ret;  // .first: ends at, .second: is valid
 typedef std::tuple<size_t, bool, std::string> quoted_ret;   // ends at, is valid, unescaped string
-typedef std::map<std::string, std::string> parameter_map;
+
+class parameter_map : public std::map<std::string, std::string> {
+public:
+    using std::map<std::string, std::string>::map;
+    operator std::string() const;
+};
+
+class auth_parameter_map : public std::map<std::string, std::string> {
+public:
+    using std::map<std::string, std::string>::map;
+    operator std::string() const;
+};
 
 struct http_version {
     int major = 0, minor = 0;
@@ -101,7 +112,9 @@ struct integer_ret {
 struct entity_tag {
     bool is_weak = false;
     std::string tag;
-    operator std::string();
+    operator std::string() const;
+    bool operator==(const entity_tag &other) const; // strong comparison, use compare() to choose between strong/weak
+    bool compare(const entity_tag &other, bool strong) const;
 };
 
 struct entity_tag_ret {
@@ -112,13 +125,14 @@ struct entity_tag_ret {
 
 struct auth_params_ret {
     size_t to = 0;
-    bool valid = false, duplicate = false;  // should reject the entire filed if duplicate=true for security
-    parameter_map params;
+    bool valid = false, duplicate = false;  // should reject the entire field if duplicate=true for security
+    auth_parameter_map params;
 };
 
 struct credentials {    // or challenge
     std::string auth_scheme;
-    std::variant<std::monostate, std::string, parameter_map> value;     // no value, token68, #auth_param
+    std::variant<std::monostate, std::string, auth_parameter_map> value;     // no value, token68, #auth_param
+    operator std::string() const;
 };
 
 struct credentials_ret {
@@ -130,6 +144,7 @@ struct credentials_ret {
 struct media_type {
     std::string type, subtype;
     parameter_map params;
+    operator std::string() const;
 };
 
 struct media_type_ret {
@@ -170,7 +185,8 @@ struct etag_field_ret {
 
 struct expectation {
     std::string name, value;
-    parameter_map params = {};
+    parameter_map params;
+    operator std::string() const;
 };
 
 struct expect_field_ret {
@@ -181,6 +197,7 @@ struct expect_field_ret {
 struct token_params {
     std::string token;
     parameter_map params;
+    operator std::string() const;
 };
 
 struct token_params_list_ret {
@@ -205,7 +222,7 @@ struct authenticate_field_ret {
 
 struct auth_params_field_ret {
     bool valid = false;
-    parameter_map params;
+    auth_parameter_map params;
 };
 
 struct accept_field_ret {
@@ -469,7 +486,7 @@ public:
 
 const char* get_status_code_phrase(int status_code);
 std::string timestamp_to_string(time_t timestamp);
-bool etag_compare(const entity_tag &a, const entity_tag &b, bool strong);
+std::string to_optional_quoted_string(const std::string &str);
 // some returned structs have automatic conversion to std::string
 std::string list_to_string(const std::vector<std::string> &list);
 std::string list_to_string(const std::vector<std::string_view> &list);
