@@ -591,68 +591,49 @@ client::response client::send(request::data *r) {
     try {
         // set up the appropriate socket and connect
         bool connection_reusable = false;
-        if (r->https) {
-            // https
-            networking::tcp_client_ssl *s = nullptr;
-            {
-                std::lock_guard<std::mutex> guard_rq(r->lock);
-                std::lock_guard<std::mutex> guard(_lock);
+        networking::tcp_client_ssl *s_ssl = nullptr;
+        {
+            std::lock_guard<std::mutex> guard_rq(r->lock);
+            std::lock_guard<std::mutex> guard(_lock);
 
-                // check for request shutdown before attaching to the request
-                _is_shutdown_rq = r->shutdown_ctrl_state || r->cancelling;
-                _shutdown_check_early();
-                _request = r;
-                _request->c = this;
+            // check for request shutdown before attaching to the request
+            _is_shutdown_rq = r->shutdown_ctrl_state || r->cancelling;
+            _shutdown_check_early();
+            _request = r;
+            _request->c = this;
 
-                // get back our socket (if we had one)
-                _idle_handler_detach();
+            // get back our socket (if we had one)
+            _idle_handler_detach();
 
-                if (_socket_container.index() == 2) {
-                    // reuse existing socket
-                    connection_reusable = _connection_reusable(_request->authority, true, true);
-                    _socket->reset();
-                    s = &std::get<2>(_socket_container);
+            // check if we can reuse a socket of the same type
+            if (_socket_container.index() == (r->https ? 2 : 1)) {
+                // reuse existing socket
+                connection_reusable = _connection_reusable(_request->authority, true, true);
+                _socket->reset();
+                if (r->https)
+                    s_ssl = &std::get<2>(_socket_container);
+            } else {
+                // close old socket
+                if (_socket && _socket->is_open())
+                    _socket->close();
+                _authority.clear();
+
+                // create new required socket type
+                if (r->https) {
+                    s_ssl = &_socket_container.emplace<2>(true, false);
+                    _socket = s_ssl;
                 } else {
-                    // create required socket type
-                    if (_socket && _socket->is_open())  // close the old one
-                        _socket->close();
-                    s = &_socket_container.emplace<2>(true, false);
-                    _socket = s;
-                    _authority.clear();
-                }
-            }
-
-            if (!connection_reusable)
-                s->connect(_request->host, _request->port, false, !_request->allow_invalid_cert);
-        } else {
-            // http
-            {
-                std::lock_guard<std::mutex> guard_rq(r->lock);
-                std::lock_guard<std::mutex> guard(_lock);
-
-                // check for request shutdown before attaching to the request
-                _is_shutdown_rq = r->shutdown_ctrl_state || r->cancelling;
-                _shutdown_check_early();
-                _request = r;
-                _request->c = this;
-
-                // get back our socket (if we had one)
-                _idle_handler_detach();
-
-                if (_socket_container.index() == 1) {
-                    // reuse existing socket
-                    connection_reusable = _connection_reusable(_request->authority, false, true);
-                    _socket->reset();
-                } else {
-                    // create required socket type
-                    if (_socket && _socket->is_open())  // close the old one
-                        _socket->close();
                     _socket = &_socket_container.emplace<1>(true);
-                    _authority.clear();
                 }
             }
+        }
 
-            if (!connection_reusable)
+        // try to reuse a persistent connection
+        if (!connection_reusable) {
+            // not reusable, make new connection
+            if (r->https)
+                s_ssl->connect(_request->host, _request->port, false, !_request->allow_invalid_cert);
+            else
                 _socket->connect(_request->host, _request->port);
         }
 
