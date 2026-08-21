@@ -150,6 +150,7 @@ public:
         request&& with_host(bool https, std::string_view hostname);    // for IPv6, must use square brackets
         request&& with_host(bool https, std::string_view hostname, unsigned int port);
         request&& with_path(std::string_view path);
+        request&& with_header(std::string_view name, const char *value);
         request&& with_header(std::string_view name, std::string &&value);
         request&& with_header(std::string_view name, std::string_view value);
         request&& with_headers(const std::map<std::string, std::string> &headers);

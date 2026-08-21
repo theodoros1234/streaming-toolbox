@@ -1394,6 +1394,10 @@ void client::request::_with_header_trust_name(std::string &&name, std::string &&
     }
 }
 
+client::request&& client::request::with_header(std::string_view name, const char *value) {
+    return with_header(name, std::string_view(value));
+}
+
 client::request&& client::request::with_header(std::string_view name, std::string_view value) {
     _valid_state(false);
 
