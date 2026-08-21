@@ -1818,6 +1818,11 @@ const std::string& client::response::header(std::string_view name) const {
     return _d->headers.get_field(name);
 }
 
+const std::string* client::response::header_or_null(std::string_view name) const {
+    _verify_data();
+    return _d->headers.get_field_or_null(name);
+}
+
 const std::map<std::string, std::string>& client::response::headers() const {
     _verify_data();
     return _d->headers.fields;

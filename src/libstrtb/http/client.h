@@ -68,6 +68,7 @@ public:
         int status() const;
         const std::string& status_message() const;
         const std::string& header(std::string_view name) const;
+        const std::string* header_or_null(std::string_view name) const;
         const std::map<std::string, std::string>& headers() const;
         const std::vector<std::string>& headers_set_cookie() const;
         const std::string& trailer(std::string_view name) const;
