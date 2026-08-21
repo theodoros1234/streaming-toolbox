@@ -94,6 +94,7 @@ public:
     private:
         void _with_parsed_host(bool https, std::string_view host, uri::host_type_enum type, unsigned int port);
         void _valid_state(bool running);
+        void _clear_header(std::string_view name);
         void _with_header_trust_name(std::string &&name, std::string_view value);
         void _with_header_trust_name(std::string &&name, std::string &&value);
         template<class T> request&& _with_headers(T headers);
@@ -188,6 +189,9 @@ public:
         response send();
         response get_response();
 
+        void clear_header(std::string_view name);
+        void clear_headers(std::initializer_list<std::string_view> list);
+        void clear_headers();
         void detach_shutdown_controller();
 
         void cancel();

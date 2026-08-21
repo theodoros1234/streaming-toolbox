@@ -1416,14 +1416,19 @@ client::request&& client::request::with_header(std::string_view name, std::strin
 
 template<class T> client::request&& client::request::_with_headers(T headers) {
     _valid_state(false);
-    _d->headers.clear();
 
     try {
         // replace all headers with the new header list (duplicates will be silently ignored)
         for (const auto& [name, value] : headers)
             with_header(name, value);
     } catch (...) {
-        _d->headers.clear();
+        // remove any added (or pending) headers and rethrow
+        for (const auto& [name, value] : headers) {
+            try {
+                _d->headers.erase(validate_header_name(name));
+            } catch (...) {}
+        }
+
         throw;
     }
 
@@ -1432,18 +1437,25 @@ template<class T> client::request&& client::request::_with_headers(T headers) {
 
 template<class T> client::request&& client::request::_with_headers_move(T headers) {
     _valid_state(false);
-    _d->headers.clear();
 
     try {
         // replace all headers with the new header list (duplicates will be silently ignored)
         for (const auto& [name, value] : headers)
             with_header(name, std::move(value));
     } catch (...) {
-        _d->headers.clear();
+        // remove any added (or pending) headers and rethrow
+        for (const auto& [name, value] : headers) {
+            try {
+                _d->headers.erase(validate_header_name(name));
+            } catch (...) {}
+        }
+
+        // clear source container that we moved from
         headers.clear();
         throw;
     }
 
+    // clear source container that we moved from
     headers.clear();
     return std::move(*this);
 }
@@ -1467,6 +1479,29 @@ client::request&& client::request::with_headers(std::map<std::string, std::strin
 
 client::request&& client::request::with_headers(std::vector< std::pair<std::string, std::string> > &&headers) {
     return _with_headers_move<std::vector< std::pair<std::string, std::string> > &>(headers);
+}
+
+void client::request::_clear_header(std::string_view name) {
+    // case-insensitive name
+    std::string name_tolower = validate_header_name(name);
+    // clear, or silently ignore if it doesn't exist
+    _d->headers.erase(name_tolower);
+}
+
+void client::request::clear_header(std::string_view name) {
+    _valid_state(false);
+    _clear_header(name);
+}
+
+void client::request::clear_headers(std::initializer_list<std::string_view> list) {
+    _valid_state(false);
+    for (const auto &name : list)
+        _clear_header(name);
+}
+
+void client::request::clear_headers() {
+    _valid_state(false);
+    _d->headers.clear();
 }
 
 // URL params, automatically percent-escape reserved characters
