@@ -11,6 +11,9 @@
 #include <map>
 #include <mutex>
 #include <condition_variable>
+#include <vector>
+#include <string>
+#include <string_view>
 #include <poll.h>
 
 namespace strtb::http {
@@ -91,8 +94,10 @@ public:
     private:
         void _with_parsed_host(bool https, std::string_view host, uri::host_type_enum type, unsigned int port);
         void _valid_state(bool running);
-        void _with_header_trust_name(const std::string &name, std::string_view value);
+        void _with_header_trust_name(std::string &&name, std::string_view value);
+        void _with_header_trust_name(std::string &&name, std::string &&value);
         template<class T> request&& _with_headers(T headers);
+        template<class T> request&& _with_headers_move(T headers);
         template<class T> request&& _with_params(T params);
         template<class T> request&& _with_body_str(T body);
         template<class T> request&& _upgrade(T protocols);
@@ -144,10 +149,13 @@ public:
         request&& with_host(bool https, std::string_view hostname);    // for IPv6, must use square brackets
         request&& with_host(bool https, std::string_view hostname, unsigned int port);
         request&& with_path(std::string_view path);
+        request&& with_header(std::string_view name, std::string &&value);
         request&& with_header(std::string_view name, std::string_view value);
         request&& with_headers(const std::map<std::string, std::string> &headers);
         request&& with_headers(const std::vector< std::pair<std::string, std::string> > &headers);
         request&& with_headers(std::initializer_list< std::pair<std::string_view, std::string_view> > headers);
+        request&& with_headers(std::map<std::string, std::string> &&headers);
+        request&& with_headers(std::vector< std::pair<std::string, std::string> > &&headers);
         request&& with_params(const std::map<std::string, std::string> &params);
         request&& with_params(const std::vector< std::pair<std::string, std::string> > &params);
         request&& with_params(std::initializer_list< std::pair<std::string_view, std::string_view> > params);

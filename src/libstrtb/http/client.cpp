@@ -9,11 +9,11 @@
 #include <charconv>
 #include <set>
 #include <cstring>
-#include <vector>
 
 #define CRLF "\r\n"
 
 using namespace std::string_literals;
+using namespace std::string_view_literals;
 
 namespace strtb::http {
 
@@ -1357,14 +1357,37 @@ client::request&& client::request::with_path(std::string_view path) {
     return std::move(*this);
 }
 
-void client::request::_with_header_trust_name(const std::string &name, std::string_view value) {
-    // check value for invalid characters
+static std::string validate_header_name(std::string_view name) {
+    std::string name_tolower = parse_token_tolower(name);
+    if (name_tolower.empty() || name_tolower.length() != name.length())
+        throw std::invalid_argument("invalid header name");
+    return name_tolower;
+}
+
+static void validate_header_value(std::string_view value) {
     for (char c : value)
         if (!(is_vchar(c) || is_obs_text(c) || is_whitespace(c)))
             std::invalid_argument("value contains invalid character " + char_escape(c));
+}
+
+void client::request::_with_header_trust_name(std::string &&name, std::string_view value) {
+    // check value for invalid characters
+    validate_header_value(value);
 
     try {
-        _d->headers[name] = value;
+        _d->headers[std::move(name)] = value;
+    } catch (...) {
+        _d->headers.erase(name);
+        throw;
+    }
+}
+
+void client::request::_with_header_trust_name(std::string &&name, std::string &&value) {
+    // check value for invalid characters
+    validate_header_value(value);
+
+    try {
+        _d->headers[std::move(name)] = std::move(value);
     } catch (...) {
         _d->headers.erase(name);
         throw;
@@ -1375,11 +1398,18 @@ client::request&& client::request::with_header(std::string_view name, std::strin
     _valid_state(false);
 
     // case-insensitive name
-    std::string name_tolower = parse_token_tolower(name);
-    if (name_tolower.empty() || name_tolower.length() != name.length())
-        throw std::invalid_argument("invalid header name");
+    std::string name_tolower = validate_header_name(name);
+    _with_header_trust_name(std::move(name_tolower), value);
 
-    _with_header_trust_name(name_tolower, value);
+    return std::move(*this);
+}
+
+client::request&& client::request::with_header(std::string_view name, std::string &&value) {
+    _valid_state(false);
+
+    // case-insensitive name
+    std::string name_tolower = validate_header_name(name);
+    _with_header_trust_name(std::move(name_tolower), std::move(value));
 
     return std::move(*this);
 }
@@ -1400,6 +1430,24 @@ template<class T> client::request&& client::request::_with_headers(T headers) {
     return std::move(*this);
 }
 
+template<class T> client::request&& client::request::_with_headers_move(T headers) {
+    _valid_state(false);
+    _d->headers.clear();
+
+    try {
+        // replace all headers with the new header list (duplicates will be silently ignored)
+        for (const auto& [name, value] : headers)
+            with_header(name, std::move(value));
+    } catch (...) {
+        _d->headers.clear();
+        headers.clear();
+        throw;
+    }
+
+    headers.clear();
+    return std::move(*this);
+}
+
 client::request&& client::request::with_headers(const std::map<std::string, std::string> &headers) {
     return _with_headers<const std::map<std::string, std::string> &>(headers);
 }
@@ -1411,6 +1459,14 @@ client::request&& client::request::with_headers(const std::vector< std::pair<std
 client::request&& client::request::with_headers(
         std::initializer_list< std::pair<std::string_view, std::string_view> > headers) {
     return _with_headers<std::initializer_list< std::pair<std::string_view, std::string_view> > >(headers);
+}
+
+client::request&& client::request::with_headers(std::map<std::string, std::string> &&headers) {
+    return _with_headers_move<std::map<std::string, std::string> &>(headers);
+}
+
+client::request&& client::request::with_headers(std::vector< std::pair<std::string, std::string> > &&headers) {
+    return _with_headers_move<std::vector< std::pair<std::string, std::string> > &>(headers);
 }
 
 // URL params, automatically percent-escape reserved characters
