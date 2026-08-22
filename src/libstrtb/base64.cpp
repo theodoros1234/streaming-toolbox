@@ -5,8 +5,8 @@
 
 namespace strtb {
 
-static inline char encode_bits(int b) {
-    assert(0 <= b && b < 64);
+static inline char encode_bits(unsigned int b) {
+    assert(b < 64);
     if (b < 26)
         return 'A' + b;
     else if (b < 52)
@@ -19,7 +19,7 @@ static inline char encode_bits(int b) {
         return '/';
 }
 
-static inline int decode_bits(char b) {
+static inline unsigned int decode_bits(char b) {
     if ('A' <= b && b <= 'Z')
         return b - 'A';
     else if ('a' <= b && b <= 'z')
@@ -36,8 +36,8 @@ static inline int decode_bits(char b) {
         throw std::invalid_argument("invalid character " + char_escape(b));
 }
 
-static inline char encode_bits_url(int b) {
-    assert(0 <= b && b < 64);
+static inline char encode_bits_url(unsigned int b) {
+    assert(b < 64);
     if (b < 26)
         return 'A' + b;
     else if (b < 52)
@@ -50,7 +50,7 @@ static inline char encode_bits_url(int b) {
         return '_';
 }
 
-static inline int decode_bits_url(char b) {
+static inline unsigned int decode_bits_url(char b) {
     if ('A' <= b && b <= 'Z')
         return b - 'A';
     else if ('a' <= b && b <= 'z')
@@ -67,9 +67,10 @@ static inline int decode_bits_url(char b) {
         throw std::invalid_argument("invalid character " + char_escape(b));
 }
 
-static inline std::string base64_encode_fn(std::string_view str, char (*encode_bits_fn)(int)) {
+static inline std::string base64_encode_fn(std::string_view str, char (*encode_bits_fn)(unsigned int)) {
     std::string out;
     size_t i;
+    const unsigned char *stru = (const unsigned char*) str.data();
 
     // reserve the needed memory with padding in mind
     out.reserve((((str.length() * 8) + 23) / 24) * 4);
@@ -78,10 +79,10 @@ static inline std::string base64_encode_fn(std::string_view str, char (*encode_b
     for (i = 0; i+2 < str.length(); i += 3) {
         // split into 6-bit parts
         int split6[4] = {
-              str[i]   >> 2,
-            ((str[i]   << 4) & 0b111111) | (str[i+1] >> 4),
-            ((str[i+1] << 2) & 0b111111) | (str[i+2] >> 6),
-              str[i+2]       & 0b111111
+              stru[i]   >> 2,
+            ((stru[i]   << 4) & 0b111111) | (stru[i+1] >> 4),
+            ((stru[i+1] << 2) & 0b111111) | (stru[i+2] >> 6),
+              stru[i+2]       & 0b111111
         };
 
         // encode into base64
@@ -101,12 +102,12 @@ static inline std::string base64_encode_fn(std::string_view str, char (*encode_b
     // last incomplete group
     // split into 6-bit groups from remaining characters
     int split6[3] = {0};
-    split6[0] = str[i] >> 2;
-    split6[1] = (str[i] << 4) & 0b111111;
+    split6[0] = stru[i] >> 2;
+    split6[1] = (stru[i] << 4) & 0b111111;
 
     if (i+1 < str.length()) {
-        split6[1] |= str[i+1] >> 4;
-        split6[2] = (str[i+1] << 2) & 0b111111;
+        split6[1] |= stru[i+1] >> 4;
+        split6[2] = (stru[i+1] << 2) & 0b111111;
     }
 
     // encode with padding
@@ -121,7 +122,8 @@ static inline std::string base64_encode_fn(std::string_view str, char (*encode_b
     return out;
 }
 
-static inline std::string base64_decode_fn(std::string_view str, bool strict_padding, int (*decode_bits_fn)(char)) {
+static inline std::string base64_decode_fn(std::string_view str, bool strict_padding,
+                                           unsigned int (*decode_bits_fn)(char)) {
     std::string out;
     size_t i;
 
@@ -139,7 +141,7 @@ static inline std::string base64_decode_fn(std::string_view str, bool strict_pad
     // process all chunks except the last one
     for (i = 0; i+4 < str.length(); i += 4) {
         // decode into 6-bit parts
-        int split6[4] = {
+        unsigned int split6[4] = {
             decode_bits_fn(str[i]),
             decode_bits_fn(str[i+1]),
             decode_bits_fn(str[i+2]),
@@ -165,7 +167,7 @@ static inline std::string base64_decode_fn(std::string_view str, bool strict_pad
         throw std::invalid_argument("improper padding");
 
     // decode into 6-bit parts
-    int split6[4] = {
+    unsigned int split6[4] = {
         decode_bits_fn(str[i]),
         decode_bits_fn(str[i+1]),
         i+2 < pad_start ? decode_bits_fn(str[i+2]) : 0,
