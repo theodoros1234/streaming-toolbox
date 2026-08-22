@@ -15,6 +15,7 @@ namespace strtb::http {
 exception::exception(const char *str) : _what(str) {}
 exception::exception(const std::string &str) : _what(str) {}
 exception::exception(std::string &&str) : _what(str) {}
+exception::exception(std::string_view str) : _what(str) {}
 
 const char* exception::what() const noexcept {
     return _what.c_str();

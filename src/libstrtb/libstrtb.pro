@@ -19,6 +19,7 @@ SOURCES += \
     http/client.cpp \
     http/codings.cpp \
     http/request_handler.cpp \
+    http/websocket.cpp \
     networking/tcp_socket_ssl_common.cpp \
     shutdown_controller.cpp \
     strescape.cpp \
@@ -76,6 +77,7 @@ HEADERS += \
     http/client_idle_connection_handler_class.h \
     http/codings.h \
     http/request_handler.h \
+    http/websocket.h \
     networking/tcp_socket_ssl_common.h \
     shutdown_controller.h \
     strescape.h \

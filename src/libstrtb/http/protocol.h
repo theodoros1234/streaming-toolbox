@@ -27,6 +27,7 @@ public:
     exception(const char *str);
     exception(const std::string &str);
     exception(std::string &&str);
+    exception(std::string_view str);
     const char* what() const noexcept;
 };
 
