@@ -7,7 +7,7 @@
 
 using namespace strtb::networking;
 
-static strtb::logging::source log("TCP Socket", false);
+static strtb::logging::source log("TCP Server Connection with SSL/TLS", false);
 
 tcp_server_connection_ssl::tcp_server_connection_ssl(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
                                                      bool buffered_send,
@@ -42,23 +42,14 @@ tcp_server_connection_ssl::tcp_server_connection_ssl(strtb::common::deregistrati
 
 tcp_server_connection_ssl::~tcp_server_connection_ssl() {
     assert((_sock == -1) == (_ssl == nullptr));
-    if (_ssl) {
-        log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
-
-        if (_thread_active) {
-            _thread.stop();
-            _thread_active = false;
-        }
-
-        shutdown(true, true);
-        SSL_free(_ssl);
-        _ssl = nullptr;
-        _sock = -1;
-        buffer_clear_recv();
-        buffer_clear_send();
-
-        if (_parent)
-            _parent->deregister(this);
+    try {
+        // close socket if it's still open
+        // NOTE: subclasses that override close() MUST handle this on their own destructors
+        if (is_open())
+            tcp_server_connection_ssl::close();
+    } catch (std::exception &e) {
+        log.critical({"Failed to destroy object: ", e.what()});
+        std::terminate();
     }
 }
 
@@ -102,6 +93,11 @@ void tcp_server_connection_ssl::handshake() {
 
 void tcp_server_connection_ssl::close() {
     assert((_sock == -1) == (_ssl == nullptr));
+    if (_parent) {
+        _parent->deregister(this);
+        _parent = nullptr;
+    }
+
     if (_ssl == nullptr)
         throw connection_closed("socket already closed", 0);
 
@@ -118,9 +114,6 @@ void tcp_server_connection_ssl::close() {
         _sock = -1;
         _line_leftovers = 0;
     }
-
-    if (_parent)
-        _parent->deregister(this);
 }
 
 size_t tcp_server_connection_ssl::_recv(size_t len) {

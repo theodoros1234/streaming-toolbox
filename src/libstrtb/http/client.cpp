@@ -501,6 +501,8 @@ void client::_cancel() {
         if (_socket->is_open())
             _socket->close();
     }
+
+    _authority.clear();
     _decoders.clear();
 }
 
@@ -613,9 +615,6 @@ client::response client::send(request::data *r) {
                 if (r->https)
                     s_ssl = &std::get<2>(_socket_container);
             } else {
-                // close old socket
-                if (_socket && _socket->is_open())
-                    _socket->close();
                 _authority.clear();
 
                 // create new required socket type
@@ -631,6 +630,7 @@ client::response client::send(request::data *r) {
         // try to reuse a persistent connection
         if (!connection_reusable) {
             // not reusable, make new connection
+            _authority.clear();
             if (r->https)
                 s_ssl->connect(_request->host, _request->port, false, !_request->allow_invalid_cert);
             else

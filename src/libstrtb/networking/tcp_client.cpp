@@ -22,11 +22,17 @@ tcp_client::tcp_client(bool buffered_send, size_t buffer_size) :
     tcp_socket(buffered_send, buffer_size) {}
 
 tcp_client::~tcp_client() {
-    detach_shutdown_controller();
-    if (_sock != -1)
-        log.put(logging::WARNING, {"Destructor called when client connection to ", _remote_ip, ":", _remote_port, " was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
-    if (_event != -1)
-        ::close(_event);
+    try {
+        detach_shutdown_controller();
+        // close socket if it's still open
+        // NOTE: subclasses that override close() MUST handle this on their own destructors
+        if (is_open())
+            tcp_client::close();
+        release();
+    } catch (std::exception &e) {
+        log.critical({"Failed to destroy object: ", e.what()});
+        std::terminate();
+    }
 }
 
 void tcp_client::_movable(tcp_client &other, const std::type_info &type) {

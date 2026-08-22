@@ -50,16 +50,16 @@ tcp_client_ssl::tcp_client_ssl(bool buffered_send, bool thread_assisted, size_t 
     _thread_assisted(thread_assisted) {}
 
 tcp_client_ssl::~tcp_client_ssl() {
-    detach_shutdown_controller();
-
-    if (_ssl) {
-        log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the SSL connection and the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
-        ::shutdown(_sock, SHUT_RDWR);
-        if (_thread_assisted)
-            _thread.stop();
-        SSL_free(_ssl);
-        _ssl = nullptr;
-        _sock = -1;
+    try {
+        detach_shutdown_controller();
+        // close socket if it's still open
+        // NOTE: subclasses that override close() MUST handle this on their own destructors
+        if (is_open())
+            tcp_client_ssl::close();
+        release();
+    } catch (std::exception &e) {
+        log.critical({"Failed to destroy object: ", e.what()});
+        std::terminate();
     }
 }
 
@@ -285,7 +285,6 @@ void tcp_client_ssl::close() {
         throw connection_closed("socket closed or hasn't been opened yet", 0);
 
     cancel_connect();
-    shutdown(true, true);
     _remote_ip = "";
     _remote_port = 0;
     _sock = -1;

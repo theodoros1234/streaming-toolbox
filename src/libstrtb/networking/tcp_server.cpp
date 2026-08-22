@@ -30,12 +30,19 @@ tcp_server::tcp_server(bool buffered_send, size_t buffer_size) : _max_active(64)
 }
 
 tcp_server::~tcp_server() {
-    detach_shutdown_controller();
-    if (!_socks.empty() || !_active_connections.empty()) {
-        log.put(logging::WARNING, {"Destructor called when server was still open. Closing the server, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the server."});
-        close();
+    try {
+        detach_shutdown_controller();
+        // close socket if it's still open
+        // NOTE: subclasses that override close() MUST handle this on their own destructors
+        if (!_socks.empty() || !_active_connections.empty()) {
+            shutdown();
+            close();
+        }
+        ::close(_event);
+    } catch (std::exception &e) {
+        log.critical({"Failed to destroy object: ", e.what()});
+        std::terminate();
     }
-    ::close(_event);
 }
 
 void tcp_server::listen(const std::string& address, uint16_t port, bool reuseaddr, int backlog) {

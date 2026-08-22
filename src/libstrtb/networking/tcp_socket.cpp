@@ -25,17 +25,16 @@ tcp_socket::tcp_socket(bool buffered_send, size_t buffer_size) :
 }
 
 tcp_socket::~tcp_socket() {
-    if (_sock != -1) {
-        log.put(logging::WARNING, {"Destructor called when socket was still open. Closing the socket, but this may lead to a crash. If you're a plugin developer, make sure you call close() on the socket."});
-        ::shutdown(_sock, SHUT_RDWR);
-        ::close(_sock);
-        buffer_clear_recv();
-        buffer_clear_send();
+    try {
+        // close socket if it's still open
+        // NOTE: subclasses that override close() MUST handle this on their own destructors
+        if (is_open())
+            tcp_socket::close();
+        release();
+    } catch (std::exception &e) {
+        log.critical({"Failed to destroy object: ", e.what()});
+        std::terminate();
     }
-    if (_buffer_recv)
-        free(_buffer_recv);
-    if (_buffer_send)
-        free(_buffer_send);
 }
 
 void tcp_socket::_prepare_buffers() {
@@ -53,8 +52,7 @@ void tcp_socket::_prepare_buffers() {
             throw internal_error(errno);
     }
 
-    buffer_clear_recv();
-    buffer_clear_send();
+    _clear_buffers();
 }
 
 void tcp_socket::_movable(tcp_socket &other, const std::type_info &type) {
@@ -227,7 +225,7 @@ void tcp_socket::close() {
     std::lock_guard<std::recursive_mutex> guard(_lock);
     if (_sock == -1)
         throw connection_closed("socket already closed or never opened", 0);
-    shutdown(true, true);
+    shutdown();
     int close_ret = ::close(_sock);
     _sock = -1;
     _send_pos = 0;
@@ -318,11 +316,9 @@ size_t tcp_socket::buffer_size() const {
     return _buffer_size;
 }
 
-void tcp_socket::buffer_clear_recv() {
-    std::memset(_buffer_recv, 0, _buffer_size);
-}
-
-void tcp_socket::buffer_clear_send() {
+void tcp_socket::_clear_buffers() {
+    if (_buffer_recv)
+        std::memset(_buffer_recv, 0, _buffer_size);
     if (_buffer_send)
         std::memset(_buffer_send, 0, _buffer_size);
 }

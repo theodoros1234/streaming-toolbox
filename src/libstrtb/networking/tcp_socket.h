@@ -36,6 +36,7 @@ protected:
     void _movable(tcp_socket &other, const std::type_info &type);
     void _move(tcp_socket &&other);
     void _move_assign(tcp_socket &&other);
+    void _clear_buffers();
 
 public:
     tcp_socket(bool buffered_send = false, size_t buffer_size = STRTB_NETWORKING_RECV_BUFFER_SIZE_DEFAULT);
@@ -59,8 +60,6 @@ public:
     bool buffered_send() const;
     size_t buffer_size() const;
     void buffer_resize(size_t size);
-    void buffer_clear_recv();
-    void buffer_clear_send();
     bool available();
     void release();
 #ifdef __linux__

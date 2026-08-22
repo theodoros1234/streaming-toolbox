@@ -1,6 +1,9 @@
 #include "tcp_server_connection.h"
+#include "../logging.h"
 
 using namespace strtb::networking;
+
+static strtb::logging::source log("TCP Server Connection", false);
 
 tcp_server_connection::tcp_server_connection(strtb::common::deregistration_interface<class tcp_server_connection*> *parent,
                                              bool buffered_send,
@@ -21,14 +24,23 @@ tcp_server_connection::tcp_server_connection(strtb::common::deregistration_inter
 }
 
 tcp_server_connection::~tcp_server_connection() {
-    if (_sock != -1 && _parent)
-        _parent->deregister(this);
+    try {
+        // close socket if it's still open
+        // NOTE: subclasses that override close() MUST handle this on their own destructors
+        if (is_open())
+            tcp_server_connection::close();
+    } catch (std::exception &e) {
+        log.critical({"Failed to destroy object: ", e.what()});
+        std::terminate();
+    }
 }
 
 void tcp_server_connection::close() {
-    tcp_socket::close();
-    if (_parent)
+    if (_parent) {
         _parent->deregister(this);
+        _parent = nullptr;
+    }
+    tcp_socket::close();
 }
 
 const std::string& tcp_server_connection::server_ip() const {
