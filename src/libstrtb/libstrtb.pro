@@ -19,7 +19,6 @@ SOURCES += \
     http/client.cpp \
     http/codings.cpp \
     http/request_handler.cpp \
-    http/websocket.cpp \
     networking/tcp_socket_ssl_common.cpp \
     shutdown_controller.cpp \
     strescape.cpp \
@@ -62,7 +61,9 @@ SOURCES += \
     networking/tcp_socket_ssl_thread.cpp \
     unicode/unicode.cpp \
     uri.cpp \
-    uri_known_tlds_default.cpp
+    uri_known_tlds_default.cpp \
+    websocket/client.cpp \
+    websocket/protocol.cpp
 
 HEADERS += \
     base64.h \
@@ -77,7 +78,6 @@ HEADERS += \
     http/client_idle_connection_handler_class.h \
     http/codings.h \
     http/request_handler.h \
-    http/websocket.h \
     networking/tcp_socket_ssl_common.h \
     shutdown_controller.h \
     strescape.h \
@@ -116,7 +116,9 @@ HEADERS += \
     networking/tcp_socket_ssl_thread.h \
     plugins/link.h \
     unicode/unicode.h \
-    uri.h
+    uri.h \
+    websocket/client.h \
+    websocket/protocol.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
