@@ -1,6 +1,7 @@
 #ifndef STRTB_WEBSOCKET_CLIENT_H
 #define STRTB_WEBSOCKET_CLIENT_H
 
+#include "protocol.h"
 #include "../http/client.h"
 #include "../networking/tcp_client_ssl.h"
 #include <vector>
@@ -33,6 +34,7 @@ private:
     std::string _subprotocol_used;
     std::variant<std::monostate, networking::tcp_client, networking::tcp_client_ssl> _socket_container;
     networking::tcp_client *_socket = nullptr;
+    frame_parser _frame_parser;
 
     void _valid_state(bool connected) const;
     template<class T> client& _with_subprotocols(T list);
@@ -74,6 +76,9 @@ public:
     void clear();
 
     const std::string& subprotocol_used() const;
+
+    // TODO: remove
+    void test_recv();
 };
 
 }

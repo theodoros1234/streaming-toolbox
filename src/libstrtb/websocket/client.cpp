@@ -3,6 +3,7 @@
 #include "../uri.h"
 #include "../strescape.h"
 #include "../base64.h"
+#include "../logging.h"
 
 #include <stdexcept>
 #include <set>
@@ -375,6 +376,85 @@ void client::connect() {
 const std::string& client::subprotocol_used() const {
     // if empty, then no subprotocol is being used
     return _subprotocol_used;
+}
+
+// TODO: remove
+void client::test_recv() {
+    logging::source l("WebSocket recv test", false);
+    const char *data = nullptr;
+    size_t len = 0;
+
+    while (true) {
+        if (len == 0)
+            std::tie(data, len) = _socket->recv();
+
+        if (len == 0)
+            return;
+
+        auto [bytes_read, frame_opt] = _frame_parser.process(data, len, false, 10000000);
+        data += bytes_read;
+        len -= bytes_read;
+
+        if (frame_opt) {
+            auto frame = std::move(frame_opt.value());
+            const char* opcode;
+            switch (frame.opcode) {
+            case OPCODE_CONT:
+                opcode = "CONT";
+                break;
+            case OPCODE_TEXT:
+                opcode = "TEXT";
+                break;
+            case OPCODE_BIN:
+                opcode = "BIN";
+                break;
+            case OPCODE_RSV3:
+                opcode = "RSV3";
+                break;
+            case OPCODE_RSV4:
+                opcode = "RSV4";
+                break;
+            case OPCODE_RSV5:
+                opcode = "RSV5";
+                break;
+            case OPCODE_RSV6:
+                opcode = "RSV6";
+                break;
+            case OPCODE_RSV7:
+                opcode = "RSV7";
+                break;
+            case OPCODE_CLOSE:
+                opcode = "CLOSE";
+                break;
+            case OPCODE_PING:
+                opcode = "PING";
+                break;
+            case OPCODE_PONG:
+                opcode = "PONG";
+                break;
+            case OPCODE_RSVB:
+                opcode = "RSVB";
+                break;
+            case OPCODE_RSVC:
+                opcode = "RSVC";
+                break;
+            case OPCODE_RSVD:
+                opcode = "RSVD";
+                break;
+            case OPCODE_RSVE:
+                opcode = "RSVE";
+                break;
+            case OPCODE_RSVF:
+                opcode = "RSVF";
+                break;
+            default:
+                opcode = "INVALID";
+            }
+
+            l.info({"fin=", frame.fin, ", rsv1=", frame.rsv1, ", rsv2=", frame.rsv2, ", rsv3=", frame.rsv3,
+                    ", opcode=", opcode, ", length=", frame.length, ", payload=", string_escape(frame.payload)});
+        }
+    }
 }
 
 }
