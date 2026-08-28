@@ -36,12 +36,12 @@ std::pair<size_t, std::optional<frame_t> > frame_parser::process(const char *dat
     // restore state
     int stage = _state.stage;
     size_t bytes_remaining = _state.bytes_remaining;
+    uint64_t tmp64 = _state.tmp64;
     size_t mask_pos = _state.mask_pos;
     uint32_t mask = _state.mask;
 
     size_t i = 0, read_len = 0;
     unsigned char byte, tmp;
-    uint64_t tmp64 = 0;
 
     switch (stage) {
     case 0:     // flags
@@ -113,6 +113,7 @@ std::pair<size_t, std::optional<frame_t> > frame_parser::process(const char *dat
             }
 
             _frame.length = tmp64;
+            tmp64 = 0;
         }
 
         // make sure it doesn't exceed the maximum length

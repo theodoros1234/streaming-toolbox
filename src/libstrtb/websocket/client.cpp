@@ -391,7 +391,7 @@ void client::test_recv() {
         if (len == 0)
             return;
 
-        auto [bytes_read, frame_opt] = _frame_parser.process(data, len, false, 10000000);
+        auto [bytes_read, frame_opt] = _frame_parser.process(data, 1, false, 10000000);
         data += bytes_read;
         len -= bytes_read;
 
