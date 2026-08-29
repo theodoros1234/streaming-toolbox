@@ -1,5 +1,9 @@
 #include "protocol.h"
 
+#include <cassert>
+#include <openssl/rand.h>
+#include <openssl/err.h>
+
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
@@ -200,6 +204,66 @@ void frame_parser::clear() {
     _state.mask_pos = 0;
     _state.mask = 0;
     _frame.clear();
+}
+
+void frame_send(networking::tcp_socket &socket, opcode_t opcode, bool fin, bool masked, std::string_view payload,
+                bool rsv1, bool rsv2, bool rsv3) {
+    std::string header;
+
+    // flags and opcode
+    header.push_back((fin << 7u) | (rsv1 << 6u) | (rsv2 << 5u) | (rsv3 << 4u) | opcode);
+
+    // mask bit and payload length
+    if (payload.length() < 126) {           // short 7-bit length
+        header.push_back((masked << 7u) | payload.length());
+    } else if (payload.length() < 65536) {  // extended 16-bit length
+        header.push_back((masked << 7u) | 126u);
+        header.push_back(payload.length() >> 8);
+        header.push_back(payload.length());
+    } else {                                // extended 64-bit length
+        header.push_back((masked << 7u) | 127u);
+        header.push_back(payload.length() >> 56);
+        header.push_back(payload.length() >> 48);
+        header.push_back(payload.length() >> 40);
+        header.push_back(payload.length() >> 32);
+        header.push_back(payload.length() >> 24);
+        header.push_back(payload.length() >> 16);
+        header.push_back(payload.length() >> 8);
+        header.push_back(payload.length());
+    }
+
+    if (masked) {
+        // generate 32-bit masking key
+        char masking_key[4];
+
+        if (RAND_bytes((unsigned char*) masking_key, sizeof(masking_key)) != 1) {
+            unsigned long m_err = ERR_get_error();
+            throw http::internal_error("websocket frame send: failed to generate masking key: "s +
+                                       "[error " + std::to_string(m_err) + "] " +
+                                       ERR_lib_error_string(m_err) + ": " +
+                                       ERR_reason_error_string(m_err));
+        }
+
+        header.append(masking_key, sizeof(masking_key));
+        socket.send(header);
+
+        // send masked payload
+        // TODO: optimize masking in chunks, and send in chunks
+        std::string payload_masked;
+        payload_masked.reserve(payload.length());
+
+        for (size_t i = 0; i < payload.length(); i++)
+            payload_masked.push_back(payload[i] ^ masking_key[i % sizeof(masking_key)]);
+
+        socket.send(payload_masked);
+        socket.flush();
+
+    } else {
+        // send without masking
+        socket.send(header);
+        socket.send(payload.data(), payload.length());
+        socket.flush();
+    }
 }
 
 }

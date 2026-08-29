@@ -384,6 +384,8 @@ void client::test_recv() {
     const char *data = nullptr;
     size_t len = 0;
 
+    frame_send(*_socket, OPCODE_TEXT, true, true, "Sending some test data from the client"sv);
+
     while (true) {
         if (len == 0)
             std::tie(data, len) = _socket->recv();
@@ -428,6 +430,7 @@ void client::test_recv() {
                 break;
             case OPCODE_PING:
                 opcode = "PING";
+                frame_send(*_socket, OPCODE_PONG, true, true, frame.payload);
                 break;
             case OPCODE_PONG:
                 opcode = "PONG";

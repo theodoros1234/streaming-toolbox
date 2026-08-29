@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "../http/protocol.h"
+#include "../networking/tcp_socket.h"
 
 namespace strtb::websocket {
 
@@ -68,6 +69,9 @@ public:
                                                        bool masked, uint64_t max_payload_len);
     void clear();
 };
+
+void frame_send(networking::tcp_socket &socket, opcode_t opcode, bool fin, bool masked, std::string_view payload,
+                bool rsv1=false, bool rsv2=false, bool rsv3=false);
 
 }
 
