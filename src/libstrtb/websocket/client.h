@@ -3,38 +3,19 @@
 
 #include "protocol.h"
 #include "../http/client.h"
-#include "../networking/tcp_client_ssl.h"
 #include <vector>
 #include <map>
 #include <initializer_list>
 #include <string>
 #include <string_view>
-#include <variant>
-#include <mutex>
 
 namespace strtb::websocket {
 
-class client {
-public:
-    class handshake_failed : public http::exception {
-    private:
-        int _status = 0;
-    public:
-        handshake_failed(const char *str, int status);
-        handshake_failed(const std::string &str, int status);
-        handshake_failed(std::string &&str, int status);
-        handshake_failed(std::string_view str, int status);
-        int status() const noexcept;
-    };
-
+class client : public base {
 private:
-    mutable std::mutex _mutex;
+    std::variant<std::monostate, networking::tcp_client, networking::tcp_client_ssl> _socket_container;
     http::client::request _handshake_rq;
     std::vector<std::string> _subprotocols_wanted;
-    std::string _subprotocol_used;
-    std::variant<std::monostate, networking::tcp_client, networking::tcp_client_ssl> _socket_container;
-    networking::tcp_client *_socket = nullptr;
-    frame_parser _frame_parser;
 
     void _valid_state(bool connected) const;
     template<class T> client& _with_subprotocols(T list);
@@ -74,11 +55,6 @@ public:
     void clear_headers();
 
     void clear();
-
-    const std::string& subprotocol_used() const;
-
-    // TODO: remove
-    void test_recv();
 };
 
 }

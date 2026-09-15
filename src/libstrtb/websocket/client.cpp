@@ -3,7 +3,6 @@
 #include "../uri.h"
 #include "../strescape.h"
 #include "../base64.h"
-#include "../logging.h"
 
 #include <stdexcept>
 #include <set>
@@ -18,22 +17,6 @@ namespace strtb::websocket {
 
 static std::mutex nonce_gen_lock;
 static std::mt19937_64 nonce_gen = std::mt19937_64(std::random_device()());
-
-client::handshake_failed::handshake_failed(const char *str, int status) :
-    exception(str), _status(status) {}
-
-client::handshake_failed::handshake_failed(const std::string &str, int status) :
-    exception(str), _status(status) {}
-
-client::handshake_failed::handshake_failed(std::string &&str, int status) :
-    exception(str), _status(status) {}
-
-client::handshake_failed::handshake_failed(std::string_view str, int status) :
-    exception(str), _status(status) {}
-
-int client::handshake_failed::status() const noexcept {
-    return _status;
-}
 
 client::client() : _handshake_rq("GET"sv) {}
 
@@ -254,8 +237,9 @@ void client::clear() {
     _handshake_rq = http::get();
     _subprotocols_wanted.clear();
     _subprotocol_used.clear();
-    _socket_container.emplace<std::monostate>();
+    _frame_parser.clear();
     _socket = nullptr;
+    _socket_container.emplace<std::monostate>();
 }
 
 void client::_valid_state(bool connected) const {
@@ -366,97 +350,13 @@ void client::connect() {
             throw http::internal_error("unexpected socket type received "
                                        "(type " + std::to_string(_socket_container.index()) + ")");
         }
+
+        // start websocket handler thread
+        _thread = std::thread(&client::_thread_fn, this, true);
     } catch (...) {
         // TODO: only clear connection-related parts instead of everything, and mind the lock
         clear();
         throw;
-    }
-}
-
-const std::string& client::subprotocol_used() const {
-    // if empty, then no subprotocol is being used
-    return _subprotocol_used;
-}
-
-// TODO: remove
-void client::test_recv() {
-    logging::source l("WebSocket recv test", false);
-    const char *data = nullptr;
-    size_t len = 0;
-
-    frame_send(*_socket, OPCODE_TEXT, true, true, "Sending some test data from the client"sv);
-
-    while (true) {
-        if (len == 0)
-            std::tie(data, len) = _socket->recv();
-
-        if (len == 0)
-            return;
-
-        auto [bytes_read, frame_opt] = _frame_parser.process(data, 1, false, 10000000);
-        data += bytes_read;
-        len -= bytes_read;
-
-        if (frame_opt) {
-            auto frame = std::move(frame_opt.value());
-            const char* opcode;
-            switch (frame.opcode) {
-            case OPCODE_CONT:
-                opcode = "CONT";
-                break;
-            case OPCODE_TEXT:
-                opcode = "TEXT";
-                break;
-            case OPCODE_BIN:
-                opcode = "BIN";
-                break;
-            case OPCODE_RSV3:
-                opcode = "RSV3";
-                break;
-            case OPCODE_RSV4:
-                opcode = "RSV4";
-                break;
-            case OPCODE_RSV5:
-                opcode = "RSV5";
-                break;
-            case OPCODE_RSV6:
-                opcode = "RSV6";
-                break;
-            case OPCODE_RSV7:
-                opcode = "RSV7";
-                break;
-            case OPCODE_CLOSE:
-                opcode = "CLOSE";
-                break;
-            case OPCODE_PING:
-                opcode = "PING";
-                frame_send(*_socket, OPCODE_PONG, true, true, frame.payload);
-                break;
-            case OPCODE_PONG:
-                opcode = "PONG";
-                break;
-            case OPCODE_RSVB:
-                opcode = "RSVB";
-                break;
-            case OPCODE_RSVC:
-                opcode = "RSVC";
-                break;
-            case OPCODE_RSVD:
-                opcode = "RSVD";
-                break;
-            case OPCODE_RSVE:
-                opcode = "RSVE";
-                break;
-            case OPCODE_RSVF:
-                opcode = "RSVF";
-                break;
-            default:
-                opcode = "INVALID";
-            }
-
-            l.info({"fin=", frame.fin, ", rsv1=", frame.rsv1, ", rsv2=", frame.rsv2, ", rsv3=", frame.rsv3,
-                    ", opcode=", opcode, ", length=", frame.length, ", payload=", string_escape(frame.payload)});
-        }
     }
 }
 
